@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Scrape church service calendar from ortodox-finsk.se
+Scrape church service calendar from ortodox-finsk.se and save to JSON.
 """
 
+import json
 import requests
 from bs4 import BeautifulSoup
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 
 @dataclass
@@ -109,29 +110,22 @@ def fetch_calendar(url: str = "https://www.ortodox-finsk.se/kalender/") -> list[
 
 
 def main():
-    print("Fetching church calendar from ortodox-finsk.se...")
-    print("-" * 60)
+    output_file = "calendar.json"
 
+    print("Fetching church calendar from ortodox-finsk.se...")
     services = fetch_calendar()
 
     if not services:
         print("No services found.")
         return
 
-    for service in services:
-        print(f"\n{service.date} ({service.day_of_week})")
-        print(f"  Service: {service.service_name}")
-        if service.occasion:
-            print(f"  Occasion: {service.occasion}")
-        if service.time:
-            print(f"  Time: {service.time}")
-        if service.location:
-            print(f"  Location: {service.location}")
-        if service.notes:
-            print(f"  Notes: {service.notes}")
+    # Convert to list of dicts and save as JSON
+    data = [asdict(service) for service in services]
 
-    print(f"\n{'-' * 60}")
-    print(f"Total services found: {len(services)}")
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved {len(services)} services to {output_file}")
 
 
 if __name__ == "__main__":
