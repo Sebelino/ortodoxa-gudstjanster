@@ -4,26 +4,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Python scraper that pulls church service calendar data from the Finnish Orthodox Congregation in Sweden (ortodox-finsk.se).
+A Go web service that scrapes and serves church service calendar data from the Finnish Orthodox Congregation in Sweden (ortodox-finsk.se).
 
 ## Development Setup
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install requests beautifulsoup4
-```
-
-## Running the Scraper
+Requires Go 1.25+.
 
 ```bash
-source venv/bin/activate
-python scrape_calendar.py
+go mod download
 ```
+
+## Running Locally
+
+```bash
+go run .
+```
+
+The server starts on port 8080 (configurable via `PORT` env var).
+
+## Running with Docker
+
+```bash
+docker build -t church-services .
+docker run -p 8080:8080 church-services
+```
+
+## Endpoints
+
+- `GET /` - Web UI showing the calendar
+- `GET /services` - JSON API returning all services
+- `GET /health` - Health check endpoint
 
 ## Architecture
 
-Single-module scraper with:
-- `ChurchService` dataclass representing a calendar entry (date, day_of_week, service_name, location, time, occasion, notes)
-- `fetch_calendar()` function that scrapes and parses the calendar page, returning a list of `ChurchService` objects
-- The calendar HTML uses `section.calendar` containing `div.calendar-item` elements
+- `main.go` - HTTP server with route handlers
+- `scraper.go` - Calendar scraping logic using goquery
+- `templates/index.html` - Embedded HTML template for the web UI
+- `Dockerfile` - Multi-stage build producing a minimal Alpine-based image
+
+The `ChurchService` struct represents a calendar entry with fields: date, day_of_week, service_name, location, time, occasion, notes.
+
+The scraper parses `section.calendar` containing `div.calendar-item` elements from the source website.
