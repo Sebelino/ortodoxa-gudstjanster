@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	var all []model.ChurchService
@@ -50,6 +50,14 @@ func main() {
 	heligaAnna := scraper.NewHeligaAnnaScraper()
 	if services, err := heligaAnna.Fetch(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "heligaanna: %v\n", err)
+	} else {
+		all = append(all, services...)
+	}
+
+	// Ryska
+	ryska := scraper.NewRyskaScraper(s, visionClient)
+	if services, err := ryska.Fetch(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "ryska: %v\n", err)
 	} else {
 		all = append(all, services...)
 	}

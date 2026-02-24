@@ -136,3 +136,89 @@ Return ONLY the JSON array, no other text.`
 
 	return entries, nil
 }
+
+// ExtractScheduleFromText sends text to OpenAI's API and extracts church service schedule entries.
+func (c *Client) ExtractScheduleFromText(ctx context.Context, text string) ([]ScheduleEntry, error) {
+	prompt := `Extract church service schedule information from this text.
+Return a JSON array of services with these fields:
+- date: in YYYY-MM-DD format. IMPORTANT: Today is February 24, 2026. All dates in this schedule are in 2026.
+- day_of_week: the day name in Swedish (e.g., "Måndag", "Söndag")
+- time: in HH:MM format (24-hour)
+- service_name: the name of the service in Swedish
+- occasion: optional, any special occasion or holiday mentioned
+
+Only include entries that have both a date/day and a time specified.
+Return ONLY the JSON array, no other text.
+
+Text to parse:
+` + text
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 4096,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var entries []ScheduleEntry
+	if err := json.Unmarshal([]byte(content), &entries); err != nil {
+		return nil, fmt.Errorf("parsing schedule entries: %w (content: %s)", err, content)
+	}
+
+	return entries, nil
+}
