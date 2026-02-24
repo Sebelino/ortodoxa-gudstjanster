@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"church-services/internal/model"
@@ -31,7 +30,7 @@ func main() {
 	// Gomos
 	storeDir := os.Getenv("STORE_DIR")
 	if storeDir == "" {
-		storeDir = filepath.Join(os.TempDir(), "church-services-store")
+		storeDir = "disk"
 	}
 	s, err := store.New(storeDir)
 	if err != nil {
