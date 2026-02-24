@@ -2,11 +2,15 @@ package scraper
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 	"time"
 
 	"church-services/internal/model"
+	"church-services/internal/store"
+	"church-services/internal/vision"
 )
 
 var dateRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
@@ -107,7 +111,13 @@ func TestGomosScraper(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	scraper := NewGomosScraper()
+	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
+	s, err := store.New(storeDir)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
+	scraper := NewGomosScraper(s, visionClient)
 
 	if scraper.Name() != "St. Georgios Cathedral" {
 		t.Errorf("Unexpected scraper name: %s", scraper.Name())
@@ -115,12 +125,12 @@ func TestGomosScraper(t *testing.T) {
 
 	services, err := scraper.Fetch(ctx)
 	if err != nil {
-		// OCR-based scraper may fail if tesseract isn't installed
-		t.Skipf("Fetch failed (tesseract may not be installed): %v", err)
+		// Vision API may fail if OPENAI_API_KEY isn't set
+		t.Skipf("Fetch failed (OPENAI_API_KEY may not be set): %v", err)
 	}
 
 	if len(services) == 0 {
-		t.Skip("No services returned (OCR may have failed to parse)")
+		t.Skip("No services returned")
 	}
 
 	t.Logf("Fetched %d services from Gomos", len(services))
@@ -152,8 +162,15 @@ func TestRegistry(t *testing.T) {
 		t.Error("New registry should be empty")
 	}
 
+	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
+	s, err := store.New(storeDir)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
+
 	registry.Register(NewFinskaScraper(""))
-	registry.Register(NewGomosScraper())
+	registry.Register(NewGomosScraper(s, visionClient))
 
 	if len(registry.Scrapers()) != 2 {
 		t.Errorf("Expected 2 scrapers, got %d", len(registry.Scrapers()))

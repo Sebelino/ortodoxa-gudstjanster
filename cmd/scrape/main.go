@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"church-services/internal/model"
 	"church-services/internal/scraper"
+	"church-services/internal/store"
+	"church-services/internal/vision"
 )
 
 func main() {
@@ -26,7 +29,18 @@ func main() {
 	}
 
 	// Gomos
-	gomos := scraper.NewGomosScraper()
+	storeDir := os.Getenv("STORE_DIR")
+	if storeDir == "" {
+		storeDir = filepath.Join(os.TempDir(), "church-services-store")
+	}
+	s, err := store.New(storeDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "store: %v\n", err)
+		os.Exit(1)
+	}
+	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	gomos := scraper.NewGomosScraper(s, visionClient)
 	if services, err := gomos.Fetch(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "gomos: %v\n", err)
 	} else {
