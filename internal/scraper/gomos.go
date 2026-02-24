@@ -184,6 +184,7 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry) []model
 
 		services = append(services, model.ChurchService{
 			Source:      gomosSourceName,
+			SourceURL:   gomosScheduleURL,
 			Date:        entry.Date,
 			DayOfWeek:   entry.DayOfWeek,
 			ServiceName: entry.ServiceName,

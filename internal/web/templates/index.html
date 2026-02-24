@@ -137,6 +137,15 @@
             margin-right: 0.25rem;
         }
 
+        .service-details a {
+            color: #2c5282;
+            text-decoration: none;
+        }
+
+        .service-details a:hover {
+            text-decoration: underline;
+        }
+
         .col-time {
             width: 70px;
             font-weight: 500;
@@ -301,6 +310,9 @@
             }
             if (service.notes) {
                 details += `<div class="detail-item"><span class="detail-label">Info:</span> ${escapeHtml(service.notes)}</div>`;
+            }
+            if (service.source_url) {
+                details += `<div class="detail-item"><span class="detail-label">Källa:</span> <a href="${escapeHtml(service.source_url)}" target="_blank" rel="noopener">${escapeHtml(service.source)}</a></div>`;
             }
             if (!details) {
                 details = '<div class="detail-item" style="color:#999;">Ingen ytterligare information</div>';
