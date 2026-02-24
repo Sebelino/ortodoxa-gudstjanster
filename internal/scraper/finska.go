@@ -1,26 +1,45 @@
-package main
+package scraper
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+
+	"church-services/internal/model"
 )
 
-type ChurchService struct {
-	Source      string  `json:"source"`
-	Date        string  `json:"date"`
-	DayOfWeek   string  `json:"day_of_week"`
-	ServiceName string  `json:"service_name"`
-	Location    *string `json:"location"`
-	Time        *string `json:"time"`
-	Occasion    *string `json:"occasion"`
-	Notes       *string `json:"notes"`
+const (
+	finskaSourceName = "Finska Ortodoxa Församlingen"
+	finskaDefaultURL = "https://www.ortodox-finsk.se/kalender/"
+)
+
+// FisnkaScraper scrapes the Finnish Orthodox Congregation calendar.
+type FisnkaScraper struct {
+	url string
 }
 
-func FetchCalendar(url string) ([]ChurchService, error) {
-	resp, err := http.Get(url)
+// NewFinskaScraper creates a new scraper for the Finnish Orthodox Congregation.
+func NewFinskaScraper(url string) *FisnkaScraper {
+	if url == "" {
+		url = finskaDefaultURL
+	}
+	return &FisnkaScraper{url: url}
+}
+
+func (s *FisnkaScraper) Name() string {
+	return finskaSourceName
+}
+
+func (s *FisnkaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", s.url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +50,7 @@ func FetchCalendar(url string) ([]ChurchService, error) {
 		return nil, err
 	}
 
-	var services []ChurchService
+	var services []model.ChurchService
 	dateRegex := regexp.MustCompile(`(\d{4}-\d{2}-\d{2})\s*\|\s*(\S+)`)
 
 	doc.Find("section.calendar div.calendar-item").Each(func(i int, item *goquery.Selection) {
@@ -95,8 +114,8 @@ func FetchCalendar(url string) ([]ChurchService, error) {
 			notesPtr = &joined
 		}
 
-		services = append(services, ChurchService{
-			Source:      "Finska Ortodoxa Församlingen",
+		services = append(services, model.ChurchService{
+			Source:      finskaSourceName,
 			Date:        date,
 			DayOfWeek:   dayOfWeek,
 			ServiceName: serviceName,

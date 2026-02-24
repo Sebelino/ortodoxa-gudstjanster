@@ -1,6 +1,7 @@
-package main
+package scraper
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,42 +11,60 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+
+	"church-services/internal/model"
 )
 
-const gomosScheduleURL = "https://gomos.se/en/category/schedule/"
-const gomosLocation = "Stockholm, St. Georgios Cathedral, Birger Jarlsgatan 92"
+const (
+	gomosSourceName  = "St. Georgios Cathedral"
+	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
+	gomosLocation    = "Stockholm, St. Georgios Cathedral, Birger Jarlsgatan 92"
+)
 
-func FetchGomosCalendar() ([]ChurchService, error) {
-	// Find the latest schedule post
-	postURL, err := findLatestSchedulePost()
+// GomosScraper scrapes the St. Georgios Cathedral schedule using OCR.
+type GomosScraper struct{}
+
+// NewGomosScraper creates a new scraper for St. Georgios Cathedral.
+func NewGomosScraper() *GomosScraper {
+	return &GomosScraper{}
+}
+
+func (s *GomosScraper) Name() string {
+	return gomosSourceName
+}
+
+func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	postURL, err := s.findLatestSchedulePost(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("finding latest post: %w", err)
 	}
 
-	// Get image URLs from the post
-	imageURLs, err := extractImageURLs(postURL)
+	imageURLs, err := s.extractImageURLs(ctx, postURL)
 	if err != nil {
 		return nil, fmt.Errorf("extracting images: %w", err)
 	}
 
-	var allServices []ChurchService
+	var allServices []model.ChurchService
 	for _, imgURL := range imageURLs {
-		// Download and OCR the image
-		text, err := downloadAndOCR(imgURL)
+		text, err := s.downloadAndOCR(ctx, imgURL)
 		if err != nil {
-			continue // Skip failed images
+			continue
 		}
 
-		// Parse the OCR text into services
-		services := parseGomosSchedule(text)
+		services := s.parseSchedule(text)
 		allServices = append(allServices, services...)
 	}
 
 	return allServices, nil
 }
 
-func findLatestSchedulePost() (string, error) {
-	resp, err := http.Get(gomosScheduleURL)
+func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", gomosScheduleURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -56,10 +75,9 @@ func findLatestSchedulePost() (string, error) {
 		return "", err
 	}
 
-	// Find the first article link (latest post)
 	var postURL string
-	doc.Find("article a, .entry-title a, h2 a").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		href, exists := s.Attr("href")
+	doc.Find("article a, .entry-title a, h2 a").EachWithBreak(func(i int, sel *goquery.Selection) bool {
+		href, exists := sel.Attr("href")
 		if exists && strings.Contains(href, "schedule") {
 			postURL = href
 			return false
@@ -74,8 +92,13 @@ func findLatestSchedulePost() (string, error) {
 	return postURL, nil
 }
 
-func extractImageURLs(postURL string) ([]string, error) {
-	resp, err := http.Get(postURL)
+func (s *GomosScraper) extractImageURLs(ctx context.Context, postURL string) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", postURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +110,8 @@ func extractImageURLs(postURL string) ([]string, error) {
 	}
 
 	var urls []string
-	doc.Find("article img, .entry-content img, .wp-block-image img").Each(func(i int, s *goquery.Selection) {
-		src, exists := s.Attr("src")
+	doc.Find("article img, .entry-content img, .wp-block-image img").Each(func(i int, sel *goquery.Selection) {
+		src, exists := sel.Attr("src")
 		if exists && (strings.Contains(src, ".jpg") || strings.Contains(src, ".png") || strings.Contains(src, ".jpeg")) {
 			urls = append(urls, src)
 		}
@@ -97,15 +120,18 @@ func extractImageURLs(postURL string) ([]string, error) {
 	return urls, nil
 }
 
-func downloadAndOCR(imageURL string) (string, error) {
-	// Download image
-	resp, err := http.Get(imageURL)
+func (s *GomosScraper) downloadAndOCR(ctx context.Context, imageURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", imageURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	// Save to temp file
 	tmpFile, err := os.CreateTemp("", "schedule-*.jpg")
 	if err != nil {
 		return "", err
@@ -119,8 +145,7 @@ func downloadAndOCR(imageURL string) (string, error) {
 	}
 	tmpFile.Close()
 
-	// Run tesseract
-	cmd := exec.Command("tesseract", tmpFile.Name(), "stdout", "-l", "swe+eng")
+	cmd := exec.CommandContext(ctx, "tesseract", tmpFile.Name(), "stdout", "-l", "swe+eng")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("tesseract failed: %w", err)
@@ -129,14 +154,12 @@ func downloadAndOCR(imageURL string) (string, error) {
 	return string(output), nil
 }
 
-func parseGomosSchedule(text string) []ChurchService {
-	var services []ChurchService
+func (s *GomosScraper) parseSchedule(text string) []model.ChurchService {
+	var services []model.ChurchService
 
 	lines := strings.Split(text, "\n")
 
-	// Pattern for dates like "Söndag 1:a februari" or "Måndag 2 februari"
 	datePattern := regexp.MustCompile(`(?i)(måndag|tisdag|onsdag|torsdag|fredag|lördag|söndag)\s+(\d{1,2})(?::?\w*)?\s+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december|january|february|march|april|may|june|july|august|september|october|november|december)`)
-	// Time pattern like "815", "930", "1000", "1800" or "8:15", "9:30"
 	timePattern := regexp.MustCompile(`\b(\d{1,2}):?(\d{2})\b`)
 
 	monthMap := map[string]string{
@@ -164,7 +187,6 @@ func parseGomosSchedule(text string) []ChurchService {
 			continue
 		}
 
-		// Check if line contains a date
 		if dateMatch := datePattern.FindStringSubmatch(line); dateMatch != nil {
 			currentDayOfWeek = dateMatch[1]
 			day := dateMatch[2]
@@ -175,7 +197,6 @@ func parseGomosSchedule(text string) []ChurchService {
 					currentDate = fmt.Sprintf("2026-%s-0%s", month, day)
 				}
 			}
-			// Extract occasion (text after the dash)
 			if dashIdx := strings.Index(line, "-"); dashIdx != -1 {
 				currentOccasion = strings.TrimSpace(line[dashIdx+1:])
 			} else {
@@ -184,17 +205,14 @@ func parseGomosSchedule(text string) []ChurchService {
 			continue
 		}
 
-		// Look for service times and names
 		if timeMatch := timePattern.FindStringSubmatch(line); timeMatch != nil && currentDate != "" {
 			hour := timeMatch[1]
 			minute := timeMatch[2]
 			timeStr := fmt.Sprintf("%s:%s", hour, minute)
 
-			// Extract service name (text before time)
 			idx := strings.Index(line, timeMatch[0])
 			serviceName := strings.TrimSpace(line[:idx])
 			if serviceName == "" {
-				// Try text after time
 				serviceName = strings.TrimSpace(line[idx+len(timeMatch[0]):])
 			}
 			if serviceName == "" {
@@ -207,8 +225,8 @@ func parseGomosSchedule(text string) []ChurchService {
 				occasionPtr = &currentOccasion
 			}
 
-			services = append(services, ChurchService{
-				Source:      "St. Georgios Cathedral",
+			services = append(services, model.ChurchService{
+				Source:      gomosSourceName,
 				Date:        currentDate,
 				DayOfWeek:   currentDayOfWeek,
 				ServiceName: serviceName,

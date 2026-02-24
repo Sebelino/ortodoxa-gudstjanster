@@ -1,0 +1,102 @@
+package web
+
+import (
+	"context"
+	"embed"
+	"encoding/json"
+	"net/http"
+	"sync"
+	"time"
+
+	"church-services/internal/cache"
+	"church-services/internal/model"
+	"church-services/internal/scraper"
+)
+
+//go:embed templates/index.html
+var templates embed.FS
+
+// Handler holds the HTTP handlers and their dependencies.
+type Handler struct {
+	registry *scraper.Registry
+	cache    *cache.Cache
+}
+
+// New creates a new Handler with the given scraper registry and cache.
+func New(registry *scraper.Registry, c *cache.Cache) *Handler {
+	return &Handler{
+		registry: registry,
+		cache:    c,
+	}
+}
+
+// RegisterRoutes registers all HTTP routes on the given mux.
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/", h.handleIndex)
+	mux.HandleFunc("/services", h.handleServices)
+	mux.HandleFunc("/health", h.handleHealth)
+}
+
+func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	data, _ := templates.ReadFile("templates/index.html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
+
+func (h *Handler) handleServices(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	services := h.fetchAllWithCache(ctx)
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(services)
+}
+
+func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
+}
+
+func (h *Handler) fetchAllWithCache(ctx context.Context) []model.ChurchService {
+	var (
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		services []model.ChurchService
+	)
+
+	for _, s := range h.registry.Scrapers() {
+		wg.Add(1)
+		go func(scraper scraper.Scraper) {
+			defer wg.Done()
+
+			// Check cache first
+			if cached, ok := h.cache.Get(scraper.Name()); ok {
+				mu.Lock()
+				services = append(services, cached...)
+				mu.Unlock()
+				return
+			}
+
+			// Fetch fresh data
+			result, err := scraper.Fetch(ctx)
+			if err != nil {
+				return
+			}
+
+			// Store in cache
+			h.cache.Set(scraper.Name(), result)
+
+			mu.Lock()
+			services = append(services, result...)
+			mu.Unlock()
+		}(s)
+	}
+
+	wg.Wait()
+	return services
+}

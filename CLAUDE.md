@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Go web service that scrapes and serves church service calendar data from the Finnish Orthodox Congregation in Sweden (ortodox-finsk.se).
+A Go web service that scrapes and serves church service calendar data from multiple Orthodox churches in Sweden.
 
 ## Development Setup
 
@@ -17,10 +17,12 @@ go mod download
 ## Running Locally
 
 ```bash
-go run .
+go run ./cmd/server
 ```
 
 The server starts on port 8080 (configurable via `PORT` env var).
+
+Cache is stored in a temp directory by default (configurable via `CACHE_DIR` env var).
 
 ## Running with Docker
 
@@ -37,11 +39,37 @@ docker run -p 8080:8080 church-services
 
 ## Architecture
 
-- `main.go` - HTTP server with route handlers
-- `scraper.go` - Calendar scraping logic using goquery
-- `templates/index.html` - Embedded HTML template for the web UI
-- `Dockerfile` - Multi-stage build producing a minimal Alpine-based image
+```
+church-services/
+├── cmd/server/main.go       # Entry point, wires up dependencies
+├── internal/
+│   ├── model/service.go     # ChurchService data model
+│   ├── scraper/
+│   │   ├── scraper.go       # Scraper interface and registry
+│   │   ├── finska.go        # Finska Ortodoxa scraper (HTML)
+│   │   └── gomos.go         # St. Georgios scraper (OCR)
+│   ├── cache/cache.go       # Disk-based caching layer
+│   └── web/
+│       ├── handler.go       # HTTP handlers
+│       └── templates/       # Embedded HTML templates
+└── Dockerfile               # Multi-stage Alpine build
+```
 
-The `ChurchService` struct represents a calendar entry with fields: date, day_of_week, service_name, location, time, occasion, notes.
+### Adding a New Scraper
 
-The scraper parses `section.calendar` containing `div.calendar-item` elements from the source website.
+1. Create a new file in `internal/scraper/` (e.g., `mychurch.go`)
+2. Implement the `Scraper` interface:
+   ```go
+   type Scraper interface {
+       Name() string
+       Fetch(ctx context.Context) ([]model.ChurchService, error)
+   }
+   ```
+3. Register it in `cmd/server/main.go`:
+   ```go
+   registry.Register(scraper.NewMyChurchScraper())
+   ```
+
+### Caching
+
+Results are cached to disk with a 30-minute TTL. Cache files are stored as JSON in the `CACHE_DIR` directory.
