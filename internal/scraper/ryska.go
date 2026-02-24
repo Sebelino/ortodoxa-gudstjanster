@@ -9,11 +9,54 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"church-services/internal/model"
 	"church-services/internal/store"
 	"church-services/internal/vision"
 )
+
+// ExtractRyskaScheduleText fetches the Ryska website and extracts the schedule text.
+// This is exported so it can be used by the extract-text tool for testing.
+func ExtractRyskaScheduleText(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", ryskaURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return ExtractRyskaScheduleTextFromHTML(string(bodyBytes)), nil
+}
+
+// ExtractRyskaScheduleTextFromHTML extracts schedule text from raw HTML.
+func ExtractRyskaScheduleTextFromHTML(htmlContent string) string {
+	// Strip HTML tags and decode entities
+	content := regexp.MustCompile(`<[^>]*>`).ReplaceAllString(htmlContent, " ")
+	content = html.UnescapeString(content)
+	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
+
+	// Extract just the schedule section (from "Januari" to "bottom of page" or similar)
+	schedulePattern := regexp.MustCompile(`(?i)(Januari\s.+?)(?:bottom of page|KRISTI FÖRKLARINGS|$)`)
+	if match := schedulePattern.FindStringSubmatch(content); len(match) > 1 {
+		content = match[1]
+	}
+
+	// Add newlines for better structure
+	content = regexp.MustCompile(`\s+(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)\s`).ReplaceAllString(content, "\n\n$1\n")
+	content = regexp.MustCompile(`\s+(\d{1,2}\s+(?:Söndag|Måndag|Tisdag|Onsdag|Torsdag|Fredag|Lördag))`).ReplaceAllString(content, "\n$1")
+
+	return strings.TrimSpace(content)
+}
 
 const (
 	ryskaSourceName = "Kristi Förklarings Ortodoxa Församling"
@@ -40,37 +83,10 @@ func (s *RyskaScraper) Name() string {
 }
 
 func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", ryskaURL, nil)
+	content, err := ExtractRyskaScheduleText(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// Strip HTML tags and decode entities
-	content := string(bodyBytes)
-	content = regexp.MustCompile(`<[^>]*>`).ReplaceAllString(content, " ")
-	content = html.UnescapeString(content)
-	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
-
-	// Extract just the schedule section (from "Januari" to "bottom of page" or similar)
-	schedulePattern := regexp.MustCompile(`(?i)(Januari\s.+?)(?:bottom of page|KRISTI FÖRKLARINGS|$)`)
-	if match := schedulePattern.FindStringSubmatch(content); len(match) > 1 {
-		content = match[1]
-	}
-
-	// Add newlines for better structure
-	content = regexp.MustCompile(`\s+(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)\s`).ReplaceAllString(content, "\n\n$1\n")
-	content = regexp.MustCompile(`\s+(\d{1,2}\s+(?:Söndag|Måndag|Tisdag|Onsdag|Torsdag|Fredag|Lördag))`).ReplaceAllString(content, "\n$1")
 
 	// Compute checksum for caching
 	hash := sha256.Sum256([]byte(content))
