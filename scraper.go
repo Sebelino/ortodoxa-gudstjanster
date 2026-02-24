@@ -31,7 +31,7 @@ func FetchCalendar(url string) ([]ChurchService, error) {
 	}
 
 	var services []ChurchService
-	dateRegex := regexp.MustCompile(`(\d{4}-\d{2}-\d{2})\s*\|\s*(\w+)`)
+	dateRegex := regexp.MustCompile(`(\d{4}-\d{2}-\d{2})\s*\|\s*(\S+)`)
 
 	doc.Find("section.calendar div.calendar-item").Each(func(i int, item *goquery.Selection) {
 		meta := item.Find("div.meta").Text()
