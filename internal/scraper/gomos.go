@@ -55,7 +55,7 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 		allServices = append(allServices, services...)
 	}
 
-	return allServices, nil
+	return s.deduplicate(allServices), nil
 }
 
 func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, error) {
@@ -151,7 +151,46 @@ func (s *GomosScraper) downloadAndOCR(ctx context.Context, imageURL string) (str
 		return "", fmt.Errorf("tesseract failed: %w", err)
 	}
 
-	return string(output), nil
+	return s.fixOCRErrors(string(output)), nil
+}
+
+// fixOCRErrors corrects common OCR mistakes for Swedish text.
+func (s *GomosScraper) fixOCRErrors(text string) string {
+	replacements := []struct {
+		old, new string
+	}{
+		// Common Swedish character OCR errors
+		{"gudstjanst", "gudstjänst"},
+		{"Gudstjanst", "Gudstjänst"},
+		{"kallsgudstjanst", "kvällsgudstjänst"},
+		{"kvallsgudstjanst", "kvällsgudstjänst"},
+		{"kvallsgudstinsten", "kvällsgudstjänsten"},
+		{"Morgongudstjanst", "Morgongudstjänst"},
+		{"morgongudstjanst", "morgongudstjänst"},
+		{"Gudomilig", "Gudomlig"},
+		{"gudomilig", "gudomlig"},
+		{"givornas", "gåvornas"},
+		{"Forsta", "Första"},
+		{"forsta", "första"},
+		{"Hégvordighet", "Högvärdighet"},
+		{"Hégvérdighet", "Högvärdighet"},
+		{"Hogvardighet", "Högvärdighet"},
+		{"forutinvigda", "förutinvigda"},
+		{"Lordag", "Lördag"},
+		{"lordag", "lördag"},
+		{"Sondag", "Söndag"},
+		{"sondag", "söndag"},
+		{"Mandag", "Måndag"},
+		{"mandag", "måndag"},
+		{"ar ", "år "},
+		{"Ar ", "År "},
+	}
+
+	for _, r := range replacements {
+		text = strings.ReplaceAll(text, r.old, r.new)
+	}
+
+	return text
 }
 
 func (s *GomosScraper) parseSchedule(text string) []model.ChurchService {
@@ -239,4 +278,32 @@ func (s *GomosScraper) parseSchedule(text string) []model.ChurchService {
 	}
 
 	return services
+}
+
+// deduplicate removes duplicate services based on date, time, and similar service names.
+func (s *GomosScraper) deduplicate(services []model.ChurchService) []model.ChurchService {
+	if len(services) == 0 {
+		return services
+	}
+
+	seen := make(map[string]bool)
+	var result []model.ChurchService
+
+	for _, svc := range services {
+		// Create a key from date + time + normalized service name
+		timeStr := ""
+		if svc.Time != nil {
+			timeStr = *svc.Time
+		}
+		// Normalize service name for comparison (lowercase, remove extra spaces)
+		normalizedName := strings.ToLower(strings.Join(strings.Fields(svc.ServiceName), " "))
+		key := fmt.Sprintf("%s|%s|%s", svc.Date, timeStr, normalizedName)
+
+		if !seen[key] {
+			seen[key] = true
+			result = append(result, svc)
+		}
+	}
+
+	return result
 }
