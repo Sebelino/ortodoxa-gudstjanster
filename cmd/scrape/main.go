@@ -46,6 +46,14 @@ func main() {
 		all = append(all, services...)
 	}
 
+	// Heliga Anna
+	heligaAnna := scraper.NewHeligaAnnaScraper()
+	if services, err := heligaAnna.Fetch(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "heligaanna: %v\n", err)
+	} else {
+		all = append(all, services...)
+	}
+
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	enc.Encode(all)
