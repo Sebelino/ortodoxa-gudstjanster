@@ -32,9 +32,18 @@ func New(registry *scraper.Registry, c *cache.Cache) *Handler {
 
 // RegisterRoutes registers all HTTP routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/", h.handleIndex)
-	mux.HandleFunc("/services", h.handleServices)
+	mux.HandleFunc("/", h.noCache(h.handleIndex))
+	mux.HandleFunc("/services", h.noCache(h.handleServices))
 	mux.HandleFunc("/health", h.handleHealth)
+}
+
+func (h *Handler) noCache(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next(w, r)
+	}
 }
 
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
