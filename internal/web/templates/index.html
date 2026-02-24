@@ -163,25 +163,11 @@
             font-size: 0.85rem;
         }
 
-        .col-location {
-            color: #666;
-            font-size: 0.85rem;
-        }
-
         .service-count {
             text-align: center;
             color: #666;
             padding: 0.75rem;
             font-size: 0.85rem;
-        }
-
-        @media (max-width: 700px) {
-            .col-location {
-                display: none;
-            }
-            .col-source {
-                width: 100px;
-            }
         }
 
         @media (max-width: 500px) {
@@ -253,10 +239,9 @@
                                                 <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
                                                 <td class="col-name">${escapeHtml(service.service_name)}</td>
                                                 <td class="col-source">${escapeHtml(getShortSource(service.source))}</td>
-                                                <td class="col-location">${service.location ? escapeHtml(getShortLocation(service.location)) : ''}</td>
                                             </tr>
                                             <tr class="service-details" id="details-${id}">
-                                                <td colspan="4">${details}</td>
+                                                <td colspan="3">${details}</td>
                                             </tr>
                                         `;
                                     }).join('')}
@@ -286,12 +271,6 @@
             if (source.includes('Finska')) return 'Finska';
             if (source.includes('Georgios')) return 'St. Georgios';
             return source;
-        }
-
-        function getShortLocation(location) {
-            if (location.includes('Bellmansgatan')) return 'Bellmansgatan 13';
-            if (location.includes('Birger Jarlsgatan')) return 'Birger Jarlsgatan 92';
-            return location;
         }
 
         function escapeHtml(text) {
