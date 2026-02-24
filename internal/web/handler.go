@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -61,9 +62,41 @@ func (h *Handler) handleServices(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	services := h.fetchAllWithCache(ctx)
+	services = filterAndSort(services)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(services)
+}
+
+func filterAndSort(services []model.ChurchService) []model.ChurchService {
+	today := time.Now().Format("2006-01-02")
+
+	// Filter out past events
+	var future []model.ChurchService
+	for _, s := range services {
+		if s.Date >= today {
+			future = append(future, s)
+		}
+	}
+
+	// Sort by date (and time if available)
+	sort.Slice(future, func(i, j int) bool {
+		if future[i].Date != future[j].Date {
+			return future[i].Date < future[j].Date
+		}
+		// Same date - sort by time if available
+		timeI := ""
+		timeJ := ""
+		if future[i].Time != nil {
+			timeI = *future[i].Time
+		}
+		if future[j].Time != nil {
+			timeJ = *future[j].Time
+		}
+		return timeI < timeJ
+	})
+
+	return future
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
