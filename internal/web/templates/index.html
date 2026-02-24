@@ -79,9 +79,10 @@
 
         .service-row {
             border-bottom: 1px solid #eee;
+            cursor: pointer;
         }
 
-        .service-row:last-child {
+        .service-row:last-child, .service-row.expanded:last-of-type + .service-details {
             border-bottom: none;
         }
 
@@ -92,6 +93,48 @@
         .service-row td {
             padding: 0.5rem 0.75rem;
             vertical-align: top;
+        }
+
+        .service-row td:first-child::before {
+            content: '▸';
+            display: inline-block;
+            margin-right: 0.4rem;
+            color: #999;
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+        }
+
+        .service-row.expanded td:first-child::before {
+            transform: rotate(90deg);
+        }
+
+        .service-details {
+            display: none;
+            background: #f8fafc;
+            border-bottom: 1px solid #eee;
+        }
+
+        .service-details.visible {
+            display: table-row;
+        }
+
+        .service-details td {
+            padding: 0.5rem 0.75rem 0.75rem 1.5rem;
+            color: #555;
+            font-size: 0.85rem;
+        }
+
+        .detail-item {
+            margin-bottom: 0.25rem;
+        }
+
+        .detail-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            color: #888;
+            margin-right: 0.25rem;
         }
 
         .col-time {
@@ -182,6 +225,7 @@
 
                 let html = '';
 
+                let rowId = 0;
                 Object.keys(grouped).forEach(date => {
                     const group = grouped[date];
                     html += `
@@ -192,14 +236,21 @@
                             </div>
                             <table class="service-table">
                                 <tbody>
-                                    ${group.services.map(service => `
-                                        <tr class="service-row">
-                                            <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
-                                            <td class="col-name">${escapeHtml(service.service_name)}</td>
-                                            <td class="col-source">${escapeHtml(getShortSource(service.source))}</td>
-                                            <td class="col-location">${service.location ? escapeHtml(getShortLocation(service.location)) : ''}</td>
-                                        </tr>
-                                    `).join('')}
+                                    ${group.services.map(service => {
+                                        const id = rowId++;
+                                        const details = buildDetails(service);
+                                        return `
+                                            <tr class="service-row" onclick="toggleDetails(${id})">
+                                                <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
+                                                <td class="col-name">${escapeHtml(service.service_name)}</td>
+                                                <td class="col-source">${escapeHtml(getShortSource(service.source))}</td>
+                                                <td class="col-location">${service.location ? escapeHtml(getShortLocation(service.location)) : ''}</td>
+                                            </tr>
+                                            <tr class="service-details" id="details-${id}">
+                                                <td colspan="4">${details}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -238,6 +289,32 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function buildDetails(service) {
+            let details = '';
+            if (service.location) {
+                details += `<div class="detail-item"><span class="detail-label">Plats:</span> ${escapeHtml(service.location)}</div>`;
+            }
+            if (service.occasion) {
+                details += `<div class="detail-item"><span class="detail-label">Tillfälle:</span> ${escapeHtml(service.occasion)}</div>`;
+            }
+            if (service.notes) {
+                details += `<div class="detail-item"><span class="detail-label">Info:</span> ${escapeHtml(service.notes)}</div>`;
+            }
+            if (!details) {
+                details = '<div class="detail-item" style="color:#999;">Ingen ytterligare information</div>';
+            }
+            return details;
+        }
+
+        function toggleDetails(id) {
+            const details = document.getElementById(`details-${id}`);
+            if (details) {
+                const row = details.previousElementSibling;
+                row.classList.toggle('expanded');
+                details.classList.toggle('visible');
+            }
         }
 
         loadServices();
