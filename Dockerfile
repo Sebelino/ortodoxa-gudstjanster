@@ -6,6 +6,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY *.go ./
+COPY templates/ templates/
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
 FROM alpine:latest
