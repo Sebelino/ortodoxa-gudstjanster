@@ -15,146 +15,129 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             background: #f5f5f5;
             color: #333;
-            line-height: 1.6;
+            line-height: 1.4;
+            font-size: 14px;
         }
 
         header {
             background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
             color: white;
-            padding: 2rem 1rem;
+            padding: 1rem;
             text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         header h1 {
-            font-size: 1.8rem;
+            font-size: 1.4rem;
             font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        header p {
-            opacity: 0.9;
-            font-size: 1rem;
         }
 
         main {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 1rem;
         }
 
-        .loading {
+        .loading, .error {
             text-align: center;
-            padding: 3rem;
+            padding: 2rem;
             color: #666;
         }
 
         .error {
             background: #fed7d7;
             color: #c53030;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
+            border-radius: 4px;
         }
 
-        .service-card {
+        .date-group {
             background: white;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-            border-left: 4px solid #2c5282;
-            transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
 
-        .service-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-        }
-
-        .service-date {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .date-badge {
+        .date-header {
             background: #2c5282;
             color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
             font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .day-name {
-            color: #666;
-            font-size: 0.85rem;
-        }
-
-        .service-name {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #1a365d;
-            margin-bottom: 0.5rem;
-        }
-
-        .service-details {
-            display: grid;
-            gap: 0.25rem;
-        }
-
-        .detail-row {
+            font-size: 0.9rem;
             display: flex;
-            align-items: flex-start;
             gap: 0.5rem;
+        }
+
+        .date-header .day-name {
+            opacity: 0.85;
+            font-weight: normal;
+        }
+
+        .service-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .service-row {
+            border-bottom: 1px solid #eee;
+        }
+
+        .service-row:last-child {
+            border-bottom: none;
+        }
+
+        .service-row:hover {
+            background: #f8fafc;
+        }
+
+        .service-row td {
+            padding: 0.5rem 0.75rem;
+            vertical-align: top;
+        }
+
+        .col-time {
+            width: 70px;
+            font-weight: 500;
+            color: #1a365d;
+            white-space: nowrap;
+        }
+
+        .col-name {
+            font-weight: 500;
+        }
+
+        .col-source {
+            width: 140px;
+            color: #666;
             font-size: 0.85rem;
         }
 
-        .detail-icon {
-            width: 20px;
-            height: 20px;
-            flex-shrink: 0;
-            opacity: 0.7;
-        }
-
-        .detail-label {
+        .col-location {
             color: #666;
-            min-width: 70px;
-        }
-
-        .detail-value {
-            color: #333;
+            font-size: 0.85rem;
         }
 
         .service-count {
             text-align: center;
             color: #666;
-            padding: 1rem;
-            font-size: 0.9rem;
+            padding: 0.75rem;
+            font-size: 0.85rem;
         }
 
-        @media (max-width: 600px) {
-            header h1 {
-                font-size: 1.4rem;
+        @media (max-width: 700px) {
+            .col-location {
+                display: none;
             }
-
-            .service-card {
-                padding: 1rem;
+            .col-source {
+                width: 100px;
             }
+        }
 
-            .service-name {
-                font-size: 1.1rem;
+        @media (max-width: 500px) {
+            .col-source {
+                display: none;
             }
-
-            .detail-row {
-                flex-direction: column;
-                gap: 0.25rem;
-            }
-
-            .detail-label {
-                min-width: auto;
+            .service-row td {
+                padding: 0.4rem 0.5rem;
             }
         }
     </style>
@@ -162,7 +145,6 @@
 <body>
     <header>
         <h1>Ortodoxa Gudstjänster i Stockholm</h1>
-        <p>Gudstjänstkalender</p>
     </header>
 
     <main>
@@ -186,31 +168,41 @@
                     return;
                 }
 
+                // Group services by date
+                const grouped = {};
+                services.forEach(service => {
+                    if (!grouped[service.date]) {
+                        grouped[service.date] = {
+                            dayOfWeek: service.day_of_week,
+                            services: []
+                        };
+                    }
+                    grouped[service.date].services.push(service);
+                });
+
                 let html = '';
 
-                services.forEach(service => {
+                Object.keys(grouped).forEach(date => {
+                    const group = grouped[date];
                     html += `
-                        <article class="service-card">
-                            <div class="service-date">
-                                <span class="date-badge">${formatDate(service.date)}</span>
-                                <span class="day-name">${service.day_of_week}</span>
+                        <div class="date-group">
+                            <div class="date-header">
+                                <span>${formatDate(date)}</span>
+                                <span class="day-name">${group.dayOfWeek}</span>
                             </div>
-                            <h2 class="service-name">${escapeHtml(service.service_name)}</h2>
-                            <div class="service-details">
-                                ${service.time ? `
-                                    <div class="detail-row">
-                                        <span class="detail-label">Tid:</span>
-                                        <span class="detail-value">${escapeHtml(service.time)}</span>
-                                    </div>
-                                ` : ''}
-                                ${service.location ? `
-                                    <div class="detail-row">
-                                        <span class="detail-label">Plats:</span>
-                                        <span class="detail-value">${escapeHtml(service.location)}</span>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </article>
+                            <table class="service-table">
+                                <tbody>
+                                    ${group.services.map(service => `
+                                        <tr class="service-row">
+                                            <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
+                                            <td class="col-name">${escapeHtml(service.service_name)}</td>
+                                            <td class="col-source">${escapeHtml(getShortSource(service.source))}</td>
+                                            <td class="col-location">${service.location ? escapeHtml(getShortLocation(service.location)) : ''}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     `;
                 });
 
@@ -228,6 +220,18 @@
             const months = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun',
                            'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
             return `${day} ${months[date.getMonth()]}`;
+        }
+
+        function getShortSource(source) {
+            if (source.includes('Finska')) return 'Finska';
+            if (source.includes('Georgios')) return 'St. Georgios';
+            return source;
+        }
+
+        function getShortLocation(location) {
+            if (location.includes('Bellmansgatan')) return 'Bellmansgatan 13';
+            if (location.includes('Birger Jarlsgatan')) return 'Birger Jarlsgatan 92';
+            return location;
         }
 
         function escapeHtml(text) {
