@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates tesseract-ocr tesseract-ocr-data-swe tesseract-ocr-data-eng
 
 WORKDIR /app
 COPY --from=builder /app/server .

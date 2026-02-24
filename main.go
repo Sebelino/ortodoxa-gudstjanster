@@ -40,14 +40,20 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleServices(w http.ResponseWriter, r *http.Request) {
-	services, err := FetchCalendar(defaultURL)
-	if err != nil {
-		http.Error(w, "Failed to fetch calendar: "+err.Error(), http.StatusInternalServerError)
-		return
+	var allServices []ChurchService
+
+	// Fetch from Finska Ortodoxa Församlingen
+	if services, err := FetchCalendar(defaultURL); err == nil {
+		allServices = append(allServices, services...)
+	}
+
+	// Fetch from St. Georgios Cathedral (OCR-based)
+	if services, err := FetchGomosCalendar(); err == nil {
+		allServices = append(allServices, services...)
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(services)
+	json.NewEncoder(w).Encode(allServices)
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {

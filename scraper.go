@@ -9,6 +9,7 @@ import (
 )
 
 type ChurchService struct {
+	Source      string  `json:"source"`
 	Date        string  `json:"date"`
 	DayOfWeek   string  `json:"day_of_week"`
 	ServiceName string  `json:"service_name"`
@@ -95,6 +96,7 @@ func FetchCalendar(url string) ([]ChurchService, error) {
 		}
 
 		services = append(services, ChurchService{
+			Source:      "Finska Ortodoxa Församlingen",
 			Date:        date,
 			DayOfWeek:   dayOfWeek,
 			ServiceName: serviceName,
