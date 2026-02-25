@@ -286,6 +286,9 @@
             if (service.location) {
                 details += `<div class="detail-item"><span class="detail-label">Plats:</span> ${escapeHtml(service.location)}</div>`;
             }
+            if (service.language) {
+                details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(service.language)}</div>`;
+            }
             if (service.occasion) {
                 details += `<div class="detail-item"><span class="detail-label">Tillfälle:</span> ${escapeHtml(service.occasion)}</div>`;
             }

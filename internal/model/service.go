@@ -11,4 +11,5 @@ type ChurchService struct {
 	Time        *string `json:"time"`
 	Occasion    *string `json:"occasion"`
 	Notes       *string `json:"notes"`
+	Language    *string `json:"language,omitempty"`
 }

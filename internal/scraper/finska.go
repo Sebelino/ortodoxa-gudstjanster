@@ -14,6 +14,7 @@ import (
 const (
 	finskaSourceName = "Finska Ortodoxa Församlingen"
 	finskaDefaultURL = "https://www.ortodox-finsk.se/kalender/"
+	finskaLanguage   = "Svenska, finska"
 )
 
 // FisnkaScraper scrapes the Finnish Orthodox Congregation calendar.
@@ -114,6 +115,7 @@ func (s *FisnkaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			notesPtr = &joined
 		}
 
+		lang := finskaLanguage
 		services = append(services, model.ChurchService{
 			Source:      finskaSourceName,
 			SourceURL:   s.url,
@@ -124,6 +126,7 @@ func (s *FisnkaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			Time:        time,
 			Occasion:    occasion,
 			Notes:       notesPtr,
+			Language:    &lang,
 		})
 	})
 

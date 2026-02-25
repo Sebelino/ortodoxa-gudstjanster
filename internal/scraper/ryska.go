@@ -62,6 +62,7 @@ const (
 	ryskaSourceName = "Kristi Förklarings Ortodoxa Församling"
 	ryskaURL        = "https://www.ryskaortodoxakyrkan.se/gudstjänst"
 	ryskaLocation   = "Stockholm, Birger Jarlsgatan 98"
+	ryskaLanguage   = "Kyrkoslaviska, svenska"
 )
 
 // RyskaScraper scrapes the Russian Orthodox Church schedule.
@@ -117,6 +118,7 @@ func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 func (s *RyskaScraper) entriesToServices(entries []vision.ScheduleEntry) []model.ChurchService {
 	var services []model.ChurchService
 	location := ryskaLocation
+	lang := ryskaLanguage
 
 	for _, entry := range entries {
 		var timePtr *string
@@ -139,6 +141,7 @@ func (s *RyskaScraper) entriesToServices(entries []vision.ScheduleEntry) []model
 			Time:        timePtr,
 			Occasion:    occasionPtr,
 			Notes:       nil,
+			Language:    &lang,
 		})
 	}
 
