@@ -160,7 +160,7 @@ func generateICS(services []model.ChurchService) string {
 		if s.SourceURL != "" {
 			desc = append(desc, fmt.Sprintf("Källa: %s", s.SourceURL))
 		}
-		description := escapeICS(strings.Join(desc, "\\n"))
+		description := escapeICS(strings.Join(desc, "\n"))
 		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", description))
 
 		// Categories
