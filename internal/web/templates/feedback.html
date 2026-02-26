@@ -138,6 +138,17 @@
         .hidden {
             display: none;
         }
+
+        /* Honeypot field - hidden from humans, visible to bots */
+        .website-field {
+            opacity: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 0;
+            width: 0;
+            z-index: -1;
+        }
     </style>
 </head>
 <body>
@@ -175,6 +186,12 @@
                     <textarea id="message-input" name="message" required placeholder="Beskriv ditt ärende..."></textarea>
                 </div>
 
+                <!-- Honeypot field - hidden from humans -->
+                <div class="website-field" aria-hidden="true">
+                    <label for="website">Website</label>
+                    <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+                </div>
+
                 <button type="submit" class="submit-btn" id="submit-btn">Skicka</button>
             </form>
         </div>
@@ -184,6 +201,7 @@
         const form = document.getElementById('feedback-form');
         const messageDiv = document.getElementById('message');
         const submitBtn = document.getElementById('submit-btn');
+        const formLoadTime = Date.now();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -195,7 +213,9 @@
             const formData = {
                 type: document.getElementById('type').value,
                 email: document.getElementById('email').value,
-                message: document.getElementById('message-input').value
+                message: document.getElementById('message-input').value,
+                website: document.getElementById('website').value,
+                timestamp: formLoadTime
             };
 
             try {

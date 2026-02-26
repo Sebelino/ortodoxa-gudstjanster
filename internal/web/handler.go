@@ -29,18 +29,60 @@ type SMTPConfig struct {
 	To       string
 }
 
+// rateLimiter tracks submissions per IP address.
+type rateLimiter struct {
+	mu       sync.Mutex
+	requests map[string][]time.Time
+	limit    int
+	window   time.Duration
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{
+		requests: make(map[string][]time.Time),
+		limit:    limit,
+		window:   window,
+	}
+}
+
+func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-rl.window)
+
+	// Filter out old requests
+	var recent []time.Time
+	for _, t := range rl.requests[ip] {
+		if t.After(cutoff) {
+			recent = append(recent, t)
+		}
+	}
+
+	if len(recent) >= rl.limit {
+		rl.requests[ip] = recent
+		return false
+	}
+
+	rl.requests[ip] = append(recent, now)
+	return true
+}
+
 // Handler holds the HTTP handlers and their dependencies.
 type Handler struct {
-	registry *scraper.Registry
-	cache    *cache.Cache
-	smtp     *SMTPConfig
+	registry    *scraper.Registry
+	cache       *cache.Cache
+	smtp        *SMTPConfig
+	rateLimiter *rateLimiter
 }
 
 // New creates a new Handler with the given scraper registry and cache.
 func New(registry *scraper.Registry, c *cache.Cache) *Handler {
 	return &Handler{
-		registry: registry,
-		cache:    c,
+		registry:    registry,
+		cache:       c,
+		rateLimiter: newRateLimiter(3, time.Hour), // 3 submissions per hour per IP
 	}
 }
 
@@ -286,13 +328,39 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPost {
 		var feedback struct {
-			Type    string `json:"type"`
-			Email   string `json:"email"`
-			Message string `json:"message"`
+			Type      string `json:"type"`
+			Email     string `json:"email"`
+			Message   string `json:"message"`
+			Website   string `json:"website"`   // Honeypot field
+			Timestamp int64  `json:"timestamp"` // Form load timestamp
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&feedback); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		// Honeypot check - bots will fill this hidden field
+		if feedback.Website != "" {
+			// Silently accept but don't send email
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Time-based check - form must be open for at least 3 seconds
+		if feedback.Timestamp > 0 {
+			elapsed := time.Now().UnixMilli() - feedback.Timestamp
+			if elapsed < 3000 {
+				// Too fast, likely a bot
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+
+		// Rate limiting check
+		clientIP := getClientIP(r)
+		if !h.rateLimiter.allow(clientIP) {
+			http.Error(w, "För många förfrågningar. Försök igen senare.", http.StatusTooManyRequests)
 			return
 		}
 
@@ -312,6 +380,26 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header (set by proxies/load balancers)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP in the list
+		if idx := strings.Index(xff, ","); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	// Fall back to RemoteAddr
+	if idx := strings.LastIndex(r.RemoteAddr, ":"); idx != -1 {
+		return r.RemoteAddr[:idx]
+	}
+	return r.RemoteAddr
 }
 
 func (h *Handler) sendFeedbackEmail(feedbackType, email, message string) error {
