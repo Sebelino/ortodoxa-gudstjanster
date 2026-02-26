@@ -15,6 +15,17 @@ import (
 
 var dateRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+// getServiceDisplayName returns a display name from the ServiceName map (prefers Swedish).
+func getServiceDisplayName(names map[string]string) string {
+	if name, ok := names["sv"]; ok {
+		return name
+	}
+	for _, name := range names {
+		return name
+	}
+	return ""
+}
+
 // testDeps holds common test dependencies for scrapers that need store and vision.
 type testDeps struct {
 	store  *store.Store
@@ -72,9 +83,17 @@ func validateService(t *testing.T, s model.ChurchService, scraperName string) {
 		t.Error("DayOfWeek is empty")
 	}
 
-	// ServiceName must not be empty
-	if s.ServiceName == "" {
+	// ServiceName must have at least one language entry
+	if len(s.ServiceName) == 0 {
 		t.Error("ServiceName is empty")
+	}
+	for lang, name := range s.ServiceName {
+		if lang == "" {
+			t.Error("ServiceName has empty language key")
+		}
+		if name == "" {
+			t.Errorf("ServiceName[%s] is empty", lang)
+		}
 	}
 
 	// If Time is set, it should look like a time
@@ -109,13 +128,13 @@ func TestFinskaScraper(t *testing.T) {
 
 	// Validate each service
 	for i, s := range services {
-		t.Run(s.Date+"_"+s.ServiceName, func(t *testing.T) {
+		t.Run(s.Date+"_"+getServiceDisplayName(s.ServiceName), func(t *testing.T) {
 			validateService(t, s, scraper.Name())
 		})
 
 		// Log first few for visibility
 		if i < 3 {
-			t.Logf("  [%d] %s: %s @ %v", i, s.Date, s.ServiceName, s.Time)
+			t.Logf("  [%d] %s: %s @ %v", i, s.Date, getServiceDisplayName(s.ServiceName), s.Time)
 		}
 	}
 
@@ -154,13 +173,13 @@ func TestGomosScraper(t *testing.T) {
 
 	// Validate each service
 	for i, s := range services {
-		t.Run(s.Date+"_"+s.ServiceName, func(t *testing.T) {
+		t.Run(s.Date+"_"+getServiceDisplayName(s.ServiceName), func(t *testing.T) {
 			validateService(t, s, scraper.Name())
 		})
 
 		// Log first few for visibility
 		if i < 3 {
-			t.Logf("  [%d] %s: %s @ %v", i, s.Date, s.ServiceName, s.Time)
+			t.Logf("  [%d] %s: %s @ %v", i, s.Date, getServiceDisplayName(s.ServiceName), s.Time)
 		}
 	}
 

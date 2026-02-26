@@ -59,7 +59,7 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 		allServices = append(allServices, services...)
 	}
 
-	return s.deduplicate(allServices), nil
+	return s.mergeByDateAndTime(allServices), nil
 }
 
 func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, error) {
@@ -173,12 +173,18 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry) []model
 			occasion = &entry.Occasion
 		}
 
+		// Use detected language, default to "sv" if not specified
+		nameLang := entry.Language
+		if nameLang == "" {
+			nameLang = "sv"
+		}
+
 		services = append(services, model.ChurchService{
 			Source:      gomosSourceName,
 			SourceURL:   gomosScheduleURL,
 			Date:        entry.Date,
 			DayOfWeek:   entry.DayOfWeek,
-			ServiceName: entry.ServiceName,
+			ServiceName: map[string]string{nameLang: entry.ServiceName},
 			Location:    &location,
 			Time:        &time,
 			Occasion:    occasion,
@@ -190,27 +196,49 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry) []model
 	return services
 }
 
-// deduplicate removes duplicate services based on date, time, and similar service names.
-func (s *GomosScraper) deduplicate(services []model.ChurchService) []model.ChurchService {
+// mergeByDateAndTime merges services with the same date and time, combining their
+// multi-language service names into a single entry.
+func (s *GomosScraper) mergeByDateAndTime(services []model.ChurchService) []model.ChurchService {
 	if len(services) == 0 {
 		return services
 	}
 
-	seen := make(map[string]bool)
-	var result []model.ChurchService
+	// Group services by date+time
+	groups := make(map[string]*model.ChurchService)
+	var order []string
 
 	for _, svc := range services {
 		timeStr := ""
 		if svc.Time != nil {
 			timeStr = *svc.Time
 		}
-		normalizedName := strings.ToLower(strings.Join(strings.Fields(svc.ServiceName), " "))
-		key := fmt.Sprintf("%s|%s|%s", svc.Date, timeStr, normalizedName)
+		key := fmt.Sprintf("%s|%s", svc.Date, timeStr)
 
-		if !seen[key] {
-			seen[key] = true
-			result = append(result, svc)
+		if existing, ok := groups[key]; ok {
+			// Merge service names from different languages
+			for lang, name := range svc.ServiceName {
+				existing.ServiceName[lang] = name
+			}
+			// Keep occasion if not already set
+			if existing.Occasion == nil && svc.Occasion != nil {
+				existing.Occasion = svc.Occasion
+			}
+		} else {
+			// Create a copy with a new map to avoid modifying the original
+			copy := svc
+			copy.ServiceName = make(map[string]string)
+			for lang, name := range svc.ServiceName {
+				copy.ServiceName[lang] = name
+			}
+			groups[key] = &copy
+			order = append(order, key)
 		}
+	}
+
+	// Preserve original order
+	var result []model.ChurchService
+	for _, key := range order {
+		result = append(result, *groups[key])
 	}
 
 	return result

@@ -116,12 +116,18 @@ func (s *RyskaScraper) entriesToServices(entries []vision.ScheduleEntry) []model
 			occasionPtr = &entry.Occasion
 		}
 
+		// Use detected language, default to "sv" if not specified
+		nameLang := entry.Language
+		if nameLang == "" {
+			nameLang = "sv"
+		}
+
 		services = append(services, model.ChurchService{
 			Source:      ryskaSourceName,
 			SourceURL:   ryskaURL,
 			Date:        entry.Date,
 			DayOfWeek:   entry.DayOfWeek,
-			ServiceName: entry.ServiceName,
+			ServiceName: map[string]string{nameLang: entry.ServiceName},
 			Location:    &location,
 			Time:        timePtr,
 			Occasion:    occasionPtr,
