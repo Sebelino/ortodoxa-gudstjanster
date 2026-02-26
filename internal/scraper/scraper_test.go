@@ -192,3 +192,92 @@ func TestRegistryFetchAll(t *testing.T) {
 
 	t.Logf("FetchAll returned %d services", len(services))
 }
+
+func assertHasFebruary2026Events(t *testing.T, services []model.ChurchService) {
+	t.Helper()
+	var feb2026Count int
+	for _, svc := range services {
+		if len(svc.Date) >= 7 && svc.Date[:7] == "2026-02" {
+			feb2026Count++
+		}
+	}
+	if feb2026Count == 0 {
+		t.Errorf("Expected at least one event in February 2026, got 0 (total events: %d)", len(services))
+	} else {
+		t.Logf("Found %d events in February 2026", feb2026Count)
+	}
+}
+
+func TestFinskaScraperHasFebruary2026Events(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	scraper := NewFinskaScraper("")
+	services, err := scraper.Fetch(ctx)
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	assertHasFebruary2026Events(t, services)
+}
+
+func TestGomosScraperHasFebruary2026Events(t *testing.T) {
+	if os.Getenv("OPENAI_API_KEY") == "" {
+		t.Skip("OPENAI_API_KEY not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
+	s, err := store.New(storeDir)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
+	scraper := NewGomosScraper(s, visionClient)
+
+	services, err := scraper.Fetch(ctx)
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	assertHasFebruary2026Events(t, services)
+}
+
+func TestHeligaAnnaScraperHasFebruary2026Events(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	scraper := NewHeligaAnnaScraper()
+	services, err := scraper.Fetch(ctx)
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	assertHasFebruary2026Events(t, services)
+}
+
+func TestRyskaScraperHasFebruary2026Events(t *testing.T) {
+	if os.Getenv("OPENAI_API_KEY") == "" {
+		t.Skip("OPENAI_API_KEY not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
+	s, err := store.New(storeDir)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
+	scraper := NewRyskaScraper(s, visionClient)
+
+	services, err := scraper.Fetch(ctx)
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	assertHasFebruary2026Events(t, services)
+}

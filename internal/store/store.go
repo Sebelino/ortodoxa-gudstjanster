@@ -63,6 +63,15 @@ func (s *Store) SetJSON(key string, v interface{}) error {
 	return s.Set(key, data)
 }
 
+// SetWithExtension stores raw bytes with a custom file extension.
+func (s *Store) SetWithExtension(key string, ext string, value []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path := filepath.Join(s.dir, key+ext)
+	return os.WriteFile(path, value, 0644)
+}
+
 func (s *Store) keyPath(key string) string {
 	return filepath.Join(s.dir, key+".json")
 }

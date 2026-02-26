@@ -118,7 +118,14 @@ func (s *GomosScraper) extractImageURLs(ctx context.Context, postURL string) ([]
 	var urls []string
 	doc.Find("article img, .entry-content img, .wp-block-image img").Each(func(i int, sel *goquery.Selection) {
 		src, exists := sel.Attr("src")
-		if exists && (strings.Contains(src, ".jpg") || strings.Contains(src, ".png") || strings.Contains(src, ".jpeg")) {
+		if !exists {
+			return
+		}
+		// Only include uploaded content images, not theme assets
+		if !strings.Contains(src, "/uploads/") {
+			return
+		}
+		if strings.Contains(src, ".jpg") || strings.Contains(src, ".png") || strings.Contains(src, ".jpeg") {
 			urls = append(urls, src)
 		}
 	})
@@ -133,6 +140,7 @@ func (s *GomosScraper) processImage(ctx context.Context, imageURL string) ([]mod
 	}
 
 	checksum := s.computeChecksum(imageData)
+	imageExt := s.imageExtension(imageURL)
 
 	var entries []vision.ScheduleEntry
 	if s.store.GetJSON(checksum, &entries) {
@@ -145,6 +153,11 @@ func (s *GomosScraper) processImage(ctx context.Context, imageURL string) ([]mod
 	}
 
 	if err := s.store.SetJSON(checksum, entries); err != nil {
+		// Log error but don't fail - we still have the data
+	}
+
+	// Save the source image alongside the JSON
+	if err := s.store.SetWithExtension(checksum, imageExt, imageData); err != nil {
 		// Log error but don't fail - we still have the data
 	}
 
@@ -169,6 +182,17 @@ func (s *GomosScraper) downloadImage(ctx context.Context, imageURL string) ([]by
 func (s *GomosScraper) computeChecksum(data []byte) string {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
+}
+
+func (s *GomosScraper) imageExtension(url string) string {
+	lower := strings.ToLower(url)
+	if strings.Contains(lower, ".png") {
+		return ".png"
+	}
+	if strings.Contains(lower, ".jpeg") {
+		return ".jpeg"
+	}
+	return ".jpg"
 }
 
 func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry) []model.ChurchService {
