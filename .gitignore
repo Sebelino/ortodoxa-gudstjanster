@@ -1,5 +1,6 @@
 calendar.json
-server
+/server
 disk/
 test-disk/
 cache/
+gitignore/
