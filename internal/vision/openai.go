@@ -161,7 +161,7 @@ Text to parse:
 				"content": prompt,
 			},
 		},
-		"max_tokens": 4096,
+		"max_tokens": 16384,
 	}
 
 	reqJSON, err := json.Marshal(reqBody)
