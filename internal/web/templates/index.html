@@ -31,6 +31,21 @@
             font-weight: 600;
         }
 
+        .top-bar {
+            text-align: right;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .top-bar a {
+            color: #2c5282;
+            text-decoration: none;
+        }
+
+        .top-bar a:hover {
+            text-decoration: underline;
+        }
+
         main {
             max-width: 1000px;
             margin: 0 auto;
@@ -170,21 +185,6 @@
             font-size: 0.85rem;
         }
 
-        .footer-links {
-            text-align: center;
-            padding: 0.5rem;
-            font-size: 0.85rem;
-        }
-
-        .footer-links a {
-            color: #2c5282;
-            text-decoration: none;
-        }
-
-        .footer-links a:hover {
-            text-decoration: underline;
-        }
-
         .filter-panel {
             background: white;
             border-radius: 6px;
@@ -305,6 +305,9 @@
     </header>
 
     <main>
+        <div class="top-bar">
+            <a href="/feedback">Rapportera fel eller föreslå förbättringar</a>
+        </div>
         <div id="filter-panel" class="filter-panel" style="display: none;">
             <div class="filter-header" onclick="toggleFilter()">
                 <span>Filtrera församlingar</span>
@@ -479,7 +482,6 @@
             });
 
             html += `<p class="service-count">Visar ${filteredServices.length} av ${allServices.length} gudstjänster</p>`;
-            html += `<p class="footer-links"><a href="/feedback">Rapportera fel eller föreslå förbättringar</a></p>`;
             content.innerHTML = html;
         }
 
