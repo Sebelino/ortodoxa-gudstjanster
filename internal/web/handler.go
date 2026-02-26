@@ -121,10 +121,8 @@ func generateICS(services []model.ChurchService) string {
 
 		// Date and time
 		if s.Time != nil && *s.Time != "" {
-			// Parse time (HH:MM format)
-			timeParts := strings.Split(*s.Time, ":")
-			if len(timeParts) >= 2 {
-				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + timeParts[0] + timeParts[1] + "00"
+			if startTime := parseStartTime(*s.Time); startTime != "" {
+				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + startTime
 				sb.WriteString(fmt.Sprintf("DTSTART:%s\r\n", dtstart))
 				// Assume 1.5 hour duration for services
 				sb.WriteString(fmt.Sprintf("DURATION:PT1H30M\r\n"))
@@ -183,6 +181,46 @@ func escapeICS(s string) string {
 	s = strings.ReplaceAll(s, ",", "\\,")
 	s = strings.ReplaceAll(s, "\n", "\\n")
 	return s
+}
+
+// parseStartTime extracts the start time from a time string and returns it in HHMMSS format.
+// Handles formats like "18:00", "1800", "18:00 - 20:00", "1800 - ca 2000", etc.
+func parseStartTime(timeStr string) string {
+	// Remove any range part (everything after " - " or " – ")
+	timeStr = strings.Split(timeStr, " - ")[0]
+	timeStr = strings.Split(timeStr, " – ")[0]
+	timeStr = strings.TrimSpace(timeStr)
+
+	// Try to parse HH:MM format
+	if parts := strings.Split(timeStr, ":"); len(parts) >= 2 {
+		hour := strings.TrimSpace(parts[0])
+		minute := strings.TrimSpace(parts[1])
+		// Take only first 2 chars of minute in case there's extra stuff
+		if len(minute) > 2 {
+			minute = minute[:2]
+		}
+		if len(hour) <= 2 && len(minute) == 2 {
+			return fmt.Sprintf("%02s%s00", hour, minute)
+		}
+	}
+
+	// Try to parse HHMM format (4 digits)
+	if len(timeStr) >= 4 {
+		// Check if first 4 chars are digits
+		candidate := timeStr[:4]
+		isDigits := true
+		for _, c := range candidate {
+			if c < '0' || c > '9' {
+				isDigits = false
+				break
+			}
+		}
+		if isDigits {
+			return candidate + "00"
+		}
+	}
+
+	return ""
 }
 
 func filterAndSort(services []model.ChurchService) []model.ChurchService {
