@@ -3,7 +3,7 @@ set -e
 
 IMAGE_NAME="church-services"
 CONTAINER_NAME="church-services"
-CACHE_DIR="${HOME}/.cache/church-services"
+CACHE_DIR="$(pwd)/cache"
 STORE_DIR="$(pwd)/disk"
 
 mkdir -p "$CACHE_DIR"
