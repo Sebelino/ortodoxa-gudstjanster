@@ -4,8 +4,10 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +37,7 @@ func New(registry *scraper.Registry, c *cache.Cache) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", h.noCache(h.handleIndex))
 	mux.HandleFunc("/services", h.noCache(h.handleServices))
+	mux.HandleFunc("/calendar.ics", h.handleICS)
 	mux.HandleFunc("/health", h.handleHealth)
 }
 
@@ -66,6 +69,120 @@ func (h *Handler) handleServices(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(services)
+}
+
+func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	defer cancel()
+
+	services := h.fetchAllWithCache(ctx)
+	services = filterAndSort(services)
+
+	// Parse excluded sources from query parameter
+	excludeParam := r.URL.Query().Get("exclude")
+	if excludeParam != "" {
+		excluded := make(map[string]bool)
+		for _, source := range strings.Split(excludeParam, ",") {
+			excluded[strings.TrimSpace(source)] = true
+		}
+		var filtered []model.ChurchService
+		for _, s := range services {
+			if !excluded[s.Source] {
+				filtered = append(filtered, s)
+			}
+		}
+		services = filtered
+	}
+
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+	w.Header().Set("Content-Disposition", "inline; filename=\"ortodoxa-gudstjanster.ics\"")
+
+	// Generate ICS content
+	ics := generateICS(services)
+	w.Write([]byte(ics))
+}
+
+func generateICS(services []model.ChurchService) string {
+	var sb strings.Builder
+
+	sb.WriteString("BEGIN:VCALENDAR\r\n")
+	sb.WriteString("VERSION:2.0\r\n")
+	sb.WriteString("PRODID:-//Ortodoxa Gudstjänster//SV\r\n")
+	sb.WriteString("CALSCALE:GREGORIAN\r\n")
+	sb.WriteString("METHOD:PUBLISH\r\n")
+	sb.WriteString("X-WR-CALNAME:Ortodoxa Gudstjänster\r\n")
+
+	for i, s := range services {
+		sb.WriteString("BEGIN:VEVENT\r\n")
+
+		// Generate unique ID
+		uid := fmt.Sprintf("%s-%d@ortodoxa-gudstjanster", s.Date, i)
+		sb.WriteString(fmt.Sprintf("UID:%s\r\n", uid))
+
+		// Date and time
+		if s.Time != nil && *s.Time != "" {
+			// Parse time (HH:MM format)
+			timeParts := strings.Split(*s.Time, ":")
+			if len(timeParts) >= 2 {
+				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + timeParts[0] + timeParts[1] + "00"
+				sb.WriteString(fmt.Sprintf("DTSTART:%s\r\n", dtstart))
+				// Assume 1.5 hour duration for services
+				sb.WriteString(fmt.Sprintf("DURATION:PT1H30M\r\n"))
+			}
+		} else {
+			// All-day event
+			dtstart := strings.ReplaceAll(s.Date, "-", "")
+			sb.WriteString(fmt.Sprintf("DTSTART;VALUE=DATE:%s\r\n", dtstart))
+		}
+
+		// Summary (service name)
+		summary := escapeICS(s.ServiceName)
+		sb.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", summary))
+
+		// Location
+		if s.Location != nil && *s.Location != "" {
+			location := escapeICS(*s.Location)
+			sb.WriteString(fmt.Sprintf("LOCATION:%s\r\n", location))
+		}
+
+		// Description with additional details
+		var desc []string
+		desc = append(desc, fmt.Sprintf("Församling: %s", s.Source))
+		if s.Language != nil && *s.Language != "" {
+			desc = append(desc, fmt.Sprintf("Språk: %s", *s.Language))
+		}
+		if s.Occasion != nil && *s.Occasion != "" {
+			desc = append(desc, fmt.Sprintf("Tillfälle: %s", *s.Occasion))
+		}
+		if s.Notes != nil && *s.Notes != "" {
+			desc = append(desc, fmt.Sprintf("Info: %s", *s.Notes))
+		}
+		if s.SourceURL != "" {
+			desc = append(desc, fmt.Sprintf("Källa: %s", s.SourceURL))
+		}
+		description := escapeICS(strings.Join(desc, "\\n"))
+		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", description))
+
+		// Categories
+		sb.WriteString(fmt.Sprintf("CATEGORIES:%s\r\n", escapeICS(s.Source)))
+
+		// Timestamp
+		now := time.Now().UTC().Format("20060102T150405Z")
+		sb.WriteString(fmt.Sprintf("DTSTAMP:%s\r\n", now))
+
+		sb.WriteString("END:VEVENT\r\n")
+	}
+
+	sb.WriteString("END:VCALENDAR\r\n")
+	return sb.String()
+}
+
+func escapeICS(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, ";", "\\;")
+	s = strings.ReplaceAll(s, ",", "\\,")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	return s
 }
 
 func filterAndSort(services []model.ChurchService) []model.ChurchService {

@@ -227,6 +227,62 @@
             cursor: pointer;
         }
 
+        .subscribe-section {
+            border-top: 1px solid #e2e8f0;
+            padding: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .subscribe-section.hidden {
+            display: none;
+        }
+
+        .subscribe-label {
+            font-size: 0.85rem;
+            color: #4a5568;
+        }
+
+        .subscribe-btn {
+            background: #2c5282;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .subscribe-btn:hover {
+            background: #1a365d;
+        }
+
+        .subscribe-btn.secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .subscribe-btn.secondary:hover {
+            background: #cbd5e0;
+        }
+
+        .copy-feedback {
+            font-size: 0.8rem;
+            color: #38a169;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .copy-feedback.visible {
+            opacity: 1;
+        }
+
         @media (max-width: 500px) {
             .col-source {
                 display: none;
@@ -248,6 +304,12 @@
                 <span>Filtrera församlingar</span>
             </div>
             <div id="filter-options" class="filter-options"></div>
+            <div id="subscribe-section" class="subscribe-section hidden">
+                <span class="subscribe-label">Prenumerera:</span>
+                <a id="subscribe-link" class="subscribe-btn" href="/calendar.ics" target="_blank">Ladda ner ICS</a>
+                <button class="subscribe-btn secondary" onclick="copySubscribeUrl()">Kopiera URL</button>
+                <span id="copy-feedback" class="copy-feedback">Kopierad!</span>
+            </div>
         </div>
         <div id="content">
             <div class="loading">Laddar gudstjänster...</div>
@@ -318,6 +380,32 @@
             }).join('');
 
             filterPanel.style.display = 'block';
+            document.getElementById('subscribe-section').classList.remove('hidden');
+            updateSubscribeLink();
+        }
+
+        function getSubscribeUrl() {
+            const base = window.location.origin + '/calendar.ics';
+            if (excludedSources.size === 0) {
+                return base;
+            }
+            const params = new URLSearchParams();
+            params.set('exclude', [...excludedSources].join(','));
+            return base + '?' + params.toString();
+        }
+
+        function updateSubscribeLink() {
+            const link = document.getElementById('subscribe-link');
+            link.href = getSubscribeUrl();
+        }
+
+        function copySubscribeUrl() {
+            const url = getSubscribeUrl();
+            navigator.clipboard.writeText(url).then(() => {
+                const feedback = document.getElementById('copy-feedback');
+                feedback.classList.add('visible');
+                setTimeout(() => feedback.classList.remove('visible'), 2000);
+            });
         }
 
         function toggleSource(source, included) {
@@ -327,6 +415,7 @@
                 excludedSources.add(source);
             }
             saveFilterState();
+            updateSubscribeLink();
             renderServices();
         }
 
