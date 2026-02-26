@@ -109,7 +109,7 @@ func (s *FisnkaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			SourceURL:   s.url,
 			Date:        date,
 			DayOfWeek:   dayOfWeek,
-			ServiceName: map[string]string{"sv": serviceName},
+			ServiceName: serviceName,
 			Location:    location,
 			Time:        time,
 			Occasion:    occasion,

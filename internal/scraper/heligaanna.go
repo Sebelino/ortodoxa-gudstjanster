@@ -113,7 +113,7 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 				SourceURL:   heligaAnnaURL,
 				Date:        date,
 				DayOfWeek:   dayOfWeek,
-				ServiceName: map[string]string{"sv": serviceName},
+				ServiceName: serviceName,
 				Location:    &location,
 				Time:        timeStr,
 				Occasion:    occasion,

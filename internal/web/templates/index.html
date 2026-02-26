@@ -237,7 +237,7 @@
                                         return `
                                             <tr class="service-row" onclick="toggleDetails(${id})">
                                                 <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
-                                                <td class="col-name">${escapeHtml(getServiceName(service.service_name))}</td>
+                                                <td class="col-name">${escapeHtml(service.service_name)}</td>
                                                 <td class="col-source">${escapeHtml(getShortSource(service.source))}</td>
                                             </tr>
                                             <tr class="service-details" id="details-${id}">
@@ -279,15 +279,6 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        function getServiceName(serviceNameObj) {
-            if (typeof serviceNameObj === 'string') return serviceNameObj;
-            if (!serviceNameObj || typeof serviceNameObj !== 'object') return '';
-            // Prefer Swedish, then any other language
-            if (serviceNameObj.sv) return serviceNameObj.sv;
-            const keys = Object.keys(serviceNameObj);
-            return keys.length > 0 ? serviceNameObj[keys[0]] : '';
         }
 
         function buildDetails(service) {
