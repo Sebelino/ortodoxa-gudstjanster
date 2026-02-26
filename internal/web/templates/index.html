@@ -170,6 +170,63 @@
             font-size: 0.85rem;
         }
 
+        .filter-panel {
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .filter-header {
+            background: #e2e8f0;
+            padding: 0.5rem 0.75rem;
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #4a5568;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .filter-header:hover {
+            background: #cbd5e0;
+        }
+
+        .filter-header::after {
+            content: '▾';
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+        }
+
+        .filter-header.collapsed::after {
+            transform: rotate(-90deg);
+        }
+
+        .filter-options {
+            padding: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
+        }
+
+        .filter-options.hidden {
+            display: none;
+        }
+
+        .filter-option {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .filter-option input {
+            cursor: pointer;
+        }
+
         @media (max-width: 500px) {
             .col-source {
                 display: none;
@@ -186,12 +243,21 @@
     </header>
 
     <main>
+        <div id="filter-panel" class="filter-panel" style="display: none;">
+            <div class="filter-header" onclick="toggleFilter()">
+                <span>Filtrera församlingar</span>
+            </div>
+            <div id="filter-options" class="filter-options"></div>
+        </div>
         <div id="content">
             <div class="loading">Laddar gudstjänster...</div>
         </div>
     </main>
 
     <script>
+        let allServices = [];
+        let excludedSources = new Set();
+
         async function loadServices() {
             const content = document.getElementById('content');
 
@@ -199,64 +265,134 @@
                 const response = await fetch('/services');
                 if (!response.ok) throw new Error('Failed to fetch services');
 
-                const services = await response.json();
+                allServices = await response.json();
 
-                if (services.length === 0) {
+                if (allServices.length === 0) {
                     content.innerHTML = '<p class="loading">Inga gudstjänster hittades.</p>';
                     return;
                 }
 
-                // Group services by date
-                const grouped = {};
-                services.forEach(service => {
-                    if (!grouped[service.date]) {
-                        grouped[service.date] = {
-                            dayOfWeek: service.day_of_week,
-                            services: []
-                        };
-                    }
-                    grouped[service.date].services.push(service);
-                });
+                // Load excluded sources from localStorage
+                loadFilterState();
 
-                let html = '';
+                // Build filter panel
+                buildFilterPanel();
 
-                let rowId = 0;
-                Object.keys(grouped).forEach(date => {
-                    const group = grouped[date];
-                    html += `
-                        <div class="date-group">
-                            <div class="date-header">
-                                <span>${formatDate(date)}</span>
-                                <span class="day-name">${group.dayOfWeek}</span>
-                            </div>
-                            <table class="service-table">
-                                <tbody>
-                                    ${group.services.map(service => {
-                                        const id = rowId++;
-                                        const details = buildDetails(service);
-                                        return `
-                                            <tr class="service-row" onclick="toggleDetails(${id})">
-                                                <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
-                                                <td class="col-name">${escapeHtml(service.service_name)}</td>
-                                                <td class="col-source">${escapeHtml(getShortSource(service.source))}</td>
-                                            </tr>
-                                            <tr class="service-details" id="details-${id}">
-                                                <td colspan="3">${details}</td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-                });
-
-                html += `<p class="service-count">Visar ${services.length} gudstjänster</p>`;
-                content.innerHTML = html;
+                // Render services
+                renderServices();
 
             } catch (error) {
                 content.innerHTML = `<div class="error">Kunde inte ladda gudstjänster: ${error.message}</div>`;
             }
+        }
+
+        function loadFilterState() {
+            try {
+                const saved = localStorage.getItem('excludedSources');
+                if (saved) {
+                    excludedSources = new Set(JSON.parse(saved));
+                }
+            } catch (e) {
+                excludedSources = new Set();
+            }
+        }
+
+        function saveFilterState() {
+            localStorage.setItem('excludedSources', JSON.stringify([...excludedSources]));
+        }
+
+        function buildFilterPanel() {
+            const sources = [...new Set(allServices.map(s => s.source))].sort();
+            const filterOptions = document.getElementById('filter-options');
+            const filterPanel = document.getElementById('filter-panel');
+
+            filterOptions.innerHTML = sources.map(source => {
+                const checked = !excludedSources.has(source) ? 'checked' : '';
+                const shortName = getShortSource(source);
+                return `
+                    <label class="filter-option">
+                        <input type="checkbox" ${checked} onchange="toggleSource('${escapeAttr(source)}', this.checked)">
+                        ${escapeHtml(shortName)}
+                    </label>
+                `;
+            }).join('');
+
+            filterPanel.style.display = 'block';
+        }
+
+        function toggleSource(source, included) {
+            if (included) {
+                excludedSources.delete(source);
+            } else {
+                excludedSources.add(source);
+            }
+            saveFilterState();
+            renderServices();
+        }
+
+        function toggleFilter() {
+            const header = document.querySelector('.filter-header');
+            const options = document.getElementById('filter-options');
+            header.classList.toggle('collapsed');
+            options.classList.toggle('hidden');
+        }
+
+        function renderServices() {
+            const content = document.getElementById('content');
+            const filteredServices = allServices.filter(s => !excludedSources.has(s.source));
+
+            if (filteredServices.length === 0) {
+                content.innerHTML = '<p class="loading">Inga gudstjänster matchar filtret.</p>';
+                return;
+            }
+
+            // Group services by date
+            const grouped = {};
+            filteredServices.forEach(service => {
+                if (!grouped[service.date]) {
+                    grouped[service.date] = {
+                        dayOfWeek: service.day_of_week,
+                        services: []
+                    };
+                }
+                grouped[service.date].services.push(service);
+            });
+
+            let html = '';
+
+            let rowId = 0;
+            Object.keys(grouped).forEach(date => {
+                const group = grouped[date];
+                html += `
+                    <div class="date-group">
+                        <div class="date-header">
+                            <span>${formatDate(date)}</span>
+                            <span class="day-name">${group.dayOfWeek}</span>
+                        </div>
+                        <table class="service-table">
+                            <tbody>
+                                ${group.services.map(service => {
+                                    const id = rowId++;
+                                    const details = buildDetails(service);
+                                    return `
+                                        <tr class="service-row" onclick="toggleDetails(${id})">
+                                            <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
+                                            <td class="col-name">${escapeHtml(service.service_name)}</td>
+                                            <td class="col-source">${escapeHtml(getShortSource(service.source))}</td>
+                                        </tr>
+                                        <tr class="service-details" id="details-${id}">
+                                            <td colspan="3">${details}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+
+            html += `<p class="service-count">Visar ${filteredServices.length} av ${allServices.length} gudstjänster</p>`;
+            content.innerHTML = html;
         }
 
         function formatDate(dateStr) {
@@ -279,6 +415,10 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function escapeAttr(text) {
+            return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         }
 
         function buildDetails(service) {
