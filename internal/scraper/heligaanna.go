@@ -3,7 +3,6 @@ package scraper
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,18 +33,7 @@ func (s *HeligaAnnaScraper) Name() string {
 }
 
 func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", heligaAnnaURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := fetchDocument(ctx, heligaAnnaURL)
 	if err != nil {
 		return nil, err
 	}

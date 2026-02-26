@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -65,18 +63,7 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 }
 
 func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", gomosScheduleURL, nil)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := fetchDocument(ctx, gomosScheduleURL)
 	if err != nil {
 		return "", err
 	}
@@ -99,18 +86,7 @@ func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, erro
 }
 
 func (s *GomosScraper) extractImageURLs(ctx context.Context, postURL string) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", postURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := fetchDocument(ctx, postURL)
 	if err != nil {
 		return nil, err
 	}
@@ -165,18 +141,7 @@ func (s *GomosScraper) processImage(ctx context.Context, imageURL string) ([]mod
 }
 
 func (s *GomosScraper) downloadImage(ctx context.Context, imageURL string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", imageURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return io.ReadAll(resp.Body)
+	return fetchURL(ctx, imageURL)
 }
 
 func (s *GomosScraper) computeChecksum(data []byte) string {

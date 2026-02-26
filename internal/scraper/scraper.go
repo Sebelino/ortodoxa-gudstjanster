@@ -2,10 +2,57 @@ package scraper
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"sync"
+
+	"github.com/PuerkitoBio/goquery"
 
 	"church-services/internal/model"
 )
+
+// fetchURL fetches the content of a URL and returns the response body as bytes.
+func fetchURL(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	return data, nil
+}
+
+// fetchDocument fetches a URL and parses it as an HTML document.
+func fetchDocument(ctx context.Context, url string) (*goquery.Document, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parsing HTML: %w", err)
+	}
+
+	return doc, nil
+}
 
 // Scraper defines the interface that all church calendar scrapers must implement.
 type Scraper interface {

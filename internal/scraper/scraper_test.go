@@ -15,6 +15,28 @@ import (
 
 var dateRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+// testDeps holds common test dependencies for scrapers that need store and vision.
+type testDeps struct {
+	store  *store.Store
+	vision *vision.Client
+}
+
+// newTestDeps creates test dependencies, skipping the test if OPENAI_API_KEY is not set.
+func newTestDeps(t *testing.T, storeDir string) *testDeps {
+	t.Helper()
+	if os.Getenv("OPENAI_API_KEY") == "" {
+		t.Skip("OPENAI_API_KEY not set")
+	}
+	s, err := store.New(storeDir)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	return &testDeps{
+		store:  s,
+		vision: vision.NewClient(os.Getenv("OPENAI_API_KEY")),
+	}
+}
+
 func validateService(t *testing.T, s model.ChurchService, scraperName string) {
 	t.Helper()
 
@@ -111,13 +133,8 @@ func TestGomosScraper(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
-	s, err := store.New(storeDir)
-	if err != nil {
-		t.Fatalf("Failed to create store: %v", err)
-	}
-	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
-	scraper := NewGomosScraper(s, visionClient)
+	deps := newTestDeps(t, filepath.Join(os.TempDir(), "church-services-store-test"))
+	scraper := NewGomosScraper(deps.store, deps.vision)
 
 	if scraper.Name() != "St. Georgios Cathedral" {
 		t.Errorf("Unexpected scraper name: %s", scraper.Name())
@@ -162,15 +179,14 @@ func TestRegistry(t *testing.T) {
 		t.Error("New registry should be empty")
 	}
 
-	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
-	s, err := store.New(storeDir)
+	s, err := store.New(filepath.Join(os.TempDir(), "church-services-store-test"))
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
-	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
+	v := vision.NewClient("")
 
 	registry.Register(NewFinskaScraper(""))
-	registry.Register(NewGomosScraper(s, visionClient))
+	registry.Register(NewGomosScraper(s, v))
 
 	if len(registry.Scrapers()) != 2 {
 		t.Errorf("Expected 2 scrapers, got %d", len(registry.Scrapers()))
@@ -222,20 +238,11 @@ func TestFinskaScraperHasFebruary2026Events(t *testing.T) {
 }
 
 func TestGomosScraperHasFebruary2026Events(t *testing.T) {
-	if os.Getenv("OPENAI_API_KEY") == "" {
-		t.Skip("OPENAI_API_KEY not set")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
-	s, err := store.New(storeDir)
-	if err != nil {
-		t.Fatalf("Failed to create store: %v", err)
-	}
-	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
-	scraper := NewGomosScraper(s, visionClient)
+	deps := newTestDeps(t, filepath.Join(os.TempDir(), "church-services-store-test"))
+	scraper := NewGomosScraper(deps.store, deps.vision)
 
 	services, err := scraper.Fetch(ctx)
 	if err != nil {
@@ -246,23 +253,15 @@ func TestGomosScraperHasFebruary2026Events(t *testing.T) {
 }
 
 func TestGomosScraperSavesSourceImage(t *testing.T) {
-	if os.Getenv("OPENAI_API_KEY") == "" {
-		t.Skip("OPENAI_API_KEY not set")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	storeDir := "../../test-disk"
 	os.RemoveAll(storeDir)
-	s, err := store.New(storeDir)
-	if err != nil {
-		t.Fatalf("Failed to create store: %v", err)
-	}
-	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
-	scraper := NewGomosScraper(s, visionClient)
+	deps := newTestDeps(t, storeDir)
+	scraper := NewGomosScraper(deps.store, deps.vision)
 
-	_, err = scraper.Fetch(ctx)
+	_, err := scraper.Fetch(ctx)
 	if err != nil {
 		t.Fatalf("Fetch failed: %v", err)
 	}
@@ -303,20 +302,11 @@ func TestHeligaAnnaScraperHasFebruary2026Events(t *testing.T) {
 }
 
 func TestRyskaScraperHasFebruary2026Events(t *testing.T) {
-	if os.Getenv("OPENAI_API_KEY") == "" {
-		t.Skip("OPENAI_API_KEY not set")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	storeDir := filepath.Join(os.TempDir(), "church-services-store-test")
-	s, err := store.New(storeDir)
-	if err != nil {
-		t.Fatalf("Failed to create store: %v", err)
-	}
-	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
-	scraper := NewRyskaScraper(s, visionClient)
+	deps := newTestDeps(t, filepath.Join(os.TempDir(), "church-services-store-test"))
+	scraper := NewRyskaScraper(deps.store, deps.vision)
 
 	services, err := scraper.Fetch(ctx)
 	if err != nil {

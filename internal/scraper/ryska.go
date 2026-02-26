@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html"
-	"io"
-	"net/http"
 	"regexp"
 	"strings"
 
@@ -19,18 +17,7 @@ import (
 // ExtractRyskaScheduleText fetches the Ryska website and extracts the schedule text.
 // This is exported so it can be used by the extract-text tool for testing.
 func ExtractRyskaScheduleText(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", ryskaURL, nil)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := fetchURL(ctx, ryskaURL)
 	if err != nil {
 		return "", err
 	}

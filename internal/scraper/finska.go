@@ -2,7 +2,6 @@ package scraper
 
 import (
 	"context"
-	"net/http"
 	"regexp"
 	"strings"
 
@@ -35,18 +34,7 @@ func (s *FisnkaScraper) Name() string {
 }
 
 func (s *FisnkaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", s.url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := fetchDocument(ctx, s.url)
 	if err != nil {
 		return nil, err
 	}
