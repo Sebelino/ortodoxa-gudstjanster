@@ -263,15 +263,6 @@
             background: #1a365d;
         }
 
-        .subscribe-btn.secondary {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-
-        .subscribe-btn.secondary:hover {
-            background: #cbd5e0;
-        }
-
         .copy-feedback {
             font-size: 0.8rem;
             color: #38a169;
@@ -306,8 +297,7 @@
             <div id="filter-options" class="filter-options"></div>
             <div id="subscribe-section" class="subscribe-section hidden">
                 <span class="subscribe-label">Prenumerera:</span>
-                <a id="subscribe-link" class="subscribe-btn" href="/calendar.ics" target="_blank">Ladda ner ICS</a>
-                <button class="subscribe-btn secondary" onclick="copySubscribeUrl()">Kopiera URL</button>
+                <button class="subscribe-btn" onclick="copySubscribeUrl()">Kopiera ICS-länk</button>
                 <span id="copy-feedback" class="copy-feedback">Kopierad!</span>
             </div>
         </div>
@@ -381,7 +371,6 @@
 
             filterPanel.style.display = 'block';
             document.getElementById('subscribe-section').classList.remove('hidden');
-            updateSubscribeLink();
         }
 
         function getSubscribeUrl() {
@@ -392,11 +381,6 @@
             const params = new URLSearchParams();
             params.set('exclude', [...excludedSources].join(','));
             return base + '?' + params.toString();
-        }
-
-        function updateSubscribeLink() {
-            const link = document.getElementById('subscribe-link');
-            link.href = getSubscribeUrl();
         }
 
         function copySubscribeUrl() {
@@ -415,7 +399,6 @@
                 excludedSources.add(source);
             }
             saveFilterState();
-            updateSubscribeLink();
             renderServices();
         }
 
