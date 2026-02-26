@@ -7,7 +7,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"church-services/internal/model"
+	"ortodoxa-gudstjanster/internal/model"
 )
 
 const (

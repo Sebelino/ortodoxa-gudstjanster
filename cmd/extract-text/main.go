@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"church-services/internal/scraper"
+	"ortodoxa-gudstjanster/internal/scraper"
 )
 
 func main() {

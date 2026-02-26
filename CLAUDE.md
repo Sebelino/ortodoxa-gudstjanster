@@ -36,8 +36,8 @@ Environment variables:
 ## Running with Docker
 
 ```bash
-docker build -t church-services .
-docker run -p 8080:8080 church-services
+docker build -t ortodoxa-gudstjanster .
+docker run -p 8080:8080 ortodoxa-gudstjanster
 ```
 
 ## Endpoints
@@ -52,7 +52,7 @@ docker run -p 8080:8080 church-services
 ## Architecture
 
 ```
-church-services/
+ortodoxa-gudstjanster/
 ├── cmd/server/main.go       # Entry point, wires up dependencies
 ├── internal/
 │   ├── model/service.go     # ChurchService data model

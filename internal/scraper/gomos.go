@@ -9,9 +9,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"church-services/internal/model"
-	"church-services/internal/store"
-	"church-services/internal/vision"
+	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/store"
+	"ortodoxa-gudstjanster/internal/vision"
 )
 
 const (

@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"church-services/internal/cache"
-	"church-services/internal/model"
-	"church-services/internal/scraper"
+	"ortodoxa-gudstjanster/internal/cache"
+	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/scraper"
 )
 
 //go:embed templates/*.html

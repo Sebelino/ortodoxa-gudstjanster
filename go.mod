@@ -1,4 +1,4 @@
-module church-services
+module ortodoxa-gudstjanster
 
 go 1.25.0
 

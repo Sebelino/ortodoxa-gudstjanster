@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"church-services/internal/model"
-	"church-services/internal/store"
-	"church-services/internal/vision"
+	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/store"
+	"ortodoxa-gudstjanster/internal/vision"
 )
 
 var dateRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
@@ -133,7 +133,7 @@ func TestGomosScraper(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	deps := newTestDeps(t, filepath.Join(os.TempDir(), "church-services-store-test"))
+	deps := newTestDeps(t, filepath.Join(os.TempDir(), "ortodoxa-gudstjanster-store-test"))
 	scraper := NewGomosScraper(deps.store, deps.vision)
 
 	if scraper.Name() != "St. Georgios Cathedral" {
@@ -179,7 +179,7 @@ func TestRegistry(t *testing.T) {
 		t.Error("New registry should be empty")
 	}
 
-	s, err := store.New(filepath.Join(os.TempDir(), "church-services-store-test"))
+	s, err := store.New(filepath.Join(os.TempDir(), "ortodoxa-gudstjanster-store-test"))
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestGomosScraperHasFebruary2026Events(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	deps := newTestDeps(t, filepath.Join(os.TempDir(), "church-services-store-test"))
+	deps := newTestDeps(t, filepath.Join(os.TempDir(), "ortodoxa-gudstjanster-store-test"))
 	scraper := NewGomosScraper(deps.store, deps.vision)
 
 	services, err := scraper.Fetch(ctx)
@@ -305,7 +305,7 @@ func TestRyskaScraperHasFebruary2026Events(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	deps := newTestDeps(t, filepath.Join(os.TempDir(), "church-services-store-test"))
+	deps := newTestDeps(t, filepath.Join(os.TempDir(), "ortodoxa-gudstjanster-store-test"))
 	scraper := NewRyskaScraper(deps.store, deps.vision)
 
 	services, err := scraper.Fetch(ctx)

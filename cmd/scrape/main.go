@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	"church-services/internal/model"
-	"church-services/internal/scraper"
-	"church-services/internal/store"
-	"church-services/internal/vision"
+	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/scraper"
+	"ortodoxa-gudstjanster/internal/store"
+	"ortodoxa-gudstjanster/internal/vision"
 )
 
 func main() {

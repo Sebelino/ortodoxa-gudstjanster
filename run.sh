@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-IMAGE_NAME="church-services"
-CONTAINER_NAME="church-services"
+IMAGE_NAME="ortodoxa-gudstjanster"
+CONTAINER_NAME="ortodoxa-gudstjanster"
 CACHE_DIR="$(pwd)/cache"
 STORE_DIR="$(pwd)/disk"
 

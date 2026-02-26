@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CACHE_DIR="${HOME}/.cache/church-services"
+CACHE_DIR="${HOME}/.cache/ortodoxa-gudstjanster"
 
 if [ -d "$CACHE_DIR" ]; then
     rm -rf "$CACHE_DIR"/*

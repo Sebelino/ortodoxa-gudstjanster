@@ -9,7 +9,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"church-services/internal/model"
+	"ortodoxa-gudstjanster/internal/model"
 )
 
 // fetchURL fetches the content of a URL and returns the response body as bytes.

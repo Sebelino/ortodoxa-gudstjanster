@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"strings"
 
-	"church-services/internal/model"
-	"church-services/internal/store"
-	"church-services/internal/vision"
+	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/store"
+	"ortodoxa-gudstjanster/internal/vision"
 )
 
 // ExtractRyskaScheduleText fetches the Ryska website and extracts the schedule text.

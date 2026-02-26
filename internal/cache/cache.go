@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"church-services/internal/model"
+	"ortodoxa-gudstjanster/internal/model"
 )
 
 // Entry represents a cached set of services with metadata.
