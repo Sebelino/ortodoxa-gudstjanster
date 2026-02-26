@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/smtp"
 	"sort"
 	"strings"
 	"sync"
@@ -16,13 +17,23 @@ import (
 	"church-services/internal/scraper"
 )
 
-//go:embed templates/index.html
+//go:embed templates/*.html
 var templates embed.FS
+
+// SMTPConfig holds SMTP configuration for sending emails.
+type SMTPConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	To       string
+}
 
 // Handler holds the HTTP handlers and their dependencies.
 type Handler struct {
 	registry *scraper.Registry
 	cache    *cache.Cache
+	smtp     *SMTPConfig
 }
 
 // New creates a new Handler with the given scraper registry and cache.
@@ -33,11 +44,17 @@ func New(registry *scraper.Registry, c *cache.Cache) *Handler {
 	}
 }
 
+// SetSMTP configures SMTP for sending feedback emails.
+func (h *Handler) SetSMTP(config *SMTPConfig) {
+	h.smtp = config
+}
+
 // RegisterRoutes registers all HTTP routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", h.noCache(h.handleIndex))
 	mux.HandleFunc("/services", h.noCache(h.handleServices))
 	mux.HandleFunc("/calendar.ics", h.handleICS)
+	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/health", h.handleHealth)
 }
 
@@ -257,6 +274,78 @@ func filterAndSort(services []model.ChurchService) []model.ChurchService {
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
+}
+
+func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		data, _ := templates.ReadFile("templates/feedback.html")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var feedback struct {
+			Type    string `json:"type"`
+			Email   string `json:"email"`
+			Message string `json:"message"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&feedback); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if feedback.Type == "" || feedback.Message == "" {
+			http.Error(w, "Type and message are required", http.StatusBadRequest)
+			return
+		}
+
+		// Send email notification
+		if err := h.sendFeedbackEmail(feedback.Type, feedback.Email, feedback.Message); err != nil {
+			http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func (h *Handler) sendFeedbackEmail(feedbackType, email, message string) error {
+	if h.smtp == nil {
+		return fmt.Errorf("SMTP not configured")
+	}
+
+	typeLabels := map[string]string{
+		"error":      "Fel i schemat",
+		"new_parish": "Lägg till församling",
+		"suggestion": "Förslag",
+		"other":      "Annat",
+	}
+
+	typeLabel := typeLabels[feedbackType]
+	if typeLabel == "" {
+		typeLabel = feedbackType
+	}
+
+	replyTo := email
+	if replyTo == "" {
+		replyTo = "ingen e-post angiven"
+	}
+
+	subject := fmt.Sprintf("Feedback: %s", typeLabel)
+	body := fmt.Sprintf("Typ: %s\nFrån: %s\n\nMeddelande:\n%s", typeLabel, replyTo, message)
+
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s",
+		h.smtp.User, h.smtp.To, subject, body)
+
+	auth := smtp.PlainAuth("", h.smtp.User, h.smtp.Password, h.smtp.Host)
+	addr := h.smtp.Host + ":" + h.smtp.Port
+
+	return smtp.SendMail(addr, auth, h.smtp.User, []string{h.smtp.To}, []byte(msg))
 }
 
 func (h *Handler) fetchAllWithCache(ctx context.Context) []model.ChurchService {

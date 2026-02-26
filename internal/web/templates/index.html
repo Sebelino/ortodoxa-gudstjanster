@@ -170,6 +170,21 @@
             font-size: 0.85rem;
         }
 
+        .footer-links {
+            text-align: center;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .footer-links a {
+            color: #2c5282;
+            text-decoration: none;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
         .filter-panel {
             background: white;
             border-radius: 6px;
@@ -464,6 +479,7 @@
             });
 
             html += `<p class="service-count">Visar ${filteredServices.length} av ${allServices.length} gudstjänster</p>`;
+            html += `<p class="footer-links"><a href="/feedback">Rapportera fel eller föreslå förbättringar</a></p>`;
             content.innerHTML = html;
         }
 

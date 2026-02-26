@@ -27,6 +27,11 @@ Environment variables:
 - `CACHE_DIR` - Directory for HTTP response cache (default: `cache/`)
 - `STORE_DIR` - Directory for Vision API results cache (default: `disk/`)
 - `OPENAI_API_KEY` - Required for scrapers that use OpenAI Vision API (Gomos, Ryska)
+- `SMTP_HOST` - SMTP server hostname (e.g., `smtp.gmail.com`)
+- `SMTP_PORT` - SMTP server port (e.g., `587`)
+- `SMTP_USER` - SMTP username/email
+- `SMTP_PASS` - SMTP password (use app password for Gmail)
+- `SMTP_TO` - Email address to receive feedback notifications
 
 ## Running with Docker
 
@@ -39,6 +44,9 @@ docker run -p 8080:8080 church-services
 
 - `GET /` - Web UI showing the calendar
 - `GET /services` - JSON API returning all services
+- `GET /calendar.ics` - ICS calendar feed (supports `?exclude=` filter)
+- `GET /feedback` - Feedback form page
+- `POST /feedback` - Submit feedback (sends email via SMTP)
 - `GET /health` - Health check endpoint
 
 ## Architecture

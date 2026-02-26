@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback - Ortodoxa Gudstjänster</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        header a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+
+        header a:hover {
+            color: white;
+        }
+
+        main {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 6px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .form-container h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #1a365d;
+        }
+
+        .form-container p {
+            color: #666;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+            color: #4a5568;
+        }
+
+        select, input, textarea {
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #2c5282;
+            box-shadow: 0 0 0 2px rgba(44, 82, 130, 0.1);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .submit-btn {
+            background: #2c5282;
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .submit-btn:hover {
+            background: #1a365d;
+        }
+
+        .submit-btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+
+        .message {
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .message.success {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .message.error {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Feedback</h1>
+        <a href="/">&larr; Tillbaka till kalendern</a>
+    </header>
+
+    <main>
+        <div class="form-container">
+            <h2>Skicka feedback</h2>
+            <p>Rapportera fel i schemat, be om att en ny församling läggs till, eller skicka andra synpunkter.</p>
+
+            <div id="message" class="message hidden"></div>
+
+            <form id="feedback-form">
+                <div class="form-group">
+                    <label for="type">Typ av feedback</label>
+                    <select id="type" name="type" required>
+                        <option value="">Välj...</option>
+                        <option value="error">Fel i schemat</option>
+                        <option value="new_parish">Lägg till församling</option>
+                        <option value="suggestion">Förslag</option>
+                        <option value="other">Annat</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">E-post (valfritt)</label>
+                    <input type="email" id="email" name="email" placeholder="din@email.se">
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Meddelande</label>
+                    <textarea id="message-input" name="message" required placeholder="Beskriv ditt ärende..."></textarea>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submit-btn">Skicka</button>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        const form = document.getElementById('feedback-form');
+        const messageDiv = document.getElementById('message');
+        const submitBtn = document.getElementById('submit-btn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Skickar...';
+            messageDiv.classList.add('hidden');
+
+            const formData = {
+                type: document.getElementById('type').value,
+                email: document.getElementById('email').value,
+                message: document.getElementById('message-input').value
+            };
+
+            try {
+                const response = await fetch('/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    messageDiv.textContent = 'Tack för din feedback! Vi har tagit emot ditt meddelande.';
+                    messageDiv.className = 'message success';
+                    form.reset();
+                } else {
+                    const error = await response.text();
+                    throw new Error(error || 'Något gick fel');
+                }
+            } catch (error) {
+                messageDiv.textContent = 'Kunde inte skicka: ' + error.message;
+                messageDiv.className = 'message error';
+            }
+
+            messageDiv.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Skicka';
+        });
+    </script>
+</body>
+</html>
