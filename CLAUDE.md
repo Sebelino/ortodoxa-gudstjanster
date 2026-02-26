@@ -22,7 +22,11 @@ go run ./cmd/server
 
 The server starts on port 8080 (configurable via `PORT` env var).
 
-Cache is stored in a temp directory by default (configurable via `CACHE_DIR` env var).
+Environment variables:
+- `PORT` - Server port (default: 8080)
+- `CACHE_DIR` - Directory for HTTP response cache (default: `cache/`)
+- `STORE_DIR` - Directory for Vision API results cache (default: `disk/`)
+- `OPENAI_API_KEY` - Required for scrapers that use OpenAI Vision API (Gomos, Ryska)
 
 ## Running with Docker
 
@@ -45,13 +49,19 @@ church-services/
 ├── internal/
 │   ├── model/service.go     # ChurchService data model
 │   ├── scraper/
-│   │   ├── scraper.go       # Scraper interface and registry
-│   │   ├── finska.go        # Finska Ortodoxa scraper (HTML)
-│   │   └── gomos.go         # St. Georgios scraper (OCR)
-│   ├── cache/cache.go       # Disk-based caching layer
+│   │   ├── scraper.go       # Scraper interface, registry, HTTP helpers
+│   │   ├── finska.go        # Finska Ortodoxa scraper (HTML parsing)
+│   │   ├── gomos.go         # St. Georgios scraper (Vision API OCR)
+│   │   ├── heligaanna.go    # Heliga Anna scraper (HTML parsing)
+│   │   └── ryska.go         # Kristi Förklarings scraper (Vision API)
+│   ├── cache/cache.go       # HTTP response cache (30-min TTL)
+│   ├── store/store.go       # Persistent store for Vision API results
+│   ├── vision/openai.go     # OpenAI Vision API client
 │   └── web/
 │       ├── handler.go       # HTTP handlers
 │       └── templates/       # Embedded HTML templates
+├── run.sh                   # Docker build and run script
+├── run_tests.sh             # Test runner for scraper tests
 └── Dockerfile               # Multi-stage Alpine build
 ```
 
@@ -72,4 +82,23 @@ church-services/
 
 ### Caching
 
-Results are cached to disk with a 30-minute TTL. Cache files are stored as JSON in the `CACHE_DIR` directory.
+Two caching layers:
+- **HTTP Cache** (`CACHE_DIR`): 30-minute TTL for scraped HTML responses
+- **Store** (`STORE_DIR`): Permanent cache for Vision API results, keyed by image checksum (SHA256)
+
+### Vision API Integration
+
+Some scrapers (Gomos, Ryska) use OpenAI Vision API to extract schedules from images or text:
+- `ExtractSchedule`: OCR from schedule images (gpt-4o)
+- `ExtractScheduleFromText`: Parse schedule from extracted text (gpt-4o-mini)
+- `CompareScheduleImages`: Detect duplicate schedules in different languages (gpt-4o-mini)
+
+The Gomos scraper filters duplicate images (same schedule in Swedish/Greek) before processing.
+
+## Testing
+
+```bash
+./run_tests.sh
+```
+
+Requires `OPENAI_API_KEY` in `gitignore/apikey.txt`. Tests verify each scraper returns February 2026 events.
