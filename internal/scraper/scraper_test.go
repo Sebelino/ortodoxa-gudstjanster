@@ -245,6 +245,50 @@ func TestGomosScraperHasFebruary2026Events(t *testing.T) {
 	assertHasFebruary2026Events(t, services)
 }
 
+func TestGomosScraperSavesSourceImage(t *testing.T) {
+	if os.Getenv("OPENAI_API_KEY") == "" {
+		t.Skip("OPENAI_API_KEY not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	storeDir := "../../test-disk"
+	os.RemoveAll(storeDir)
+	s, err := store.New(storeDir)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	visionClient := vision.NewClient(os.Getenv("OPENAI_API_KEY"))
+	scraper := NewGomosScraper(s, visionClient)
+
+	_, err = scraper.Fetch(ctx)
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	// Check that at least one image file was saved
+	entries, err := os.ReadDir(storeDir)
+	if err != nil {
+		t.Fatalf("Failed to read store directory: %v", err)
+	}
+
+	var imageCount int
+	for _, entry := range entries {
+		name := entry.Name()
+		if filepath.Ext(name) == ".jpg" || filepath.Ext(name) == ".png" || filepath.Ext(name) == ".jpeg" {
+			imageCount++
+			t.Logf("Found image: %s", name)
+		}
+	}
+
+	if imageCount == 0 {
+		t.Error("Expected at least one image file (.jpg/.png) in store directory")
+	} else {
+		t.Logf("Found %d image files in store directory", imageCount)
+	}
+}
+
 func TestHeligaAnnaScraperHasFebruary2026Events(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
