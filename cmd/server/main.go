@@ -13,7 +13,7 @@ import (
 	"ortodoxa-gudstjanster/internal/web"
 )
 
-const defaultCacheTTL = 30 * time.Minute
+const defaultCacheTTL = 6 * time.Hour
 
 func main() {
 	port := os.Getenv("PORT")

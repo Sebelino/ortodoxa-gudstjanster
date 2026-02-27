@@ -63,7 +63,7 @@ ortodoxa-gudstjanster/
 │   │   ├── heligaanna.go    # Heliga Anna scraper (HTML parsing)
 │   │   ├── ryska.go         # Kristi Förklarings scraper (Vision API)
 │   │   └── srpska.go        # Sankt Sava scraper (recurring events)
-│   ├── cache/cache.go       # HTTP response cache (30-min TTL)
+│   ├── cache/cache.go       # HTTP response cache (6-hour TTL)
 │   ├── store/store.go       # Persistent store for Vision API results
 │   ├── vision/openai.go     # OpenAI Vision API client
 │   └── web/
@@ -92,7 +92,7 @@ ortodoxa-gudstjanster/
 ### Caching
 
 Two caching layers:
-- **HTTP Cache** (`CACHE_DIR`): 30-minute TTL for scraped HTML responses
+- **HTTP Cache** (`CACHE_DIR`): 6-hour TTL for scraped HTML responses
 - **Store** (`STORE_DIR`): Permanent cache for Vision API results, keyed by image checksum (SHA256)
 
 ### Vision API Integration
