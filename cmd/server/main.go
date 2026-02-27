@@ -54,6 +54,7 @@ func main() {
 	registry.Register(scraper.NewGomosScraper(s, visionClient))
 	registry.Register(scraper.NewHeligaAnnaScraper())
 	registry.Register(scraper.NewRyskaScraper(s, visionClient))
+	registry.Register(scraper.NewSrpskaScraper())
 
 	// Initialize HTTP handlers
 	handler := web.New(registry, c)

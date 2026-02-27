@@ -61,7 +61,8 @@ ortodoxa-gudstjanster/
 │   │   ├── finska.go        # Finska Ortodoxa scraper (HTML parsing)
 │   │   ├── gomos.go         # St. Georgios scraper (Vision API OCR)
 │   │   ├── heligaanna.go    # Heliga Anna scraper (HTML parsing)
-│   │   └── ryska.go         # Kristi Förklarings scraper (Vision API)
+│   │   ├── ryska.go         # Kristi Förklarings scraper (Vision API)
+│   │   └── srpska.go        # Srpska Pravoslavna scraper (recurring events)
 │   ├── cache/cache.go       # HTTP response cache (30-min TTL)
 │   ├── store/store.go       # Persistent store for Vision API results
 │   ├── vision/openai.go     # OpenAI Vision API client
