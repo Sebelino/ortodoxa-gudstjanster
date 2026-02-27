@@ -1,10 +1,10 @@
 # Ortodoxa Gudstjänster
 
-En webbtjänst som samlar gudstjänstscheman från ortodoxa kyrkor i Sverige i en gemensam kalender.
+En webbtjänst som samlar gudstjänstscheman från östortodoxa församlingar i Sverige i en gemensam kalender.
 
 ## Funktioner
 
-- Samlar scheman från flera ortodoxa församlingar i Stockholm
+- Samlar scheman från flera östortodoxa församlingar i Stockholm
 - Webbgränssnitt för att bläddra bland kommande gudstjänster
 - Filtrera efter församling
 - ICS-kalenderflöde för prenumeration i Google Kalender, Apple Kalender m.fl.
