@@ -170,6 +170,7 @@ func generateICS(services []model.ChurchService) string {
 	sb.WriteString("CALSCALE:GREGORIAN\r\n")
 	sb.WriteString("METHOD:PUBLISH\r\n")
 	sb.WriteString("X-WR-CALNAME:Ortodoxa Gudstjänster\r\n")
+	sb.WriteString("X-WR-TIMEZONE:Europe/Stockholm\r\n")
 
 	for i, s := range services {
 		sb.WriteString("BEGIN:VEVENT\r\n")
@@ -182,7 +183,7 @@ func generateICS(services []model.ChurchService) string {
 		if s.Time != nil && *s.Time != "" {
 			if startTime := parseStartTime(*s.Time); startTime != "" {
 				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + startTime
-				sb.WriteString(fmt.Sprintf("DTSTART:%s\r\n", dtstart))
+				sb.WriteString(fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s\r\n", dtstart))
 				// Assume 1.5 hour duration for services
 				sb.WriteString(fmt.Sprintf("DURATION:PT1H30M\r\n"))
 			}
