@@ -38,6 +38,16 @@ Du kan exkludera specifika församlingar med parametern `exclude`:
 https://ortodoxa-gudstjanster.fly.dev/calendar.ics?exclude=St.%20Georgios%20Cathedral
 ```
 
+#### Lägga till i Google Kalender
+
+1. Öppna [Google Calendar](https://calendar.google.com) i webbläsaren
+2. Klicka på **+** bredvid "Andra kalendrar" i vänstermenyn
+3. Välj **Från webbadress** / **From URL**
+4. Klistra in URL:en: `https://ortodoxa-gudstjanster.fly.dev/calendar.ics`
+5. Klicka på **Lägg till kalender**
+
+Kalendern synkroniseras automatiskt med nya gudstjänster.
+
 ### JSON-API
 
 ```
