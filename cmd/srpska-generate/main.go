@@ -15,7 +15,7 @@ import (
 	"ortodoxa-gudstjanster/internal/srpska"
 )
 
-const defaultWeeks = 8
+const defaultWeeks = 26
 
 func main() {
 	// Read schedule JSON from stdin

@@ -11,7 +11,7 @@ const (
 	srpskaSourceName = "Sankt Sava"
 	srpskaLocation   = "Stockholm, Bägerstavägen 68"
 	srpskaLanguage   = "Serbiska, svenska"
-	srpskaWeeks      = 8
+	srpskaWeeks      = 26
 )
 
 // SrpskaScraper scrapes the Serbian Orthodox Church schedule.
