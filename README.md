@@ -16,7 +16,7 @@ En webbtjänst som samlar gudstjänstscheman från ortodoxa kyrkor i Sverige i e
 - St. Georgios Cathedral (Grekisk-ortodoxa)
 - Heliga Anna av Novgorod
 - Kristi Förklarings Ortodoxa Församling (Rysk-ortodoxa)
-- Srpska Pravoslavna Crkva Sveti Sava (Serbisk-ortodoxa)
+- Sankt Sava (Serbisk-ortodoxa)
 
 ## Användning
 

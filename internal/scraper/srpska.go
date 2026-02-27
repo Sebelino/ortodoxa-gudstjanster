@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	srpskaSourceName = "Srpska Pravoslavna Crkva Sveti Sava"
+	srpskaSourceName = "Sankt Sava"
 	srpskaURL        = "https://www.crkvastokholm.se/calendar"
 	srpskaLocation   = "Stockholm, Bägerstavägen 68"
 	srpskaLanguage   = "Serbiska, svenska"
@@ -140,13 +140,13 @@ func (s *SrpskaScraper) schedulesMatch(current, expected []srpskaService) bool {
 
 func (s *SrpskaScraper) sendScheduleChangeNotification(newSchedule []srpskaService) {
 	if s.smtpHost == "" || s.smtpUser == "" || s.smtpPass == "" {
-		fmt.Printf("WARNING: Srpska church schedule has changed but SMTP not configured!\n")
+		fmt.Printf("WARNING: Sankt Sava schedule has changed but SMTP not configured!\n")
 		fmt.Printf("New schedule: %+v\n", newSchedule)
 		return
 	}
 
-	subject := "Srpska Pravoslavna Crkva - Schema ändrat!"
-	body := fmt.Sprintf(`Schemat för Srpska Pravoslavna Crkva Sveti Sava har ändrats på hemsidan.
+	subject := "Sankt Sava - Schema ändrat!"
+	body := fmt.Sprintf(`Schemat för Sankt Sava har ändrats på hemsidan.
 
 Nytt schema från hemsidan:
 %s
