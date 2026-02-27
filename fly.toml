@@ -17,7 +17,7 @@ primary_region = "arn"
   processes = ["app"]
 
 [[vm]]
-  memory = "256mb"
+  memory = "1gb"
   cpu_kind = "shared"
   cpus = 1
 
