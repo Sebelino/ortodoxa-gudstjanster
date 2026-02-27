@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/chromedp/chromedp"
 )
 
 const (
-	srpskaBaseURL = "https://www.crkvastokholm.se"
+	srpskaCalendarURL = "https://www.crkvastokholm.se/calendar"
 )
 
 // RecurringSchedule represents the structured schedule output
@@ -29,7 +29,7 @@ type RecurringService struct {
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	schedule, err := extractSchedule(ctx)
@@ -47,288 +47,161 @@ func main() {
 }
 
 func extractSchedule(ctx context.Context) (*RecurringSchedule, error) {
-	// First, fetch the main page to find the JS bundle URL
-	htmlBody, err := fetchURL(ctx, srpskaBaseURL)
+	// Create headless Chrome context
+	opts := chromedp.DefaultExecAllocatorOptions[:]
+	if chromePath := os.Getenv("CHROME_PATH"); chromePath != "" {
+		opts = append(opts, chromedp.ExecPath(chromePath))
+	}
+	opts = append(opts,
+		chromedp.Headless,
+		chromedp.DisableGPU,
+		chromedp.NoSandbox,
+	)
+	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
+	defer allocCancel()
+
+	chromeCtx, chromeCancel := chromedp.NewContext(allocCtx)
+	defer chromeCancel()
+
+	var tableText string
+
+	// Navigate to the calendar page and extract the schedule table
+	err := chromedp.Run(chromeCtx,
+		chromedp.Navigate(srpskaCalendarURL),
+		// Wait for the schedule table to be rendered
+		chromedp.WaitVisible(`table`, chromedp.ByQuery),
+		// Give React a moment to fully render
+		chromedp.Sleep(1*time.Second),
+		// Extract the table text content
+		chromedp.Text(`table`, &tableText, chromedp.ByQuery),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("fetching main page: %w", err)
+		return nil, fmt.Errorf("extracting schedule table: %w", err)
 	}
 
-	// Extract JS bundle URL
-	jsURLRegex := regexp.MustCompile(`src="(/assets/index-[^"]+\.js)"`)
-	matches := jsURLRegex.FindStringSubmatch(string(htmlBody))
-	if len(matches) < 2 {
-		return nil, fmt.Errorf("could not find JS bundle URL")
-	}
-	jsURL := srpskaBaseURL + matches[1]
+	// Parse the extracted text
+	return parseScheduleTable(tableText)
+}
 
-	// Fetch the JS bundle
-	jsBody, err := fetchURL(ctx, jsURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetching JS bundle: %w", err)
-	}
-	jsContent := string(jsBody)
-
-	// Extract Swedish translations
-	translations := extractSwedishTranslations(jsContent)
-
+func parseScheduleTable(text string) (*RecurringSchedule, error) {
 	schedule := &RecurringSchedule{
 		Services: []RecurringService{},
 	}
 
-	// Parse footer entries which have both days and times
-	// footer.svetaLiturgija1: "Söndag, lördag, helgdag: kl. 9:00" (Liturgy)
-	// footer.svetaLiturgija2: "Daglig morgongudstjänst: kl. 9:00"
-	// footer.svetaLiturgija3: "Daglig aftongudstjänst: kl. 17:00"
+	// Split into lines and process
+	lines := strings.Split(text, "\n")
 
-	if val, ok := translations["footer.svetaLiturgija1"]; ok {
-		if svc := parseFooterEntry("Helig Liturgi", val); svc != nil {
-			schedule.Services = append(schedule.Services, *svc)
+	// Pattern to match service entries like "Јутрење - недеља:	8:00"
+	// Format: "ServiceName - days:	HH:MM" (tab-separated)
+	servicePattern := regexp.MustCompile(`^(.+?)\s*[-–]\s*(.+?):\s*(\d{1,2}):(\d{2})`)
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
 		}
-	}
 
-	if val, ok := translations["footer.svetaLiturgija2"]; ok {
-		if svc := parseFooterEntry("", val); svc != nil {
-			schedule.Services = append(schedule.Services, *svc)
+		// Handle tab-separated format: join with space
+		line = strings.ReplaceAll(line, "\t", " ")
+
+		matches := servicePattern.FindStringSubmatch(line)
+		if len(matches) >= 5 {
+			name := strings.TrimSpace(matches[1])
+			daysStr := strings.TrimSpace(matches[2])
+			hour := matches[3]
+			minute := matches[4]
+
+			if len(hour) == 1 {
+				hour = "0" + hour
+			}
+			timeStr := hour + ":" + minute
+
+			// Translate Serbian service name to Swedish
+			swedishName := translateServiceName(name)
+			days := parseDays(daysStr)
+
+			if swedishName != "" && len(days) > 0 {
+				schedule.Services = append(schedule.Services, RecurringService{
+					Name: swedishName,
+					Days: days,
+					Time: timeStr,
+				})
+			}
 		}
-	}
-
-	if val, ok := translations["footer.svetaLiturgija3"]; ok {
-		if svc := parseFooterEntry("", val); svc != nil {
-			schedule.Services = append(schedule.Services, *svc)
-		}
-	}
-
-	// Also check calendar.table for more detailed day information
-	// These may provide more specific days than the footer
-	calendarServices := extractCalendarTableServices(translations)
-	if len(calendarServices) > 0 {
-		// Use calendar table data if it provides more detail
-		schedule.Services = mergeSchedules(schedule.Services, calendarServices)
 	}
 
 	if len(schedule.Services) == 0 {
-		return nil, fmt.Errorf("could not extract any schedule information")
+		return nil, fmt.Errorf("could not parse any services from table text: %q", text)
 	}
 
 	return schedule, nil
 }
 
-func extractSwedishTranslations(jsContent string) map[string]string {
-	translations := make(map[string]string)
+func translateServiceName(name string) string {
+	// Serbian (Cyrillic) to Swedish translations
+	translations := map[string]string{
+		"Јутрење":   "Morgongudstjänst",
+		"Литургија": "Helig Liturgi",
+		"Вечерње":   "Aftongudstjänst",
+		// Latin variants
+		"Jutrenje":  "Morgongudstjänst",
+		"Liturgija": "Helig Liturgi",
+		"Večernje":  "Aftongudstjänst",
+	}
 
-	// Match all string key-value pairs
-	keyPattern := regexp.MustCompile(`"([a-zA-Z0-9_.]+)":"([^"]+)"`)
-	matches := keyPattern.FindAllStringSubmatch(jsContent, -1)
-
-	for _, match := range matches {
-		if len(match) >= 3 {
-			key := match[1]
-			value := match[2]
-			// Only keep Swedish translations
-			if isSwedish(value) {
-				translations[key] = value
-			}
+	for serbian, swedish := range translations {
+		if strings.Contains(name, serbian) {
+			return swedish
 		}
 	}
 
-	return translations
+	return name
 }
 
-func isSwedish(s string) bool {
-	swedishIndicators := []string{
-		"lördag", "söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag",
-		"helgdag", "Morgon", "Afton", "kl.", "Helig", "Daglig",
-		"ö", "ä", "å", // Swedish letters
+func parseDays(s string) []string {
+	var days []string
+
+	// Check for "working days" patterns in various languages
+	// Serbian Cyrillic: "радни дани", Latin: "radni dani"
+	if strings.Contains(s, "радни дани") || strings.Contains(strings.ToLower(s), "radni dan") ||
+		strings.Contains(strings.ToLower(s), "vardagar") || strings.Contains(strings.ToLower(s), "working day") {
+		return []string{"måndag", "tisdag", "onsdag", "torsdag", "fredag"}
 	}
+
+	// Map of day names (Serbian Cyrillic, Serbian Latin, Swedish) to Swedish
+	dayMappings := []struct {
+		patterns []string
+		swedish  string
+	}{
+		{[]string{"понедељак", "ponedeljak", "måndag"}, "måndag"},
+		{[]string{"уторак", "utorak", "tisdag"}, "tisdag"},
+		{[]string{"среда", "sreda", "onsdag"}, "onsdag"},
+		{[]string{"четвртак", "četvrtak", "torsdag"}, "torsdag"},
+		{[]string{"петак", "petak", "fredag"}, "fredag"},
+		{[]string{"субота", "subota", "lördag"}, "lördag"},
+		{[]string{"недеља", "nedelja", "söndag"}, "söndag"},
+		{[]string{"празник", "praznik", "helgdag"}, "helgdag"},
+	}
+
 	lowerS := strings.ToLower(s)
-	for _, indicator := range swedishIndicators {
-		if strings.Contains(lowerS, strings.ToLower(indicator)) {
-			return true
-		}
-	}
-	return false
-}
-
-func parseFooterEntry(defaultName, value string) *RecurringService {
-	svc := &RecurringService{}
-
-	// Extract time
-	timeRegex := regexp.MustCompile(`kl\.?\s*(\d{1,2}):(\d{2})`)
-	timeMatch := timeRegex.FindStringSubmatch(value)
-	if len(timeMatch) >= 3 {
-		hour := timeMatch[1]
-		if len(hour) == 1 {
-			hour = "0" + hour
-		}
-		svc.Time = hour + ":" + timeMatch[2]
-	}
-
-	// Extract name from the value if not provided
-	if defaultName != "" {
-		svc.Name = defaultName
-	} else {
-		// Try to extract name from value (text before ":")
-		if colonIdx := strings.Index(value, ":"); colonIdx != -1 {
-			namePart := strings.TrimSpace(value[:colonIdx])
-			// Check if it's actually a name (not days)
-			if !containsDay(namePart) {
-				svc.Name = namePart
+	for _, mapping := range dayMappings {
+		for _, pattern := range mapping.patterns {
+			if strings.Contains(s, pattern) || strings.Contains(lowerS, strings.ToLower(pattern)) {
+				// Avoid duplicates
+				found := false
+				for _, d := range days {
+					if d == mapping.swedish {
+						found = true
+						break
+					}
+				}
+				if !found {
+					days = append(days, mapping.swedish)
+				}
+				break
 			}
-		}
-	}
-
-	// Extract days
-	svc.Days = extractDays(value)
-
-	// Handle "Daglig" (daily)
-	if strings.Contains(strings.ToLower(value), "daglig") {
-		svc.Days = []string{"måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag"}
-	}
-
-	if svc.Time != "" && (len(svc.Days) > 0 || svc.Name != "") {
-		return svc
-	}
-
-	return nil
-}
-
-func containsDay(s string) bool {
-	days := []string{"måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag", "helgdag"}
-	lowerS := strings.ToLower(s)
-	for _, day := range days {
-		if strings.Contains(lowerS, day) {
-			return true
-		}
-	}
-	return false
-}
-
-func extractCalendarTableServices(translations map[string]string) []RecurringService {
-	var services []RecurringService
-
-	// calendar.table.time1: "Morgongudstjänst - lördag, söndag och helgdag:"
-	// calendar.table.time2: "Hellig liturgi - lördag, söndag och helgdag:"
-	// calendar.table.time3: "Morgongudstjänst - måndag och fredag:"
-	// calendar.table.time4: "Aftongudstjänst - måndag och fredag:"
-
-	for i := 1; i <= 4; i++ {
-		key := fmt.Sprintf("calendar.table.time%d", i)
-		if val, ok := translations[key]; ok {
-			svc := parseCalendarTableEntry(val)
-			if svc != nil {
-				services = append(services, *svc)
-			}
-		}
-	}
-
-	return services
-}
-
-func parseCalendarTableEntry(value string) *RecurringService {
-	svc := &RecurringService{}
-
-	// Extract name (text before " - ")
-	if dashIdx := strings.Index(value, " - "); dashIdx != -1 {
-		svc.Name = strings.TrimSpace(value[:dashIdx])
-	}
-
-	// Extract days
-	svc.Days = extractDays(value)
-
-	if svc.Name != "" && len(svc.Days) > 0 {
-		return svc
-	}
-
-	return nil
-}
-
-func extractDays(s string) []string {
-	days := []string{}
-	lowerS := strings.ToLower(s)
-
-	dayList := []string{"måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag", "helgdag"}
-
-	for _, day := range dayList {
-		if strings.Contains(lowerS, day) {
-			days = append(days, day)
 		}
 	}
 
 	return days
-}
-
-func mergeSchedules(footerServices, calendarServices []RecurringService) []RecurringService {
-	// Create a map of calendar services by normalized name
-	calendarByName := make(map[string]*RecurringService)
-	for i := range calendarServices {
-		name := strings.ToLower(calendarServices[i].Name)
-		calendarByName[name] = &calendarServices[i]
-	}
-
-	// Merge times from footer into calendar services
-	result := []RecurringService{}
-
-	for _, footer := range footerServices {
-		footerNameLower := strings.ToLower(footer.Name)
-
-		// Try to find matching calendar entry
-		var matched *RecurringService
-		for name, cal := range calendarByName {
-			if strings.Contains(footerNameLower, name) || strings.Contains(name, footerNameLower) {
-				matched = cal
-				break
-			}
-			// Check for partial matches
-			if strings.Contains(footerNameLower, "liturgi") && strings.Contains(name, "liturgi") {
-				matched = cal
-				break
-			}
-			if strings.Contains(footerNameLower, "morgon") && strings.Contains(name, "morgon") {
-				matched = cal
-				break
-			}
-			if strings.Contains(footerNameLower, "afton") && strings.Contains(name, "afton") {
-				matched = cal
-				break
-			}
-		}
-
-		if matched != nil && matched.Time == "" {
-			// Use calendar days with footer time
-			merged := RecurringService{
-				Name: matched.Name,
-				Days: matched.Days,
-				Time: footer.Time,
-			}
-			result = append(result, merged)
-			delete(calendarByName, strings.ToLower(matched.Name))
-		} else {
-			// Use footer entry as-is
-			result = append(result, footer)
-		}
-	}
-
-	// Add any remaining calendar services without times
-	for _, cal := range calendarByName {
-		if cal.Time != "" || len(cal.Days) > 0 {
-			result = append(result, *cal)
-		}
-	}
-
-	return result
-}
-
-func fetchURL(ctx context.Context, url string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return io.ReadAll(resp.Body)
 }
