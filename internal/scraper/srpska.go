@@ -194,15 +194,51 @@ func (s *SrpskaScraper) generateRecurringEvents() []model.ChurchService {
 	lang := srpskaLanguage
 
 	for current.Before(end) {
+		weekday := current.Weekday()
+
 		// Liturgy at 9:00 on Saturday and Sunday
-		if current.Weekday() == time.Saturday || current.Weekday() == time.Sunday {
+		if weekday == time.Saturday || weekday == time.Sunday {
 			timeStr := "09:00"
 			services = append(services, model.ChurchService{
 				Source:      srpskaSourceName,
 				SourceURL:   srpskaURL,
 				Date:        current.Format("2006-01-02"),
-				DayOfWeek:   s.weekdayToSwedish(current.Weekday()),
+				DayOfWeek:   s.weekdayToSwedish(weekday),
 				ServiceName: "Helig Liturgi",
+				Location:    &location,
+				Time:        &timeStr,
+				Occasion:    nil,
+				Notes:       nil,
+				Language:    &lang,
+			})
+		}
+
+		// Morning service at 9:00 on Monday and Friday
+		if weekday == time.Monday || weekday == time.Friday {
+			timeStr := "09:00"
+			services = append(services, model.ChurchService{
+				Source:      srpskaSourceName,
+				SourceURL:   srpskaURL,
+				Date:        current.Format("2006-01-02"),
+				DayOfWeek:   s.weekdayToSwedish(weekday),
+				ServiceName: "Morgongudstjänst",
+				Location:    &location,
+				Time:        &timeStr,
+				Occasion:    nil,
+				Notes:       nil,
+				Language:    &lang,
+			})
+		}
+
+		// Evening service at 17:00 on Monday and Friday
+		if weekday == time.Monday || weekday == time.Friday {
+			timeStr := "17:00"
+			services = append(services, model.ChurchService{
+				Source:      srpskaSourceName,
+				SourceURL:   srpskaURL,
+				Date:        current.Format("2006-01-02"),
+				DayOfWeek:   s.weekdayToSwedish(weekday),
+				ServiceName: "Aftongudstjänst",
 				Location:    &location,
 				Time:        &timeStr,
 				Occasion:    nil,
