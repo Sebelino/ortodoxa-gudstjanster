@@ -20,7 +20,8 @@ const (
 	srpskaLanguage   = "Serbiska, svenska"
 )
 
-// Expected schedule - if this changes on the website, send notification
+// Expected schedule from JSON-LD - if this changes on the website, send notification
+// Note: The actual liturgy time shown in the page content is 9:00, but JSON-LD says 10:00
 var expectedSrpskaSchedule = []srpskaService{
 	{DayOfWeek: "Sunday", Opens: "10:00", Closes: "12:00", ServiceName: "Helig Liturgi"},
 }
@@ -193,9 +194,9 @@ func (s *SrpskaScraper) generateRecurringEvents() []model.ChurchService {
 	lang := srpskaLanguage
 
 	for current.Before(end) {
-		// Sunday Liturgy at 10:00
-		if current.Weekday() == time.Sunday {
-			timeStr := "10:00"
+		// Liturgy at 9:00 on Saturday and Sunday
+		if current.Weekday() == time.Saturday || current.Weekday() == time.Sunday {
+			timeStr := "09:00"
 			services = append(services, model.ChurchService{
 				Source:      srpskaSourceName,
 				SourceURL:   srpskaURL,
