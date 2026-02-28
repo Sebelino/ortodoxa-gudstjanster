@@ -4,3 +4,4 @@ project_id   = "your-gcp-project-id"
 region       = "europe-north1"
 service_name = "ortodoxa-gudstjanster"
 image_tag    = "latest"
+domain       = ""  # Optional: custom domain (e.g., "example.com")

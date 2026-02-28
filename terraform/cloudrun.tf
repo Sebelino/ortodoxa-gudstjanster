@@ -1,3 +1,9 @@
+variable "domain" {
+  description = "Custom domain for the service"
+  type        = string
+  default     = ""
+}
+
 # Cloud Run service
 resource "google_cloud_run_v2_service" "app" {
   name     = var.service_name
@@ -109,4 +115,25 @@ resource "google_cloud_run_v2_service" "app" {
     google_secret_manager_secret_iam_member.smtp_to_access,
     google_storage_bucket_iam_member.store_access,
   ]
+}
+
+# Custom domain mapping (optional)
+resource "google_cloud_run_domain_mapping" "custom_domain" {
+  count    = var.domain != "" ? 1 : 0
+  location = var.region
+  name     = var.domain
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.app.name
+  }
+}
+
+# Output DNS records needed for domain verification
+output "domain_dns_records" {
+  description = "DNS records to configure for custom domain"
+  value       = var.domain != "" ? google_cloud_run_domain_mapping.custom_domain[0].status[0].resource_records : []
 }
