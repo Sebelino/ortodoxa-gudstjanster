@@ -1,0 +1,6 @@
+# Copy this file to terraform.tfvars and fill in the values
+
+project_id   = "your-gcp-project-id"
+region       = "europe-north1"
+service_name = "ortodoxa-gudstjanster"
+image_tag    = "latest"
