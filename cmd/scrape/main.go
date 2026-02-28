@@ -32,7 +32,7 @@ func main() {
 	if storeDir == "" {
 		storeDir = "disk"
 	}
-	s, err := store.New(storeDir)
+	s, err := store.NewLocal(storeDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "store: %v\n", err)
 		os.Exit(1)

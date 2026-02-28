@@ -54,12 +54,12 @@ const (
 
 // RyskaScraper scrapes the Russian Orthodox Church schedule.
 type RyskaScraper struct {
-	store  *store.Store
+	store  store.Store
 	vision *vision.Client
 }
 
 // NewRyskaScraper creates a new scraper for the Russian Orthodox Church.
-func NewRyskaScraper(s *store.Store, v *vision.Client) *RyskaScraper {
+func NewRyskaScraper(s store.Store, v *vision.Client) *RyskaScraper {
 	return &RyskaScraper{
 		store:  s,
 		vision: v,

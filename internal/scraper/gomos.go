@@ -23,12 +23,12 @@ const (
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
 type GomosScraper struct {
-	store  *store.Store
+	store  store.Store
 	vision *vision.Client
 }
 
 // NewGomosScraper creates a new scraper for St. Georgios Cathedral.
-func NewGomosScraper(s *store.Store, v *vision.Client) *GomosScraper {
+func NewGomosScraper(s store.Store, v *vision.Client) *GomosScraper {
 	return &GomosScraper{
 		store:  s,
 		vision: v,

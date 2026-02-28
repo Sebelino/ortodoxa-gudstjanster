@@ -17,7 +17,7 @@ var dateRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 // testDeps holds common test dependencies for scrapers that need store and vision.
 type testDeps struct {
-	store  *store.Store
+	store  store.Store
 	vision *vision.Client
 }
 
@@ -27,7 +27,7 @@ func newTestDeps(t *testing.T, storeDir string) *testDeps {
 	if os.Getenv("OPENAI_API_KEY") == "" {
 		t.Skip("OPENAI_API_KEY not set")
 	}
-	s, err := store.New(storeDir)
+	s, err := store.NewLocal(storeDir)
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestRegistry(t *testing.T) {
 		t.Error("New registry should be empty")
 	}
 
-	s, err := store.New(filepath.Join(os.TempDir(), "ortodoxa-gudstjanster-store-test"))
+	s, err := store.NewLocal(filepath.Join(os.TempDir(), "ortodoxa-gudstjanster-store-test"))
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}

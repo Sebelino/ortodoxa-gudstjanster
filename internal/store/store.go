@@ -7,24 +7,33 @@ import (
 	"sync"
 )
 
-// Store is a persistent key-value store backed by JSON files.
+// Store is the interface for a persistent key-value store.
 // Unlike cache, it has no TTL - data persists indefinitely.
-type Store struct {
+type Store interface {
+	Get(key string) ([]byte, bool)
+	Set(key string, value []byte) error
+	GetJSON(key string, v interface{}) bool
+	SetJSON(key string, v interface{}) error
+	SetWithExtension(key string, ext string, value []byte) error
+}
+
+// LocalStore is a file-based implementation of Store.
+type LocalStore struct {
 	dir string
 	mu  sync.RWMutex
 }
 
-// New creates a new Store with the specified directory.
-func New(dir string) (*Store, error) {
+// NewLocal creates a new LocalStore with the specified directory.
+func NewLocal(dir string) (*LocalStore, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
-	return &Store{dir: dir}, nil
+	return &LocalStore{dir: dir}, nil
 }
 
 // Get retrieves a value by key. Returns the value and true if found,
 // or nil and false if not found.
-func (s *Store) Get(key string) ([]byte, bool) {
+func (s *LocalStore) Get(key string) ([]byte, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -37,7 +46,7 @@ func (s *Store) Get(key string) ([]byte, bool) {
 }
 
 // Set stores a value with the given key.
-func (s *Store) Set(key string, value []byte) error {
+func (s *LocalStore) Set(key string, value []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -46,7 +55,7 @@ func (s *Store) Set(key string, value []byte) error {
 }
 
 // GetJSON retrieves and unmarshals a JSON value.
-func (s *Store) GetJSON(key string, v interface{}) bool {
+func (s *LocalStore) GetJSON(key string, v interface{}) bool {
 	data, ok := s.Get(key)
 	if !ok {
 		return false
@@ -55,7 +64,7 @@ func (s *Store) GetJSON(key string, v interface{}) bool {
 }
 
 // SetJSON marshals and stores a value as JSON.
-func (s *Store) SetJSON(key string, v interface{}) error {
+func (s *LocalStore) SetJSON(key string, v interface{}) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -64,7 +73,7 @@ func (s *Store) SetJSON(key string, v interface{}) error {
 }
 
 // SetWithExtension stores raw bytes with a custom file extension.
-func (s *Store) SetWithExtension(key string, ext string, value []byte) error {
+func (s *LocalStore) SetWithExtension(key string, ext string, value []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -72,6 +81,6 @@ func (s *Store) SetWithExtension(key string, ext string, value []byte) error {
 	return os.WriteFile(path, value, 0644)
 }
 
-func (s *Store) keyPath(key string) string {
+func (s *LocalStore) keyPath(key string) string {
 	return filepath.Join(s.dir, key+".json")
 }

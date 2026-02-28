@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -26,11 +27,6 @@ func main() {
 		cacheDir = "cache"
 	}
 
-	storeDir := os.Getenv("STORE_DIR")
-	if storeDir == "" {
-		storeDir = "disk"
-	}
-
 	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
 
 	// Initialize cache
@@ -39,10 +35,28 @@ func main() {
 		log.Fatalf("Failed to initialize cache: %v", err)
 	}
 
-	// Initialize store
-	s, err := store.New(storeDir)
-	if err != nil {
-		log.Fatalf("Failed to initialize store: %v", err)
+	// Initialize store (GCS or local)
+	var s store.Store
+	gcsBucket := os.Getenv("GCS_BUCKET")
+	if gcsBucket != "" {
+		ctx := context.Background()
+		gcsStore, err := store.NewGCS(ctx, gcsBucket)
+		if err != nil {
+			log.Fatalf("Failed to initialize GCS store: %v", err)
+		}
+		s = gcsStore
+		log.Printf("Store: GCS bucket %s", gcsBucket)
+	} else {
+		storeDir := os.Getenv("STORE_DIR")
+		if storeDir == "" {
+			storeDir = "disk"
+		}
+		localStore, err := store.NewLocal(storeDir)
+		if err != nil {
+			log.Fatalf("Failed to initialize local store: %v", err)
+		}
+		s = localStore
+		log.Printf("Store: local directory %s", storeDir)
 	}
 
 	// Initialize vision client
@@ -78,7 +92,6 @@ func main() {
 
 	log.Printf("Server starting on port %s", port)
 	log.Printf("Cache directory: %s", cacheDir)
-	log.Printf("Store directory: %s", storeDir)
 	log.Printf("Registered scrapers: %d", len(registry.Scrapers()))
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
