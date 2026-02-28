@@ -184,8 +184,8 @@ func generateICS(services []model.ChurchService) string {
 			if startTime := parseStartTime(*s.Time); startTime != "" {
 				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + startTime
 				sb.WriteString(fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s\r\n", dtstart))
-				// Assume 1.5 hour duration for services
-				sb.WriteString(fmt.Sprintf("DURATION:PT1H30M\r\n"))
+				// Default 1 hour duration for services
+				sb.WriteString(fmt.Sprintf("DURATION:PT1H\r\n"))
 			}
 		} else {
 			// All-day event
