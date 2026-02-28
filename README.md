@@ -2,6 +2,8 @@
 
 En webbtjänst som samlar gudstjänstscheman från östortodoxa församlingar i Sverige i en gemensam kalender.
 
+**https://ortodoxagudstjanster.se**
+
 ## Funktioner
 
 - Samlar scheman från flera östortodoxa församlingar i Stockholm
@@ -22,20 +24,20 @@ En webbtjänst som samlar gudstjänstscheman från östortodoxa församlingar i 
 
 ### Webbgränssnitt
 
-Besök webbsidan för att bläddra bland kommande gudstjänster. Du kan filtrera efter församling och expandera varje gudstjänst för detaljer.
+Besök [ortodoxagudstjanster.se](https://ortodoxagudstjanster.se) för att bläddra bland kommande gudstjänster. Du kan filtrera efter församling och expandera varje gudstjänst för detaljer.
 
 ### Kalenderprenumeration
 
 Prenumerera på ICS-flödet för att få gudstjänsterna i din kalenderapp:
 
 ```
-https://ortodoxa-gudstjanster.fly.dev/calendar.ics
+https://ortodoxagudstjanster.se/calendar.ics
 ```
 
 Du kan exkludera specifika församlingar med parametern `exclude`:
 
 ```
-https://ortodoxa-gudstjanster.fly.dev/calendar.ics?exclude=St.%20Georgios%20Cathedral
+https://ortodoxagudstjanster.se/calendar.ics?exclude=St.%20Georgios%20Cathedral
 ```
 
 #### Lägga till i Google Kalender
@@ -43,7 +45,7 @@ https://ortodoxa-gudstjanster.fly.dev/calendar.ics?exclude=St.%20Georgios%20Cath
 1. Öppna [Google Calendar](https://calendar.google.com) i webbläsaren
 2. Klicka på **+** bredvid "Andra kalendrar" i vänstermenyn
 3. Välj **Från webbadress** / **From URL**
-4. Klistra in URL:en: `https://ortodoxa-gudstjanster.fly.dev/calendar.ics`
+4. Klistra in URL:en: `https://ortodoxagudstjanster.se/calendar.ics`
 5. Klicka på **Lägg till kalender**
 
 Kalendern synkroniseras automatiskt med nya gudstjänster.
@@ -76,7 +78,8 @@ Servern startar på http://localhost:8080.
 |----------|-------------|----------|
 | `PORT` | Serverport | `8080` |
 | `CACHE_DIR` | Katalog för HTTP-cache | `cache/` |
-| `STORE_DIR` | Cache för Vision API-resultat | `disk/` |
+| `STORE_DIR` | Lokal cache för Vision API-resultat | `disk/` |
+| `GCS_BUCKET` | GCS-bucket för Vision API-resultat (produktion) | - |
 | `OPENAI_API_KEY` | Krävs för OCR-baserade scrapers | - |
 | `SMTP_HOST` | SMTP-server för feedback-mejl | - |
 | `SMTP_PORT` | SMTP-port | - |
@@ -99,8 +102,12 @@ OPENAI_API_KEY=din-nyckel go test ./...
 
 ## Driftsättning
 
-Tjänsten är konfigurerad för driftsättning på [Fly.io](https://fly.io):
+Tjänsten körs på Google Cloud Run. Infrastruktur hanteras med Terraform i `terraform/`.
 
 ```bash
-./deploy.sh
+cd terraform
+terraform init
+terraform apply
 ```
+
+Se [CLAUDE.md](CLAUDE.md) för detaljerade instruktioner.
