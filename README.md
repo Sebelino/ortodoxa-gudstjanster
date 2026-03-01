@@ -12,6 +12,22 @@ En webbtjänst som samlar gudstjänstscheman från östortodoxa församlingar i 
 - ICS-kalenderflöde för prenumeration i Google Kalender, Apple Kalender m.fl.
 - JSON-API för programmatisk åtkomst
 
+## Arkitektur
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Insamling (var 6:e timme)                                │
+│ Cloud Scheduler → Cloud Run Job → Scraping → Firestore   │
+└──────────────────────────────────────────────────────────┘
+                                          ↓
+┌──────────────────────────────────────────────────────────┐
+│ Webbserver                                               │
+│ ortodoxagudstjanster.se → Cloud Run → Läs Firestore      │
+└──────────────────────────────────────────────────────────┘
+```
+
+Data samlas in av ett schemalagt jobb som kör alla scrapers och sparar resultaten i Firestore. Webbservern läser sedan från Firestore för snabb responstid.
+
 ## Församlingar
 
 - Finska Ortodoxa Församlingen (Helige Nikolai)
@@ -66,32 +82,63 @@ Kräver Go 1.25+.
 # Installera beroenden
 go mod download
 
-# Kör lokalt
+# Kör webbserver lokalt (kräver Firestore-åtkomst)
+export GCP_PROJECT_ID=ortodoxa-gudstjanster
+export FIRESTORE_COLLECTION=services
 go run ./cmd/server
+
+# Kör insamlingsjobb lokalt (kräver GCS och OpenAI API)
+export GCP_PROJECT_ID=ortodoxa-gudstjanster
+export FIRESTORE_COLLECTION=services
+export GCS_BUCKET=ortodoxa-gudstjanster-ortodoxa-store
+export OPENAI_API_KEY=din-nyckel
+go run ./cmd/ingest
 ```
 
 Servern startar på http://localhost:8080.
 
 ### Miljövariabler
 
+#### Webbserver
+
 | Variabel | Beskrivning | Standard |
 |----------|-------------|----------|
 | `PORT` | Serverport | `8080` |
-| `CACHE_DIR` | Katalog för HTTP-cache | `cache/` |
-| `STORE_DIR` | Lokal cache för Vision API-resultat | `disk/` |
-| `GCS_BUCKET` | GCS-bucket för Vision API-resultat (produktion) | - |
-| `OPENAI_API_KEY` | Krävs för OCR-baserade scrapers | - |
+| `GCP_PROJECT_ID` | GCP-projekt-ID | (krävs) |
+| `FIRESTORE_COLLECTION` | Firestore-collection | `services` |
 | `SMTP_HOST` | SMTP-server för feedback-mejl | - |
 | `SMTP_PORT` | SMTP-port | - |
 | `SMTP_USER` | SMTP-användarnamn | - |
 | `SMTP_PASS` | SMTP-lösenord | - |
 | `SMTP_TO` | Mottagare för feedback | - |
 
+#### Insamlingsjobb
+
+| Variabel | Beskrivning | Standard |
+|----------|-------------|----------|
+| `GCP_PROJECT_ID` | GCP-projekt-ID | (krävs) |
+| `FIRESTORE_COLLECTION` | Firestore-collection | `services` |
+| `GCS_BUCKET` | GCS-bucket för Vision API-cache | (krävs) |
+| `OPENAI_API_KEY` | Krävs för OCR-baserade scrapers | (krävs) |
+
 ### Köra med Docker
 
 ```bash
 docker build -t ortodoxa-gudstjanster .
-docker run -p 8080:8080 -e OPENAI_API_KEY=din-nyckel ortodoxa-gudstjanster
+
+# Kör webbserver
+docker run -p 8080:8080 \
+  -e GCP_PROJECT_ID=ortodoxa-gudstjanster \
+  -e FIRESTORE_COLLECTION=services \
+  ortodoxa-gudstjanster ./server
+
+# Kör insamlingsjobb
+docker run \
+  -e GCP_PROJECT_ID=ortodoxa-gudstjanster \
+  -e FIRESTORE_COLLECTION=services \
+  -e GCS_BUCKET=ortodoxa-gudstjanster-ortodoxa-store \
+  -e OPENAI_API_KEY=din-nyckel \
+  ortodoxa-gudstjanster ./ingest
 ```
 
 ### Tester
@@ -99,6 +146,10 @@ docker run -p 8080:8080 -e OPENAI_API_KEY=din-nyckel ortodoxa-gudstjanster
 ```bash
 OPENAI_API_KEY=din-nyckel go test ./...
 ```
+
+### Hjälpskript
+
+Se [scripts/README.md](scripts/README.md) för verktyg som inspekterar Firestore-data.
 
 ## Driftsättning
 
@@ -110,4 +161,8 @@ terraform init
 terraform apply
 ```
 
-Se [CLAUDE.md](CLAUDE.md) för detaljerade instruktioner.
+Se [terraform/README.md](terraform/README.md) för detaljerade instruktioner.
+
+## Mer information
+
+Se [CLAUDE.md](CLAUDE.md) för fullständig teknisk dokumentation.
