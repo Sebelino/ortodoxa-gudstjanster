@@ -12,13 +12,16 @@ import (
 	"sync"
 	"time"
 
-	"ortodoxa-gudstjanster/internal/cache"
 	"ortodoxa-gudstjanster/internal/model"
-	"ortodoxa-gudstjanster/internal/scraper"
 )
 
 //go:embed templates/*.html
 var templates embed.FS
+
+// ServiceFetcher is an interface for fetching church services.
+type ServiceFetcher interface {
+	GetAllServices(ctx context.Context) ([]model.ChurchService, error)
+}
 
 // SMTPConfig holds SMTP configuration for sending emails.
 type SMTPConfig struct {
@@ -71,17 +74,15 @@ func (rl *rateLimiter) allow(ip string) bool {
 
 // Handler holds the HTTP handlers and their dependencies.
 type Handler struct {
-	registry    *scraper.Registry
-	cache       *cache.Cache
+	fetcher     ServiceFetcher
 	smtp        *SMTPConfig
 	rateLimiter *rateLimiter
 }
 
-// New creates a new Handler with the given scraper registry and cache.
-func New(registry *scraper.Registry, c *cache.Cache) *Handler {
+// New creates a new Handler with the given service fetcher.
+func New(fetcher ServiceFetcher) *Handler {
 	return &Handler{
-		registry:    registry,
-		cache:       c,
+		fetcher:     fetcher,
 		rateLimiter: newRateLimiter(3, time.Hour), // 3 submissions per hour per IP
 	}
 }
@@ -120,10 +121,14 @@ func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleServices(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	services := h.fetchAllWithCache(ctx)
+	services, err := h.fetcher.GetAllServices(ctx)
+	if err != nil {
+		http.Error(w, "Failed to fetch services", http.StatusInternalServerError)
+		return
+	}
 	services = filterAndSort(services)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -131,10 +136,14 @@ func (h *Handler) handleServices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	services := h.fetchAllWithCache(ctx)
+	services, err := h.fetcher.GetAllServices(ctx)
+	if err != nil {
+		http.Error(w, "Failed to fetch services", http.StatusInternalServerError)
+		return
+	}
 	services = filterAndSort(services)
 
 	// Parse excluded sources from query parameter
@@ -437,41 +446,3 @@ func (h *Handler) sendFeedbackEmail(feedbackType, email, message string) error {
 	return smtp.SendMail(addr, auth, h.smtp.User, []string{h.smtp.To}, []byte(msg))
 }
 
-func (h *Handler) fetchAllWithCache(ctx context.Context) []model.ChurchService {
-	var (
-		wg       sync.WaitGroup
-		mu       sync.Mutex
-		services []model.ChurchService
-	)
-
-	for _, s := range h.registry.Scrapers() {
-		wg.Add(1)
-		go func(scraper scraper.Scraper) {
-			defer wg.Done()
-
-			// Check cache first
-			if cached, ok := h.cache.Get(scraper.Name()); ok {
-				mu.Lock()
-				services = append(services, cached...)
-				mu.Unlock()
-				return
-			}
-
-			// Fetch fresh data
-			result, err := scraper.Fetch(ctx)
-			if err != nil {
-				return
-			}
-
-			// Store in cache
-			h.cache.Set(scraper.Name(), result)
-
-			mu.Lock()
-			services = append(services, result...)
-			mu.Unlock()
-		}(s)
-	}
-
-	wg.Wait()
-	return services
-}

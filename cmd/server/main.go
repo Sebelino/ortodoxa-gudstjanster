@@ -5,73 +5,39 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
-	"ortodoxa-gudstjanster/internal/cache"
-	"ortodoxa-gudstjanster/internal/scraper"
-	"ortodoxa-gudstjanster/internal/store"
-	"ortodoxa-gudstjanster/internal/vision"
+	"ortodoxa-gudstjanster/internal/firestore"
 	"ortodoxa-gudstjanster/internal/web"
 )
 
-const defaultCacheTTL = 6 * time.Hour
-
 func main() {
+	ctx := context.Background()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	cacheDir := os.Getenv("CACHE_DIR")
-	if cacheDir == "" {
-		cacheDir = "cache"
+	projectID := os.Getenv("GCP_PROJECT_ID")
+	if projectID == "" {
+		log.Fatal("GCP_PROJECT_ID environment variable is required")
 	}
 
-	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
+	firestoreCollection := os.Getenv("FIRESTORE_COLLECTION")
+	if firestoreCollection == "" {
+		firestoreCollection = "services"
+	}
 
-	// Initialize cache
-	c, err := cache.New(cacheDir, defaultCacheTTL)
+	// Initialize Firestore client
+	fsClient, err := firestore.New(ctx, projectID, firestoreCollection)
 	if err != nil {
-		log.Fatalf("Failed to initialize cache: %v", err)
+		log.Fatalf("Failed to initialize Firestore client: %v", err)
 	}
-
-	// Initialize store (GCS or local)
-	var s store.Store
-	gcsBucket := os.Getenv("GCS_BUCKET")
-	if gcsBucket != "" {
-		ctx := context.Background()
-		gcsStore, err := store.NewGCS(ctx, gcsBucket)
-		if err != nil {
-			log.Fatalf("Failed to initialize GCS store: %v", err)
-		}
-		s = gcsStore
-		log.Printf("Store: GCS bucket %s", gcsBucket)
-	} else {
-		storeDir := os.Getenv("STORE_DIR")
-		if storeDir == "" {
-			storeDir = "disk"
-		}
-		localStore, err := store.NewLocal(storeDir)
-		if err != nil {
-			log.Fatalf("Failed to initialize local store: %v", err)
-		}
-		s = localStore
-		log.Printf("Store: local directory %s", storeDir)
-	}
-
-	// Initialize vision client
-	visionClient := vision.NewClient(openaiAPIKey)
-
-	// Initialize scraper registry and register all scrapers
-	registry := scraper.NewRegistry()
-	registry.Register(scraper.NewFinskaScraper(""))
-	registry.Register(scraper.NewGomosScraper(s, visionClient))
-	registry.Register(scraper.NewHeligaAnnaScraper())
-	registry.Register(scraper.NewRyskaScraper(s, visionClient))
-	registry.Register(scraper.NewSrpskaScraper())
+	defer fsClient.Close()
+	log.Printf("Firestore: project %s, collection %s", projectID, firestoreCollection)
 
 	// Initialize HTTP handlers
-	handler := web.New(registry, c)
+	handler := web.New(fsClient)
 
 	// Configure SMTP if environment variables are set
 	if smtpHost := os.Getenv("SMTP_HOST"); smtpHost != "" {
@@ -91,8 +57,6 @@ func main() {
 	handler.RegisterRoutes(mux)
 
 	log.Printf("Server starting on port %s", port)
-	log.Printf("Cache directory: %s", cacheDir)
-	log.Printf("Registered scrapers: %d", len(registry.Scrapers()))
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)

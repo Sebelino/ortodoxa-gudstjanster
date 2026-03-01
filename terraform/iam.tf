@@ -11,6 +11,13 @@ resource "google_storage_bucket_iam_member" "store_access" {
   member = "serviceAccount:${google_service_account.cloudrun.email}"
 }
 
+# Grant service account access to Firestore
+resource "google_project_iam_member" "cloudrun_firestore_access" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.cloudrun.email}"
+}
+
 # Allow unauthenticated access to Cloud Run service
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
   location = google_cloud_run_v2_service.app.location

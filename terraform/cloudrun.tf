@@ -34,26 +34,16 @@ resource "google_cloud_run_v2_service" "app" {
 
       # Environment variables
       env {
-        name  = "CACHE_DIR"
-        value = "/tmp/cache"
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
       }
 
       env {
-        name  = "GCS_BUCKET"
-        value = google_storage_bucket.store.name
+        name  = "FIRESTORE_COLLECTION"
+        value = "services"
       }
 
       # Secrets from Secret Manager
-      env {
-        name = "OPENAI_API_KEY"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.openai_api_key.secret_id
-            version = "latest"
-          }
-        }
-      }
-
       env {
         name = "SMTP_HOST"
         value_source {
@@ -107,13 +97,13 @@ resource "google_cloud_run_v2_service" "app" {
   }
 
   depends_on = [
-    google_secret_manager_secret_iam_member.openai_api_key_access,
     google_secret_manager_secret_iam_member.smtp_host_access,
     google_secret_manager_secret_iam_member.smtp_port_access,
     google_secret_manager_secret_iam_member.smtp_user_access,
     google_secret_manager_secret_iam_member.smtp_pass_access,
     google_secret_manager_secret_iam_member.smtp_to_access,
-    google_storage_bucket_iam_member.store_access,
+    google_project_iam_member.cloudrun_firestore_access,
+    google_firestore_database.main,
   ]
 }
 
