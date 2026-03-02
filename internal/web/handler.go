@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/smtp"
 	"sort"
@@ -381,6 +382,7 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 
 		// Send email notification
 		if err := h.sendFeedbackEmail(feedback.Type, feedback.Email, feedback.Message); err != nil {
+			log.Printf("Failed to send feedback email: %v", err)
 			http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
 			return
 		}
@@ -412,6 +414,14 @@ func getClientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
+// normalizeNewlines replaces bare \n and \r with \r\n for SMTP compliance.
+func normalizeNewlines(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	s = strings.ReplaceAll(s, "\n", "\r\n")
+	return s
+}
+
 func (h *Handler) sendFeedbackEmail(feedbackType, email, message string) error {
 	if h.smtp == nil {
 		return fmt.Errorf("SMTP not configured")
@@ -435,7 +445,7 @@ func (h *Handler) sendFeedbackEmail(feedbackType, email, message string) error {
 	}
 
 	subject := fmt.Sprintf("Feedback: %s", typeLabel)
-	body := fmt.Sprintf("Typ: %s\nFrån: %s\n\nMeddelande:\n%s", typeLabel, replyTo, message)
+	body := fmt.Sprintf("Typ: %s\r\nFrån: %s\r\n\r\nMeddelande:\r\n%s", typeLabel, replyTo, normalizeNewlines(message))
 
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s",
 		h.smtp.User, h.smtp.To, subject, body)

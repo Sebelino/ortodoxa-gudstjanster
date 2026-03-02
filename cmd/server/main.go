@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"ortodoxa-gudstjanster/internal/firestore"
 	"ortodoxa-gudstjanster/internal/web"
@@ -40,13 +41,13 @@ func main() {
 	handler := web.New(fsClient)
 
 	// Configure SMTP if environment variables are set
-	if smtpHost := os.Getenv("SMTP_HOST"); smtpHost != "" {
+	if smtpHost := strings.TrimSpace(os.Getenv("SMTP_HOST")); smtpHost != "" {
 		handler.SetSMTP(&web.SMTPConfig{
 			Host:     smtpHost,
-			Port:     os.Getenv("SMTP_PORT"),
-			User:     os.Getenv("SMTP_USER"),
-			Password: os.Getenv("SMTP_PASS"),
-			To:       os.Getenv("SMTP_TO"),
+			Port:     strings.TrimSpace(os.Getenv("SMTP_PORT")),
+			User:     strings.TrimSpace(os.Getenv("SMTP_USER")),
+			Password: strings.TrimSpace(os.Getenv("SMTP_PASS")),
+			To:       strings.TrimSpace(os.Getenv("SMTP_TO")),
 		})
 		log.Printf("SMTP configured: %s -> %s", os.Getenv("SMTP_USER"), os.Getenv("SMTP_TO"))
 	} else {
