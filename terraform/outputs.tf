@@ -13,6 +13,11 @@ output "storage_bucket" {
   value       = google_storage_bucket.store.name
 }
 
+output "uploads_bucket" {
+  description = "Name of the Cloud Storage bucket for manual schedule uploads"
+  value       = google_storage_bucket.uploads.name
+}
+
 output "service_account_email" {
   description = "Email of the Cloud Run service account"
   value       = google_service_account.cloudrun.email

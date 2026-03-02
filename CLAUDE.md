@@ -50,6 +50,7 @@ The server starts on port 8080 (configurable via `PORT` env var).
 export GCP_PROJECT_ID=ortodoxa-gudstjanster
 export FIRESTORE_COLLECTION=services
 export GCS_BUCKET=ortodoxa-gudstjanster-ortodoxa-store
+export GCS_UPLOAD_BUCKET=ortodoxa-gudstjanster-ortodoxa-uploads  # optional
 export OPENAI_API_KEY=your-api-key
 go run ./cmd/ingest
 ```
@@ -70,6 +71,7 @@ go run ./cmd/ingest
 - `GCP_PROJECT_ID` - GCP project ID (required)
 - `FIRESTORE_COLLECTION` - Firestore collection name (default: `services`)
 - `GCS_BUCKET` - GCS bucket for Vision API results cache (required)
+- `GCS_UPLOAD_BUCKET` - GCS bucket for manually uploaded schedule images (optional, enables fallback)
 - `OPENAI_API_KEY` - Required for scrapers that use OpenAI Vision API
 
 ## Running with Docker
@@ -121,7 +123,8 @@ ortodoxa-gudstjanster/
 │   ├── cache/cache.go       # HTTP response cache (used by scrapers)
 │   ├── store/
 │   │   ├── store.go         # Store interface and local file implementation
-│   │   └── gcs.go           # Google Cloud Storage implementation
+│   │   ├── gcs.go           # Google Cloud Storage implementation
+│   │   └── bucket_reader.go # Read-only GCS bucket access (for upload bucket)
 │   ├── vision/openai.go     # OpenAI Vision API client
 │   └── web/
 │       ├── handler.go       # HTTP handlers (uses ServiceFetcher interface)
@@ -197,6 +200,14 @@ Permanent cache for OpenAI Vision API results:
 - Keyed by image checksum (SHA256)
 - Stored in GCS bucket `ortodoxa-gudstjanster-ortodoxa-store`
 - Prevents re-processing identical images
+
+### Manual Upload Bucket (GCS)
+
+Fallback source for schedule images when a church website doesn't publish them:
+- Bucket: `ortodoxa-gudstjanster-ortodoxa-uploads`
+- Images organized by parish prefix (e.g., `gomos/march-2026.jpg`)
+- Ingest SA has read-only access; images are uploaded manually
+- The Gomos scraper tries its website first, then falls back to `gomos/` in this bucket
 
 ## Vision API Integration
 
@@ -280,6 +291,7 @@ Secrets must be populated manually in Google Secret Manager:
 | Cloud Scheduler | `ortodoxa-gudstjanster-ingest-schedule` | Triggers ingestion every 6h |
 | Firestore | `(default)` | Service data storage |
 | GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-store` | Vision API cache |
+| GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-uploads` | Manual schedule image uploads |
 | Artifact Registry | `ortodoxa-gudstjanster` | Docker images |
 
 ### Service Accounts

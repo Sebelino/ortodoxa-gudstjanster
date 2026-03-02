@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -23,8 +25,10 @@ const (
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
 type GomosScraper struct {
-	store  store.Store
-	vision *vision.Client
+	store        store.Store
+	vision       *vision.Client
+	uploadReader *store.BucketReader
+	uploadPrefix string
 }
 
 // NewGomosScraper creates a new scraper for St. Georgios Cathedral.
@@ -35,11 +39,60 @@ func NewGomosScraper(s store.Store, v *vision.Client) *GomosScraper {
 	}
 }
 
+// SetUploadSource configures a GCS bucket as a fallback image source.
+func (s *GomosScraper) SetUploadSource(reader *store.BucketReader, prefix string) {
+	s.uploadReader = reader
+	s.uploadPrefix = prefix
+}
+
 func (s *GomosScraper) Name() string {
 	return gomosSourceName
 }
 
 func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	services, err := s.fetchFromWebsite(ctx)
+	websiteUsable := err == nil && len(services) > 0 && s.hasCurrentServices(services)
+	if websiteUsable {
+		return services, nil
+	}
+
+	if s.uploadReader != nil {
+		if err != nil {
+			log.Printf("Gomos: website failed (%v), trying upload bucket fallback", err)
+		} else if len(services) > 0 {
+			log.Printf("Gomos: website has only past services, trying upload bucket fallback")
+		} else {
+			log.Printf("Gomos: website returned no results, trying upload bucket fallback")
+		}
+		bucketServices, bucketErr := s.fetchFromBucket(ctx)
+		if bucketErr == nil && len(bucketServices) > 0 {
+			// Combine: bucket services + any still-relevant website services
+			combined := append(bucketServices, services...)
+			return s.deduplicate(combined), nil
+		}
+		if bucketErr != nil {
+			log.Printf("Gomos: upload bucket fallback failed: %v", bucketErr)
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return services, nil
+}
+
+// hasCurrentServices checks whether any services are today or in the future.
+func (s *GomosScraper) hasCurrentServices(services []model.ChurchService) bool {
+	today := time.Now().Format("2006-01-02")
+	for _, svc := range services {
+		if svc.Date >= today {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *GomosScraper) fetchFromWebsite(ctx context.Context) ([]model.ChurchService, error) {
 	postURL, err := s.findLatestSchedulePost(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("finding latest post: %w", err)
@@ -61,6 +114,54 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 	for _, imgURL := range filteredURLs {
 		services, err := s.processImage(ctx, imgURL)
 		if err != nil {
+			continue
+		}
+		allServices = append(allServices, services...)
+	}
+
+	return s.deduplicate(allServices), nil
+}
+
+func (s *GomosScraper) fetchFromBucket(ctx context.Context) ([]model.ChurchService, error) {
+	names, err := s.uploadReader.ListObjects(ctx, s.uploadPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("listing upload objects: %w", err)
+	}
+
+	// Build set of object names for sidecar lookup
+	nameSet := make(map[string]bool, len(names))
+	for _, name := range names {
+		nameSet[name] = true
+	}
+
+	var allServices []model.ChurchService
+	for _, name := range names {
+		lower := strings.ToLower(name)
+		if !strings.HasSuffix(lower, ".jpg") && !strings.HasSuffix(lower, ".jpeg") && !strings.HasSuffix(lower, ".png") {
+			continue
+		}
+
+		imageData, err := s.uploadReader.ReadObject(ctx, name)
+		if err != nil {
+			log.Printf("Gomos: failed to read upload %s: %v", name, err)
+			continue
+		}
+
+		// Check for a .source.txt sidecar with the source URL
+		sourceURL := gomosScheduleURL
+		baseName := name[:strings.LastIndex(name, ".")]
+		sidecar := baseName + ".source.txt"
+		if nameSet[sidecar] {
+			if data, err := s.uploadReader.ReadObject(ctx, sidecar); err == nil {
+				if url := strings.TrimSpace(string(data)); url != "" {
+					sourceURL = url
+				}
+			}
+		}
+
+		services, err := s.processImageData(ctx, imageData, name, sourceURL)
+		if err != nil {
+			log.Printf("Gomos: failed to process upload %s: %v", name, err)
 			continue
 		}
 		allServices = append(allServices, services...)
@@ -191,15 +292,19 @@ func (s *GomosScraper) processImage(ctx context.Context, imageURL string) ([]mod
 		return nil, fmt.Errorf("downloading image: %w", err)
 	}
 
+	return s.processImageData(ctx, imageData, imageURL, gomosScheduleURL)
+}
+
+func (s *GomosScraper) processImageData(ctx context.Context, imageData []byte, sourceRef string, sourceURL string) ([]model.ChurchService, error) {
 	checksum := s.computeChecksum(imageData)
-	imageExt := s.imageExtension(imageURL)
+	imageExt := s.imageExtension(sourceRef)
 
 	var entries []vision.ScheduleEntry
 	if s.store.GetJSON(checksum, &entries) {
-		return s.convertToServices(entries), nil
+		return s.convertToServices(entries, sourceURL), nil
 	}
 
-	entries, err = s.vision.ExtractSchedule(ctx, imageData)
+	entries, err := s.vision.ExtractSchedule(ctx, imageData)
 	if err != nil {
 		return nil, fmt.Errorf("extracting schedule: %w", err)
 	}
@@ -213,7 +318,7 @@ func (s *GomosScraper) processImage(ctx context.Context, imageURL string) ([]mod
 		// Log error but don't fail - we still have the data
 	}
 
-	return s.convertToServices(entries), nil
+	return s.convertToServices(entries, sourceURL), nil
 }
 
 func (s *GomosScraper) downloadImage(ctx context.Context, imageURL string) ([]byte, error) {
@@ -236,7 +341,7 @@ func (s *GomosScraper) imageExtension(url string) string {
 	return ".jpg"
 }
 
-func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry) []model.ChurchService {
+func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceURL string) []model.ChurchService {
 	var services []model.ChurchService
 
 	for _, entry := range entries {
@@ -251,7 +356,7 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry) []model
 
 		services = append(services, model.ChurchService{
 			Source:      gomosSourceName,
-			SourceURL:   gomosScheduleURL,
+			SourceURL:   sourceURL,
 			Date:        entry.Date,
 			DayOfWeek:   entry.DayOfWeek,
 			ServiceName: entry.ServiceName,

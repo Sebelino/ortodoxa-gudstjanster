@@ -52,10 +52,27 @@ func main() {
 	defer fsClient.Close()
 	log.Printf("Firestore: project %s, collection %s", projectID, firestoreCollection)
 
+	// Initialize upload bucket reader (optional)
+	gcsUploadBucket := os.Getenv("GCS_UPLOAD_BUCKET")
+	var uploadReader *store.BucketReader
+	if gcsUploadBucket != "" {
+		var err2 error
+		uploadReader, err2 = store.NewBucketReader(ctx, gcsUploadBucket)
+		if err2 != nil {
+			log.Fatalf("Failed to initialize upload bucket reader: %v", err2)
+		}
+		defer uploadReader.Close()
+		log.Printf("Upload bucket: %s", gcsUploadBucket)
+	}
+
 	// Initialize scraper registry and register all scrapers
 	registry := scraper.NewRegistry()
 	registry.Register(scraper.NewFinskaScraper(""))
-	registry.Register(scraper.NewGomosScraper(gcsStore, visionClient))
+	gomosScraper := scraper.NewGomosScraper(gcsStore, visionClient)
+	if uploadReader != nil {
+		gomosScraper.SetUploadSource(uploadReader, "gomos/")
+	}
+	registry.Register(gomosScraper)
 	registry.Register(scraper.NewHeligaAnnaScraper())
 	registry.Register(scraper.NewRyskaScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewSrpskaScraper())
