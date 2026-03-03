@@ -31,6 +31,12 @@
             font-weight: 600;
         }
 
+        .last-updated {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-top: 0.25rem;
+        }
+
         .top-bar {
             text-align: right;
             margin-bottom: 0.5rem;
@@ -302,6 +308,7 @@
 <body>
     <header>
         <h1>Ortodoxa Gudstjänster</h1>
+        <div id="last-updated" class="last-updated"></div>
     </header>
 
     <main>
@@ -542,7 +549,42 @@
             }
         }
 
+        async function loadLastUpdated() {
+            try {
+                const response = await fetch('/last-updated');
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!data.batch_id) return;
+
+                // Parse batch_id format: "YYYYMMDD-HHMMSS" (UTC)
+                const b = data.batch_id;
+                const utcDate = new Date(
+                    Date.UTC(
+                        parseInt(b.slice(0, 4)),
+                        parseInt(b.slice(4, 6)) - 1,
+                        parseInt(b.slice(6, 8)),
+                        parseInt(b.slice(9, 11)),
+                        parseInt(b.slice(11, 13)),
+                        parseInt(b.slice(13, 15))
+                    )
+                );
+
+                const months = ['januari', 'februari', 'mars', 'april', 'maj', 'juni',
+                                'juli', 'augusti', 'september', 'oktober', 'november', 'december'];
+                const day = utcDate.getDate();
+                const month = months[utcDate.getMonth()];
+                const hours = String(utcDate.getHours()).padStart(2, '0');
+                const minutes = String(utcDate.getMinutes()).padStart(2, '0');
+
+                document.getElementById('last-updated').textContent =
+                    `Senast uppdaterad: ${day} ${month}, ${hours}:${minutes}`;
+            } catch (e) {
+                // Graceful degradation — hide element
+            }
+        }
+
         loadServices();
+        loadLastUpdated();
     </script>
 </body>
 </html>

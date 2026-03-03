@@ -22,6 +22,7 @@ var templates embed.FS
 // ServiceFetcher is an interface for fetching church services.
 type ServiceFetcher interface {
 	GetAllServices(ctx context.Context) ([]model.ChurchService, error)
+	GetLatestBatchID(ctx context.Context) (string, error)
 }
 
 // rateLimiter tracks submissions per IP address.
@@ -90,6 +91,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/services", h.noCache(h.handleServices))
 	mux.HandleFunc("/calendar.ics", h.handleICS)
 	mux.HandleFunc("/feedback", h.handleFeedback)
+	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
 }
 
@@ -313,6 +315,20 @@ func filterAndSort(services []model.ChurchService) []model.ChurchService {
 	})
 
 	return future
+}
+
+func (h *Handler) handleLastUpdated(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	batchID, err := h.fetcher.GetLatestBatchID(ctx)
+	if err != nil {
+		http.Error(w, "Failed to fetch last updated", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(map[string]string{"batch_id": batchID})
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {

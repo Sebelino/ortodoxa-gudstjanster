@@ -149,6 +149,25 @@ func (c *Client) CountServicesForSource(ctx context.Context, source string) (int
 	return count, nil
 }
 
+// GetLatestBatchID returns the most recent batch_id from the collection.
+func (c *Client) GetLatestBatchID(ctx context.Context) (string, error) {
+	iter := c.client.Collection(c.collection).
+		OrderBy("batch_id", firestore.Desc).
+		Limit(1).
+		Documents(ctx)
+
+	doc, err := iter.Next()
+	if err == iterator.Done {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("querying latest batch_id: %w", err)
+	}
+
+	batchID, _ := doc.Data()["batch_id"].(string)
+	return batchID, nil
+}
+
 // generateDocID creates a unique document ID based on service fields.
 func generateDocID(svc model.ChurchService) string {
 	timeStr := ""
