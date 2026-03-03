@@ -46,12 +46,14 @@ func (c *Client) ExtractSchedule(ctx context.Context, imageData []byte) ([]Sched
 	}
 
 	prompt := `Extract church service schedule information from this image.
+The image may be in any language (Greek, Swedish, etc.). ALL output must be translated to Swedish.
+
 Return a JSON array of services with these fields:
 - date: in YYYY-MM-DD format (use year 2026 if not specified)
 - day_of_week: the day name in Swedish (e.g., "Måndag", "Söndag")
 - time: in HH:MM format (24-hour)
-- service_name: the name of the service in Swedish
-- occasion: optional, any special occasion or holiday mentioned
+- service_name: the name of the service translated to Swedish (e.g., "Θεία Λειτουργία" → "Gudomlig liturgi")
+- occasion: optional, any special occasion or holiday mentioned, translated to Swedish
 
 Only include entries that have both a date/day and a time specified.
 Return ONLY the JSON array, no other text.`
