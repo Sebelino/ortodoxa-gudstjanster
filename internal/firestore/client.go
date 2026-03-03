@@ -129,6 +129,26 @@ func (c *Client) GetAllServices(ctx context.Context) ([]model.ChurchService, err
 	return services, nil
 }
 
+// CountServicesForSource returns the number of stored services for a given source.
+func (c *Client) CountServicesForSource(ctx context.Context, source string) (int, error) {
+	query := c.client.Collection(c.collection).Where("source", "==", source)
+	count := 0
+
+	iter := query.Documents(ctx)
+	for {
+		_, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return 0, fmt.Errorf("counting documents for source %s: %w", source, err)
+		}
+		count++
+	}
+
+	return count, nil
+}
+
 // generateDocID creates a unique document ID based on service fields.
 func generateDocID(svc model.ChurchService) string {
 	timeStr := ""

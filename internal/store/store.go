@@ -15,6 +15,8 @@ type Store interface {
 	GetJSON(key string, v interface{}) bool
 	SetJSON(key string, v interface{}) error
 	SetWithExtension(key string, ext string, value []byte) error
+	// SetRaw writes raw bytes to the given path (used as-is, no extension appended).
+	SetRaw(path string, data []byte) error
 }
 
 // LocalStore is a file-based implementation of Store.
@@ -79,6 +81,18 @@ func (s *LocalStore) SetWithExtension(key string, ext string, value []byte) erro
 
 	path := filepath.Join(s.dir, key+ext)
 	return os.WriteFile(path, value, 0644)
+}
+
+// SetRaw writes raw bytes to the given path (used as-is, no extension appended).
+func (s *LocalStore) SetRaw(path string, data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	fullPath := filepath.Join(s.dir, path)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(fullPath, data, 0644)
 }
 
 func (s *LocalStore) keyPath(key string) string {

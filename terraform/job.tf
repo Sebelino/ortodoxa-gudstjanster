@@ -32,6 +32,37 @@ resource "google_secret_manager_secret_iam_member" "ingest_openai_api_key_access
   member    = "serviceAccount:${google_service_account.ingest.email}"
 }
 
+# Grant ingestion service account access to SMTP secrets (for alerting)
+resource "google_secret_manager_secret_iam_member" "ingest_smtp_host_access" {
+  secret_id = google_secret_manager_secret.smtp_host.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.ingest.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "ingest_smtp_port_access" {
+  secret_id = google_secret_manager_secret.smtp_port.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.ingest.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "ingest_smtp_user_access" {
+  secret_id = google_secret_manager_secret.smtp_user.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.ingest.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "ingest_smtp_pass_access" {
+  secret_id = google_secret_manager_secret.smtp_pass.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.ingest.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "ingest_smtp_to_access" {
+  secret_id = google_secret_manager_secret.smtp_to.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.ingest.email}"
+}
+
 # Cloud Run Job for ingestion
 resource "google_cloud_run_v2_job" "ingest" {
   name     = "${var.service_name}-ingest"
@@ -82,12 +113,68 @@ resource "google_cloud_run_v2_job" "ingest" {
             }
           }
         }
+
+        # SMTP secrets for alerting
+        env {
+          name = "SMTP_HOST"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.smtp_host.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name = "SMTP_PORT"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.smtp_port.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name = "SMTP_USER"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.smtp_user.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name = "SMTP_PASS"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.smtp_pass.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name = "SMTP_TO"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.smtp_to.secret_id
+              version = "latest"
+            }
+          }
+        }
       }
     }
   }
 
   depends_on = [
     google_secret_manager_secret_iam_member.ingest_openai_api_key_access,
+    google_secret_manager_secret_iam_member.ingest_smtp_host_access,
+    google_secret_manager_secret_iam_member.ingest_smtp_port_access,
+    google_secret_manager_secret_iam_member.ingest_smtp_user_access,
+    google_secret_manager_secret_iam_member.ingest_smtp_pass_access,
+    google_secret_manager_secret_iam_member.ingest_smtp_to_access,
     google_storage_bucket_iam_member.ingest_store_access,
     google_storage_bucket_iam_member.ingest_uploads_access,
     google_project_iam_member.ingest_firestore_access,

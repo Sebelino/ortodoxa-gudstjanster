@@ -117,6 +117,25 @@ func (s *GCSStore) SetWithExtension(key string, ext string, value []byte) error 
 	return writer.Close()
 }
 
+// SetRaw writes raw bytes to the given path (used as-is, no extension appended).
+func (s *GCSStore) SetRaw(path string, data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	obj := s.client.Bucket(s.bucket).Object(path)
+	writer := obj.NewWriter(ctx)
+	writer.ContentType = "application/json"
+
+	if _, err := writer.Write(data); err != nil {
+		writer.Close()
+		return err
+	}
+	return writer.Close()
+}
+
 // Close closes the GCS client.
 func (s *GCSStore) Close() error {
 	return s.client.Close()

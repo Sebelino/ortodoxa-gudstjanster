@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
+	"ortodoxa-gudstjanster/internal/email"
 	"ortodoxa-gudstjanster/internal/firestore"
+	"ortodoxa-gudstjanster/internal/model"
 	"ortodoxa-gudstjanster/internal/scraper"
 	"ortodoxa-gudstjanster/internal/store"
 	"ortodoxa-gudstjanster/internal/vision"
@@ -65,6 +69,21 @@ func main() {
 		log.Printf("Upload bucket: %s", gcsUploadBucket)
 	}
 
+	// Initialize SMTP for alerting (optional)
+	var smtpConfig *email.SMTPConfig
+	if smtpHost := strings.TrimSpace(os.Getenv("SMTP_HOST")); smtpHost != "" {
+		smtpConfig = &email.SMTPConfig{
+			Host:     smtpHost,
+			Port:     strings.TrimSpace(os.Getenv("SMTP_PORT")),
+			User:     strings.TrimSpace(os.Getenv("SMTP_USER")),
+			Password: strings.TrimSpace(os.Getenv("SMTP_PASS")),
+			To:       strings.TrimSpace(os.Getenv("SMTP_TO")),
+		}
+		log.Printf("SMTP configured for alerting: %s -> %s", smtpConfig.User, smtpConfig.To)
+	} else {
+		log.Printf("SMTP not configured (alerts disabled)")
+	}
+
 	// Initialize scraper registry and register all scrapers
 	registry := scraper.NewRegistry()
 	registry.Register(scraper.NewFinskaScraper(""))
@@ -100,6 +119,35 @@ func main() {
 		log.Printf("Scraper %s fetched %d services", scraperName, len(services))
 
 		if len(services) > 0 {
+			// Check if the new count is less than the existing count
+			existingCount, err := fsClient.CountServicesForSource(ctx, scraperName)
+			if err != nil {
+				log.Printf("WARNING: Failed to count existing services for %s: %v", scraperName, err)
+				// Proceed with replacement if we can't count
+			} else if len(services) < existingCount {
+				log.Printf("WARNING: Scraper %s returned fewer services (%d) than currently stored (%d). Skipping replacement.",
+					scraperName, len(services), existingCount)
+
+				// Save rejected data to GCS for diagnostics
+				gcsPath := saveDiagnostics(gcsStore, scraperName, services)
+
+				// Send alert email if SMTP is configured
+				if smtpConfig != nil {
+					subject := fmt.Sprintf("Ingestion alert: %s service count decreased", scraperName)
+					body := fmt.Sprintf(
+						"Scraper: %s\r\nExisting count: %d\r\nNew count: %d\r\nAction: Skipped replacement (existing data preserved)\r\nRejected data: gs://%s/%s",
+						scraperName, existingCount, len(services), gcsBucket, gcsPath,
+					)
+					if err := smtpConfig.Send(subject, body); err != nil {
+						log.Printf("ERROR: Failed to send alert email for %s: %v", scraperName, err)
+					} else {
+						log.Printf("Alert email sent for %s", scraperName)
+					}
+				}
+
+				continue
+			}
+
 			if err := fsClient.ReplaceServicesForSource(ctx, scraperName, services, batchID); err != nil {
 				log.Printf("ERROR: Failed to store services for %s: %v", scraperName, err)
 				failedScrapers++
@@ -117,4 +165,26 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Ingestion completed successfully")
+}
+
+// saveDiagnostics serializes rejected services to GCS and returns the object path.
+func saveDiagnostics(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService) string {
+	timestamp := time.Now().UTC().Format("20060102-150405")
+	// Sanitize scraper name for use in path
+	safeName := strings.ReplaceAll(strings.ToLower(scraperName), " ", "-")
+	path := fmt.Sprintf("diagnostics/%s/%s.json", safeName, timestamp)
+
+	data, err := json.MarshalIndent(services, "", "  ")
+	if err != nil {
+		log.Printf("WARNING: Failed to marshal diagnostics for %s: %v", scraperName, err)
+		return path
+	}
+
+	if err := gcsStore.SetRaw(path, data); err != nil {
+		log.Printf("WARNING: Failed to save diagnostics for %s to %s: %v", scraperName, path, err)
+	} else {
+		log.Printf("Saved rejected data for %s to %s", scraperName, path)
+	}
+
+	return path
 }

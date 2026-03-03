@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"ortodoxa-gudstjanster/internal/email"
 	"ortodoxa-gudstjanster/internal/firestore"
 	"ortodoxa-gudstjanster/internal/web"
 )
@@ -42,7 +43,7 @@ func main() {
 
 	// Configure SMTP if environment variables are set
 	if smtpHost := strings.TrimSpace(os.Getenv("SMTP_HOST")); smtpHost != "" {
-		handler.SetSMTP(&web.SMTPConfig{
+		handler.SetSMTP(&email.SMTPConfig{
 			Host:     smtpHost,
 			Port:     strings.TrimSpace(os.Getenv("SMTP_PORT")),
 			User:     strings.TrimSpace(os.Getenv("SMTP_USER")),

@@ -73,6 +73,11 @@ go run ./cmd/ingest
 - `GCS_BUCKET` - GCS bucket for Vision API results cache (required)
 - `GCS_UPLOAD_BUCKET` - GCS bucket for manually uploaded schedule images (optional, enables fallback)
 - `OPENAI_API_KEY` - Required for scrapers that use OpenAI Vision API
+- `SMTP_HOST` - SMTP server hostname for alerting (optional, enables email alerts)
+- `SMTP_PORT` - SMTP server port for alerting
+- `SMTP_USER` - SMTP username/email for alerting
+- `SMTP_PASS` - SMTP password for alerting
+- `SMTP_TO` - Email address to receive ingestion alerts
 
 ## Running with Docker
 
@@ -112,6 +117,7 @@ ortodoxa-gudstjanster/
 │   └── ingest/main.go       # Ingestion job entry point (scrapes → Firestore)
 ├── internal/
 │   ├── model/service.go     # ChurchService data model
+│   ├── email/email.go       # Shared SMTP email package (used by web + ingest)
 │   ├── firestore/client.go  # Firestore client for storing/retrieving services
 │   ├── scraper/
 │   │   ├── scraper.go       # Scraper interface, registry, HTTP helpers
@@ -184,6 +190,15 @@ go run scripts/inspect-firestore.go -project=my-project -collection=my-collectio
    ```go
    registry.Register(scraper.NewMyChurchScraper())
    ```
+
+## Ingestion Alerting
+
+When a scraper returns fewer services than are currently stored in Firestore for that source, the ingestion job:
+1. **Skips the replacement** — existing data in Firestore is preserved
+2. **Saves rejected data** to GCS under `diagnostics/{source-name}/{timestamp}.json` for inspection
+3. **Sends an email alert** (if SMTP is configured) with the scraper name, old/new counts, and GCS path to the rejected data
+
+This prevents broken scrapers or flaky networks from silently replacing good data with incomplete data.
 
 ## Data Storage
 

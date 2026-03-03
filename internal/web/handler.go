@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/smtp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"ortodoxa-gudstjanster/internal/email"
 	"ortodoxa-gudstjanster/internal/model"
 )
 
@@ -22,15 +22,6 @@ var templates embed.FS
 // ServiceFetcher is an interface for fetching church services.
 type ServiceFetcher interface {
 	GetAllServices(ctx context.Context) ([]model.ChurchService, error)
-}
-
-// SMTPConfig holds SMTP configuration for sending emails.
-type SMTPConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	To       string
 }
 
 // rateLimiter tracks submissions per IP address.
@@ -76,7 +67,7 @@ func (rl *rateLimiter) allow(ip string) bool {
 // Handler holds the HTTP handlers and their dependencies.
 type Handler struct {
 	fetcher     ServiceFetcher
-	smtp        *SMTPConfig
+	smtp        *email.SMTPConfig
 	rateLimiter *rateLimiter
 }
 
@@ -89,7 +80,7 @@ func New(fetcher ServiceFetcher) *Handler {
 }
 
 // SetSMTP configures SMTP for sending feedback emails.
-func (h *Handler) SetSMTP(config *SMTPConfig) {
+func (h *Handler) SetSMTP(config *email.SMTPConfig) {
 	h.smtp = config
 }
 
@@ -414,15 +405,7 @@ func getClientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// normalizeNewlines replaces bare \n and \r with \r\n for SMTP compliance.
-func normalizeNewlines(s string) string {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.ReplaceAll(s, "\r", "\n")
-	s = strings.ReplaceAll(s, "\n", "\r\n")
-	return s
-}
-
-func (h *Handler) sendFeedbackEmail(feedbackType, email, message string) error {
+func (h *Handler) sendFeedbackEmail(feedbackType, senderEmail, message string) error {
 	if h.smtp == nil {
 		return fmt.Errorf("SMTP not configured")
 	}
@@ -439,20 +422,14 @@ func (h *Handler) sendFeedbackEmail(feedbackType, email, message string) error {
 		typeLabel = feedbackType
 	}
 
-	replyTo := email
+	replyTo := senderEmail
 	if replyTo == "" {
 		replyTo = "ingen e-post angiven"
 	}
 
 	subject := fmt.Sprintf("Feedback: %s", typeLabel)
-	body := fmt.Sprintf("Typ: %s\r\nFrån: %s\r\n\r\nMeddelande:\r\n%s", typeLabel, replyTo, normalizeNewlines(message))
+	body := fmt.Sprintf("Typ: %s\r\nFrån: %s\r\n\r\nMeddelande:\r\n%s", typeLabel, replyTo, email.NormalizeNewlines(message))
 
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s",
-		h.smtp.User, h.smtp.To, subject, body)
-
-	auth := smtp.PlainAuth("", h.smtp.User, h.smtp.Password, h.smtp.Host)
-	addr := h.smtp.Host + ":" + h.smtp.Port
-
-	return smtp.SendMail(addr, auth, h.smtp.User, []string{h.smtp.To}, []byte(msg))
+	return h.smtp.Send(subject, body)
 }
 
