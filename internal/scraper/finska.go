@@ -105,6 +105,7 @@ func (s *FisnkaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 
 		lang := finskaLanguage
 		services = append(services, model.ChurchService{
+			Parish:      finskaSourceName,
 			Source:      finskaSourceName,
 			SourceURL:   s.url,
 			Date:        date,

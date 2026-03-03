@@ -2,6 +2,7 @@ package model
 
 // ChurchService represents a single church service event.
 type ChurchService struct {
+	Parish      string  `json:"parish"`
 	Source      string  `json:"source"`
 	SourceURL   string  `json:"source_url,omitempty"`
 	Date        string  `json:"date"`

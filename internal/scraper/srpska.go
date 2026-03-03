@@ -54,6 +54,7 @@ func (s *SrpskaScraper) toChurchServices(events []srpska.CalendarEvent) []model.
 	for i, event := range events {
 		timeStr := event.Time
 		services[i] = model.ChurchService{
+			Parish:      srpskaSourceName,
 			Source:      srpskaSourceName,
 			SourceURL:   srpska.CalendarURL,
 			Date:        event.Date,

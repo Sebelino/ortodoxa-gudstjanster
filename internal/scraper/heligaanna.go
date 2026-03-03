@@ -109,6 +109,7 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 			location := heligaAnnaLocation
 			lang := heligaAnnaLanguage
 			services = append(services, model.ChurchService{
+				Parish:      heligaAnnaSourceName,
 				Source:      heligaAnnaSourceName,
 				SourceURL:   heligaAnnaURL,
 				Date:        date,

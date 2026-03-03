@@ -149,7 +149,7 @@ func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
 		}
 		var filtered []model.ChurchService
 		for _, s := range services {
-			if !excluded[s.Source] {
+			if !excluded[s.Parish] {
 				filtered = append(filtered, s)
 			}
 		}
@@ -208,7 +208,7 @@ func generateICS(services []model.ChurchService) string {
 
 		// Description with additional details
 		var desc []string
-		desc = append(desc, fmt.Sprintf("Församling: %s", s.Source))
+		desc = append(desc, fmt.Sprintf("Församling: %s", s.Parish))
 		if s.Language != nil && *s.Language != "" {
 			desc = append(desc, fmt.Sprintf("Språk: %s", *s.Language))
 		}
@@ -220,12 +220,14 @@ func generateICS(services []model.ChurchService) string {
 		}
 		if s.SourceURL != "" {
 			desc = append(desc, fmt.Sprintf("Källa: %s", s.SourceURL))
+		} else if s.Source != "" {
+			desc = append(desc, fmt.Sprintf("Källa: %s", s.Source))
 		}
 		description := escapeICS(strings.Join(desc, "\n"))
 		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", description))
 
 		// Categories
-		sb.WriteString(fmt.Sprintf("CATEGORIES:%s\r\n", escapeICS(s.Source)))
+		sb.WriteString(fmt.Sprintf("CATEGORIES:%s\r\n", escapeICS(s.Parish)))
 
 		// Timestamp
 		now := time.Now().UTC().Format("20060102T150405Z")

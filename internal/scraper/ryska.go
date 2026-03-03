@@ -143,6 +143,7 @@ func (s *RyskaScraper) entriesToServices(entries []vision.ScheduleEntry) []model
 		}
 
 		services = append(services, model.ChurchService{
+			Parish:      ryskaSourceName,
 			Source:      ryskaSourceName,
 			SourceURL:   ryskaURL,
 			Date:        entry.Date,

@@ -210,6 +210,7 @@ func generateDocID(svc model.ChurchService) string {
 // serviceToMap converts a ChurchService to a Firestore document map.
 func serviceToMap(svc model.ChurchService, scraperName string, batchID string) map[string]interface{} {
 	m := map[string]interface{}{
+		"parish":       svc.Parish,
 		"source":       svc.Source,
 		"scraper_name": scraperName,
 		"date":         svc.Date,
@@ -242,8 +243,15 @@ func serviceToMap(svc model.ChurchService, scraperName string, batchID string) m
 func mapToService(m map[string]interface{}) (model.ChurchService, error) {
 	svc := model.ChurchService{}
 
+	if v, ok := m["parish"].(string); ok {
+		svc.Parish = v
+	}
 	if v, ok := m["source"].(string); ok {
 		svc.Source = v
+	}
+	// Fall back to source if parish is absent (backward compat with existing docs)
+	if svc.Parish == "" {
+		svc.Parish = svc.Source
 	}
 	if v, ok := m["source_url"].(string); ok {
 		svc.SourceURL = v

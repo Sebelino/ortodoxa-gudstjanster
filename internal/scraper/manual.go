@@ -14,11 +14,14 @@ const manualScraperName = "Manuella händelser"
 
 // RecurringEvent defines a manually configured recurring event.
 type RecurringEvent struct {
+	Parish        string `json:"parish"`
 	Source        string `json:"source"`
+	SourceURL     string `json:"source_url,omitempty"`
 	ServiceName   string `json:"service_name"`
 	Location      string `json:"location"`
 	Time          string `json:"time"`
 	Language      string `json:"language"`
+	Notes         string `json:"notes,omitempty"`
 	StartDate     string `json:"start_date"` // "2006-01-02"
 	IntervalWeeks int    `json:"interval_weeks"`
 }
@@ -71,13 +74,19 @@ func (s *ManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			timeStr := event.Time
 			language := event.Language
 			svc := model.ChurchService{
+				Parish:      event.Parish,
 				Source:      event.Source,
+				SourceURL:   event.SourceURL,
 				Date:        date.Format("2006-01-02"),
 				DayOfWeek:   swedishDayOfWeek(date.Weekday()),
 				ServiceName: event.ServiceName,
 				Location:    &location,
 				Time:        &timeStr,
 				Language:    &language,
+			}
+			if event.Notes != "" {
+				notes := event.Notes
+				svc.Notes = &notes
 			}
 			services = append(services, svc)
 		}

@@ -207,7 +207,8 @@ This prevents broken scrapers or flaky networks from silently replacing good dat
 
 Services are stored in the `services` collection with:
 - Document ID: SHA256 hash of `(source, date, service_name, time)`
-- Fields: `source`, `source_url`, `date`, `day_of_week`, `service_name`, `location`, `time`, `occasion`, `notes`, `language`, `batch_id`
+- Fields: `parish`, `source`, `source_url`, `date`, `day_of_week`, `service_name`, `location`, `time`, `occasion`, `notes`, `language`, `batch_id`
+- `parish` identifies the church (used for UI filtering/grouping); `source` describes where the data came from (displayed as "Källa"). For most scrapers these are identical; the manual scraper can set them differently. Legacy docs without `parish` fall back to `source`.
 - Composite index on `source` + `date` for efficient queries
 
 ### Vision API Cache (GCS)
