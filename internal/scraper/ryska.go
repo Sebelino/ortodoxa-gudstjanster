@@ -6,23 +6,49 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html"
+	"os"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/chromedp/chromedp"
 
 	"ortodoxa-gudstjanster/internal/model"
 	"ortodoxa-gudstjanster/internal/store"
 	"ortodoxa-gudstjanster/internal/vision"
 )
 
-// ExtractRyskaScheduleText fetches the Ryska website and extracts the schedule text.
-// This is exported so it can be used by the extract-text tool for testing.
+// ExtractRyskaScheduleText fetches the Ryska website using headless Chrome
+// (needed because it's a Wix site that renders content via JavaScript)
+// and extracts the schedule text.
 func ExtractRyskaScheduleText(ctx context.Context) (string, error) {
-	bodyBytes, err := fetchURL(ctx, ryskaURL)
+	opts := chromedp.DefaultExecAllocatorOptions[:]
+	if chromePath := os.Getenv("CHROME_PATH"); chromePath != "" {
+		opts = append(opts, chromedp.ExecPath(chromePath))
+	}
+	opts = append(opts,
+		chromedp.Headless,
+		chromedp.DisableGPU,
+		chromedp.NoSandbox,
+	)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
+	defer allocCancel()
+
+	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
+	defer taskCancel()
+
+	var body string
+	err := chromedp.Run(taskCtx,
+		chromedp.Navigate(ryskaURL),
+		chromedp.Sleep(5*time.Second),
+		chromedp.InnerHTML("body", &body),
+	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("fetching with chromedp: %w", err)
 	}
 
-	return ExtractRyskaScheduleTextFromHTML(string(bodyBytes)), nil
+	return ExtractRyskaScheduleTextFromHTML(body), nil
 }
 
 // ExtractRyskaScheduleTextFromHTML extracts schedule text from raw HTML.

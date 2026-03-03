@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const openaiAPIURL = "https://api.openai.com/v1/chat/completions"
@@ -141,9 +142,10 @@ Return ONLY the JSON array, no other text.`
 
 // ExtractScheduleFromText sends text to OpenAI's API and extracts church service schedule entries.
 func (c *Client) ExtractScheduleFromText(ctx context.Context, text string) ([]ScheduleEntry, error) {
-	prompt := `Extract church service schedule information from this text.
+	today := time.Now().Format("January 2, 2006")
+	prompt := fmt.Sprintf(`Extract church service schedule information from this text.
 Return a JSON array of services with these fields:
-- date: in YYYY-MM-DD format. IMPORTANT: Today is February 24, 2026. All dates in this schedule are in 2026.
+- date: in YYYY-MM-DD format. IMPORTANT: Today is %s. Use the year indicated in the text; if not specified, use 2026.
 - day_of_week: the day name in Swedish (e.g., "Måndag", "Söndag")
 - time: in HH:MM format (24-hour)
 - service_name: the name of the service in Swedish
@@ -153,7 +155,7 @@ Only include entries that have both a date/day and a time specified.
 Return ONLY the JSON array, no other text.
 
 Text to parse:
-` + text
+`, today) + text
 
 	reqBody := map[string]interface{}{
 		"model": "gpt-4o-mini",
