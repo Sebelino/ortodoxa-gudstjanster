@@ -72,6 +72,7 @@ go run ./cmd/ingest
 - `FIRESTORE_COLLECTION` - Firestore collection name (default: `services`)
 - `GCS_BUCKET` - GCS bucket for Vision API results cache (required)
 - `GCS_UPLOAD_BUCKET` - GCS bucket for manually uploaded schedule images (optional, enables fallback)
+- `GCS_MANUAL_EVENTS_BUCKET` - GCS bucket for manually configured recurring events (optional, enables manual scraper)
 - `OPENAI_API_KEY` - Required for scrapers that use OpenAI Vision API
 - `SMTP_HOST` - SMTP server hostname for alerting (optional, enables email alerts)
 - `SMTP_PORT` - SMTP server port for alerting
@@ -307,6 +308,7 @@ Secrets must be populated manually in Google Secret Manager:
 | Firestore | `(default)` | Service data storage |
 | GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-store` | Vision API cache |
 | GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-uploads` | Manual schedule image uploads |
+| GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-manual-events` | Manual recurring event definitions |
 | Artifact Registry | `ortodoxa-gudstjanster` | Docker images |
 
 ### Service Accounts

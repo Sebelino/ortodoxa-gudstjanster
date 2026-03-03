@@ -37,13 +37,13 @@ func (c *Client) Close() error {
 	return c.client.Close()
 }
 
-// ReplaceServicesForSource atomically replaces all services for a source.
-// It deletes all existing documents for the source, then writes the new ones.
-func (c *Client) ReplaceServicesForSource(ctx context.Context, source string, services []model.ChurchService, batchID string) error {
+// ReplaceServicesForScraper atomically replaces all services for a scraper.
+// It deletes all existing documents for the scraper, then writes the new ones.
+func (c *Client) ReplaceServicesForScraper(ctx context.Context, scraperName string, services []model.ChurchService, batchID string) error {
 	coll := c.client.Collection(c.collection)
 
-	// First, delete all existing documents for this source
-	if err := c.deleteServicesForSource(ctx, source); err != nil {
+	// First, delete all existing documents for this scraper
+	if err := c.deleteServicesForScraper(ctx, scraperName); err != nil {
 		return fmt.Errorf("deleting existing services: %w", err)
 	}
 
@@ -58,7 +58,7 @@ func (c *Client) ReplaceServicesForSource(ctx context.Context, source string, se
 		for _, svc := range services[i:end] {
 			docID := generateDocID(svc)
 			doc := coll.Doc(docID)
-			batch.Set(doc, serviceToMap(svc, batchID))
+			batch.Set(doc, serviceToMap(svc, scraperName, batchID))
 		}
 
 		if _, err := batch.Commit(ctx); err != nil {
@@ -69,11 +69,39 @@ func (c *Client) ReplaceServicesForSource(ctx context.Context, source string, se
 	return nil
 }
 
-// deleteServicesForSource deletes all documents for a given source.
-func (c *Client) deleteServicesForSource(ctx context.Context, source string) error {
+// deleteServicesForScraper deletes all documents for a given scraper.
+// It first deletes by scraper_name (new docs), then cleans up legacy docs
+// where source matches but scraper_name is absent.
+func (c *Client) deleteServicesForScraper(ctx context.Context, scraperName string) error {
 	coll := c.client.Collection(c.collection)
-	query := coll.Where("source", "==", source)
 
+	// Delete docs with scraper_name == scraperName
+	if err := c.deleteDocs(ctx, coll.Where("scraper_name", "==", scraperName)); err != nil {
+		return err
+	}
+
+	// Legacy cleanup: delete docs where source == scraperName and scraper_name is absent
+	iter := coll.Where("source", "==", scraperName).Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("iterating legacy documents: %w", err)
+		}
+		if _, hasScraper := doc.Data()["scraper_name"]; !hasScraper {
+			if _, err := doc.Ref.Delete(ctx); err != nil {
+				return fmt.Errorf("deleting legacy document: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// deleteDocs deletes all documents matching a query in batches.
+func (c *Client) deleteDocs(ctx context.Context, query firestore.Query) error {
 	for {
 		iter := query.Limit(batchSize).Documents(ctx)
 		batch := c.client.Batch()
@@ -129,9 +157,9 @@ func (c *Client) GetAllServices(ctx context.Context) ([]model.ChurchService, err
 	return services, nil
 }
 
-// CountServicesForSource returns the number of stored services for a given source.
-func (c *Client) CountServicesForSource(ctx context.Context, source string) (int, error) {
-	query := c.client.Collection(c.collection).Where("source", "==", source)
+// CountServicesForScraper returns the number of stored services for a given scraper.
+func (c *Client) CountServicesForScraper(ctx context.Context, scraperName string) (int, error) {
+	query := c.client.Collection(c.collection).Where("scraper_name", "==", scraperName)
 	count := 0
 
 	iter := query.Documents(ctx)
@@ -141,7 +169,7 @@ func (c *Client) CountServicesForSource(ctx context.Context, source string) (int
 			break
 		}
 		if err != nil {
-			return 0, fmt.Errorf("counting documents for source %s: %w", source, err)
+			return 0, fmt.Errorf("counting documents for scraper %s: %w", scraperName, err)
 		}
 		count++
 	}
@@ -180,9 +208,10 @@ func generateDocID(svc model.ChurchService) string {
 }
 
 // serviceToMap converts a ChurchService to a Firestore document map.
-func serviceToMap(svc model.ChurchService, batchID string) map[string]interface{} {
+func serviceToMap(svc model.ChurchService, scraperName string, batchID string) map[string]interface{} {
 	m := map[string]interface{}{
 		"source":       svc.Source,
+		"scraper_name": scraperName,
 		"date":         svc.Date,
 		"day_of_week":  svc.DayOfWeek,
 		"service_name": svc.ServiceName,

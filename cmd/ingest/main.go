@@ -69,6 +69,19 @@ func main() {
 		log.Printf("Upload bucket: %s", gcsUploadBucket)
 	}
 
+	// Initialize manual events bucket reader (optional)
+	gcsManualEventsBucket := os.Getenv("GCS_MANUAL_EVENTS_BUCKET")
+	var manualEventsReader *store.BucketReader
+	if gcsManualEventsBucket != "" {
+		var err2 error
+		manualEventsReader, err2 = store.NewBucketReader(ctx, gcsManualEventsBucket)
+		if err2 != nil {
+			log.Fatalf("Failed to initialize manual events bucket reader: %v", err2)
+		}
+		defer manualEventsReader.Close()
+		log.Printf("Manual events bucket: %s", gcsManualEventsBucket)
+	}
+
 	// Initialize SMTP for alerting (optional)
 	var smtpConfig *email.SMTPConfig
 	if smtpHost := strings.TrimSpace(os.Getenv("SMTP_HOST")); smtpHost != "" {
@@ -95,6 +108,7 @@ func main() {
 	registry.Register(scraper.NewHeligaAnnaScraper())
 	registry.Register(scraper.NewRyskaScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewSrpskaScraper())
+	registry.Register(scraper.NewManualScraper(manualEventsReader))
 
 	// Generate batch ID for this ingestion run
 	batchID := time.Now().UTC().Format("20060102-150405")
@@ -120,7 +134,7 @@ func main() {
 
 		if len(services) > 0 {
 			// Check if the new count is less than the existing count
-			existingCount, err := fsClient.CountServicesForSource(ctx, scraperName)
+			existingCount, err := fsClient.CountServicesForScraper(ctx, scraperName)
 			if err != nil {
 				log.Printf("WARNING: Failed to count existing services for %s: %v", scraperName, err)
 				// Proceed with replacement if we can't count
@@ -148,7 +162,7 @@ func main() {
 				continue
 			}
 
-			if err := fsClient.ReplaceServicesForSource(ctx, scraperName, services, batchID); err != nil {
+			if err := fsClient.ReplaceServicesForScraper(ctx, scraperName, services, batchID); err != nil {
 				log.Printf("ERROR: Failed to store services for %s: %v", scraperName, err)
 				failedScrapers++
 				continue

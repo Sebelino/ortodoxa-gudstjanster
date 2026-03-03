@@ -18,6 +18,11 @@ output "uploads_bucket" {
   value       = google_storage_bucket.uploads.name
 }
 
+output "manual_events_bucket" {
+  description = "Name of the Cloud Storage bucket for manual recurring events"
+  value       = google_storage_bucket.manual_events.name
+}
+
 output "service_account_email" {
   description = "Email of the Cloud Run service account"
   value       = google_service_account.cloudrun.email
