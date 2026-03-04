@@ -4,10 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -50,49 +50,48 @@ func (s *GomosScraper) Name() string {
 }
 
 func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
-	services, err := s.fetchFromWebsite(ctx)
-	websiteUsable := err == nil && len(services) > 0 && s.hasCurrentServices(services)
-	if websiteUsable {
-		return services, nil
+	// Collect images from all sources
+	var allImages []imageWithData
+
+	websiteImages, websiteErr := s.fetchWebsiteImages(ctx)
+	if websiteErr != nil {
+		log.Printf("Gomos: website failed: %v", websiteErr)
 	}
+	allImages = append(allImages, websiteImages...)
 
 	if s.uploadReader != nil {
-		if err != nil {
-			log.Printf("Gomos: website failed (%v), trying upload bucket fallback", err)
-		} else if len(services) > 0 {
-			log.Printf("Gomos: website has only past services, trying upload bucket fallback")
-		} else {
-			log.Printf("Gomos: website returned no results, trying upload bucket fallback")
-		}
-		bucketServices, bucketErr := s.fetchFromBucket(ctx)
-		if bucketErr == nil && len(bucketServices) > 0 {
-			// Combine: bucket services + any still-relevant website services
-			combined := append(bucketServices, services...)
-			return s.deduplicate(combined), nil
-		}
+		bucketImages, bucketErr := s.fetchBucketImages(ctx)
 		if bucketErr != nil {
-			log.Printf("Gomos: upload bucket fallback failed: %v", bucketErr)
+			log.Printf("Gomos: bucket failed: %v", bucketErr)
 		}
+		allImages = append(allImages, bucketImages...)
 	}
 
+	if len(allImages) == 0 {
+		if websiteErr != nil {
+			return nil, websiteErr
+		}
+		return nil, fmt.Errorf("no images found")
+	}
+
+	// Process all images together: raw OCR, deduplicate by fingerprint (prefer Swedish), translate if needed
+	services, err := s.processImages(ctx, allImages)
 	if err != nil {
 		return nil, err
 	}
-	return services, nil
+
+	return s.deduplicate(services), nil
 }
 
-// hasCurrentServices checks whether any services are today or in the future.
-func (s *GomosScraper) hasCurrentServices(services []model.ChurchService) bool {
-	today := time.Now().Format("2006-01-02")
-	for _, svc := range services {
-		if svc.Date >= today {
-			return true
-		}
-	}
-	return false
+// imageWithData pairs downloaded image bytes with source metadata.
+type imageWithData struct {
+	data      []byte
+	sourceRef string // URL or bucket object name
+	sourceURL string // the URL to use as source in the service
 }
 
-func (s *GomosScraper) fetchFromWebsite(ctx context.Context) ([]model.ChurchService, error) {
+// fetchWebsiteImages downloads schedule images from the gomos.se website.
+func (s *GomosScraper) fetchWebsiteImages(ctx context.Context) ([]imageWithData, error) {
 	postURL, err := s.findLatestSchedulePost(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("finding latest post: %w", err)
@@ -103,38 +102,31 @@ func (s *GomosScraper) fetchFromWebsite(ctx context.Context) ([]model.ChurchServ
 		return nil, fmt.Errorf("extracting images: %w", err)
 	}
 
-	// Filter out duplicate images (same schedule in different languages)
-	filteredURLs, err := s.filterDuplicateImages(ctx, imageURLs)
-	if err != nil {
-		// If filtering fails, continue with all images
-		filteredURLs = imageURLs
-	}
-
-	var allServices []model.ChurchService
-	for _, imgURL := range filteredURLs {
-		services, err := s.processImage(ctx, imgURL)
+	var images []imageWithData
+	for _, url := range imageURLs {
+		data, err := s.downloadImage(ctx, url)
 		if err != nil {
+			log.Printf("Gomos: failed to download %s: %v", url, err)
 			continue
 		}
-		allServices = append(allServices, services...)
+		images = append(images, imageWithData{
+			data:      data,
+			sourceRef: url,
+			sourceURL: gomosScheduleURL,
+		})
 	}
 
-	return s.deduplicate(allServices), nil
+	return images, nil
 }
 
-func (s *GomosScraper) fetchFromBucket(ctx context.Context) ([]model.ChurchService, error) {
+// fetchBucketImages reads schedule images from the upload bucket.
+func (s *GomosScraper) fetchBucketImages(ctx context.Context) ([]imageWithData, error) {
 	names, err := s.uploadReader.ListObjects(ctx, s.uploadPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("listing upload objects: %w", err)
 	}
 
-	// Build set of object names for sidecar lookup
-	nameSet := make(map[string]bool, len(names))
-	for _, name := range names {
-		nameSet[name] = true
-	}
-
-	var allServices []model.ChurchService
+	var images []imageWithData
 	for _, name := range names {
 		lower := strings.ToLower(name)
 		if !strings.HasSuffix(lower, ".jpg") && !strings.HasSuffix(lower, ".jpeg") && !strings.HasSuffix(lower, ".png") {
@@ -147,27 +139,240 @@ func (s *GomosScraper) fetchFromBucket(ctx context.Context) ([]model.ChurchServi
 			continue
 		}
 
-		// Check for a .source.txt sidecar with the source URL
-		sourceURL := gomosScheduleURL
-		baseName := name[:strings.LastIndex(name, ".")]
-		sidecar := baseName + ".source.txt"
-		if nameSet[sidecar] {
-			if data, err := s.uploadReader.ReadObject(ctx, sidecar); err == nil {
-				if url := strings.TrimSpace(string(data)); url != "" {
-					sourceURL = url
+		images = append(images, imageWithData{
+			data:      imageData,
+			sourceRef: name,
+			sourceURL: gomosScheduleURL,
+		})
+	}
+
+	return images, nil
+}
+
+// ocrResult pairs a raw OCR result with the source URL for the image.
+type ocrResult struct {
+	raw       *vision.RawScheduleResult
+	sourceURL string
+}
+
+// processImages is the core pipeline: raw OCR each image, deduplicate by month,
+// then merge, convert, or translate surviving entries to Swedish.
+func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData) ([]model.ChurchService, error) {
+
+	// Step 1: Raw OCR each image (cached)
+	var results []ocrResult
+	for _, img := range images {
+		raw, err := s.rawOCR(ctx, img.data, img.sourceRef)
+		if err != nil {
+			log.Printf("Gomos: raw OCR failed for %s: %v", img.sourceRef, err)
+			continue
+		}
+		results = append(results, ocrResult{raw: raw, sourceURL: img.sourceURL})
+	}
+
+	// Step 2: Group by month (images covering the same month are the same schedule)
+	type group struct {
+		items []ocrResult
+	}
+	groups := make(map[string]*group)
+	var order []string // preserve insertion order
+	for _, r := range results {
+		month := scheduleMonth(r.raw.Entries)
+		if _, ok := groups[month]; !ok {
+			groups[month] = &group{}
+			order = append(order, month)
+		}
+		groups[month].items = append(groups[month].items, r)
+	}
+
+	// Step 3+4: Per group, merge or convert entries
+	var allServices []model.ChurchService
+	for _, month := range order {
+		g := groups[month]
+
+		var entries []vision.ScheduleEntry
+		sourceURL := g.items[0].sourceURL
+
+		if len(g.items) > 1 {
+			// Multiple images for the same month: merge via AI
+			var err error
+			entries, err = s.mergeEntries(ctx, g.items)
+			if err != nil {
+				log.Printf("Gomos: merge failed for %s: %v", month, err)
+				continue
+			}
+		} else {
+			// Single image: convert directly or translate
+			chosen := g.items[0]
+			sourceURL = chosen.sourceURL
+			lang := strings.ToLower(chosen.raw.Language)
+			if lang == "swedish" || lang == "svenska" {
+				entries = rawEntriesToSwedish(chosen.raw.Entries)
+			} else {
+				var err error
+				entries, err = s.translateEntries(ctx, chosen.raw.Entries)
+				if err != nil {
+					log.Printf("Gomos: translation failed: %v", err)
+					continue
 				}
 			}
 		}
 
-		services, err := s.processImageData(ctx, imageData, name, sourceURL)
-		if err != nil {
-			log.Printf("Gomos: failed to process upload %s: %v", name, err)
-			continue
-		}
-		allServices = append(allServices, services...)
+		allServices = append(allServices, s.convertToServices(entries, sourceURL)...)
 	}
 
-	return s.deduplicate(allServices), nil
+	return allServices, nil
+}
+
+// rawOCR extracts schedule entries from an image in the original language, with caching.
+func (s *GomosScraper) rawOCR(ctx context.Context, imageData []byte, sourceRef string) (*vision.RawScheduleResult, error) {
+	checksum := s.computeChecksum(imageData)
+	cacheKey := "raw-ocr/" + checksum
+
+	var cached vision.RawScheduleResult
+	if s.store.GetJSON(cacheKey, &cached) {
+		log.Printf("Gomos: raw OCR cache hit for %s", sourceRef)
+		return &cached, nil
+	}
+
+	result, rawResponse, err := s.vision.ExtractScheduleRaw(ctx, imageData)
+	if err != nil {
+		return nil, fmt.Errorf("raw OCR for %s: %w", sourceRef, err)
+	}
+
+	// Persist structured result
+	if data, merr := json.Marshal(result); merr == nil {
+		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
+			log.Printf("Gomos: failed to cache raw OCR result: %v", werr)
+		}
+	}
+
+	// Persist source image
+	imageExt := s.imageExtension(sourceRef)
+	if werr := s.store.SetRaw(cacheKey+imageExt, imageData); werr != nil {
+		log.Printf("Gomos: failed to persist source image: %v", werr)
+	}
+
+	// Persist raw API response
+	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
+		log.Printf("Gomos: failed to persist raw response: %v", werr)
+	}
+
+	return result, nil
+}
+
+// scheduleMonth returns the most common year-month (YYYY-MM) among entries,
+// used to group images covering the same monthly schedule.
+func scheduleMonth(entries []vision.RawScheduleEntry) string {
+	counts := make(map[string]int)
+	for _, e := range entries {
+		if len(e.Date) >= 7 {
+			counts[e.Date[:7]]++
+		}
+	}
+	best := ""
+	bestN := 0
+	for m, n := range counts {
+		if n > bestN {
+			best = m
+			bestN = n
+		}
+	}
+	return best
+}
+
+// mergeEntries merges multiple OCR results (same schedule, different languages) via the OpenAI API, with caching.
+func (s *GomosScraper) mergeEntries(ctx context.Context, items []ocrResult) ([]vision.ScheduleEntry, error) {
+	// Collect all raw schedule results
+	schedules := make([]vision.RawScheduleResult, len(items))
+	for i, item := range items {
+		schedules[i] = *item.raw
+	}
+
+	// Compute cache key from combined inputs
+	inputJSON, err := json.Marshal(schedules)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling schedules: %w", err)
+	}
+	hash := sha256.Sum256(inputJSON)
+	hashStr := hex.EncodeToString(hash[:])
+	cacheKey := "merge/" + hashStr
+
+	var cached []vision.ScheduleEntry
+	if s.store.GetJSON(cacheKey, &cached) {
+		log.Printf("Gomos: merge cache hit")
+		return cached, nil
+	}
+
+	merged, rawResponse, err := s.vision.MergeScheduleEntries(ctx, schedules)
+	if err != nil {
+		return nil, fmt.Errorf("merging entries: %w", err)
+	}
+
+	// Persist structured result
+	if data, merr := json.Marshal(merged); merr == nil {
+		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
+			log.Printf("Gomos: failed to cache merged entries: %v", werr)
+		}
+	}
+
+	// Persist raw API response
+	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
+		log.Printf("Gomos: failed to persist merge response: %v", werr)
+	}
+
+	return merged, nil
+}
+
+// translateEntries translates raw schedule entries to Swedish via the OpenAI API, with caching.
+func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.RawScheduleEntry) ([]vision.ScheduleEntry, error) {
+	entriesJSON, err := json.Marshal(entries)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling entries: %w", err)
+	}
+	hash := sha256.Sum256(entriesJSON)
+	hashStr := hex.EncodeToString(hash[:])
+	cacheKey := "translate/" + hashStr
+
+	var cached []vision.ScheduleEntry
+	if s.store.GetJSON(cacheKey, &cached) {
+		log.Printf("Gomos: translate cache hit")
+		return cached, nil
+	}
+
+	translated, rawResponse, err := s.vision.TranslateScheduleEntries(ctx, entries)
+	if err != nil {
+		return nil, fmt.Errorf("translating entries: %w", err)
+	}
+
+	// Persist structured result
+	if data, merr := json.Marshal(translated); merr == nil {
+		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
+			log.Printf("Gomos: failed to cache translated entries: %v", werr)
+		}
+	}
+
+	// Persist raw API response
+	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
+		log.Printf("Gomos: failed to persist translate response: %v", werr)
+	}
+
+	return translated, nil
+}
+
+// rawEntriesToSwedish converts RawScheduleEntry to ScheduleEntry directly (no API call needed).
+func rawEntriesToSwedish(entries []vision.RawScheduleEntry) []vision.ScheduleEntry {
+	result := make([]vision.ScheduleEntry, len(entries))
+	for i, e := range entries {
+		result[i] = vision.ScheduleEntry{
+			Date:        e.Date,
+			DayOfWeek:   e.DayOfWeek,
+			Time:        e.Time,
+			ServiceName: e.ServiceName,
+			Occasion:    e.Occasion,
+		}
+	}
+	return result
 }
 
 func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, error) {
@@ -215,110 +420,6 @@ func (s *GomosScraper) extractImageURLs(ctx context.Context, postURL string) ([]
 	})
 
 	return urls, nil
-}
-
-// filterDuplicateImages compares images pairwise to find duplicates (same schedule in different languages)
-// and keeps only the Swedish version.
-func (s *GomosScraper) filterDuplicateImages(ctx context.Context, urls []string) ([]string, error) {
-	if len(urls) <= 1 {
-		return urls, nil
-	}
-
-	// Download all images first
-	imageData := make(map[string][]byte)
-	for _, url := range urls {
-		data, err := s.downloadImage(ctx, url)
-		if err != nil {
-			continue
-		}
-		imageData[url] = data
-	}
-
-	// Track which URLs to exclude (non-Swedish duplicates)
-	exclude := make(map[string]bool)
-
-	// Compare pairs of images
-	for i := 0; i < len(urls); i++ {
-		if exclude[urls[i]] {
-			continue
-		}
-		data1, ok1 := imageData[urls[i]]
-		if !ok1 {
-			continue
-		}
-
-		for j := i + 1; j < len(urls); j++ {
-			if exclude[urls[j]] {
-				continue
-			}
-			data2, ok2 := imageData[urls[j]]
-			if !ok2 {
-				continue
-			}
-
-			// Compare the two images
-			result, err := s.vision.CompareScheduleImages(ctx, data1, data2)
-			if err != nil {
-				// If comparison fails, keep both images
-				continue
-			}
-
-			if result.SameSchedule {
-				// They're the same schedule - keep only the Swedish one
-				if result.SwedishImageNum == 1 {
-					exclude[urls[j]] = true
-				} else {
-					exclude[urls[i]] = true
-					break // Move to next i since current one is excluded
-				}
-			}
-		}
-	}
-
-	// Build filtered list
-	var filtered []string
-	for _, url := range urls {
-		if !exclude[url] {
-			filtered = append(filtered, url)
-		}
-	}
-
-	return filtered, nil
-}
-
-func (s *GomosScraper) processImage(ctx context.Context, imageURL string) ([]model.ChurchService, error) {
-	imageData, err := s.downloadImage(ctx, imageURL)
-	if err != nil {
-		return nil, fmt.Errorf("downloading image: %w", err)
-	}
-
-	return s.processImageData(ctx, imageData, imageURL, gomosScheduleURL)
-}
-
-func (s *GomosScraper) processImageData(ctx context.Context, imageData []byte, sourceRef string, sourceURL string) ([]model.ChurchService, error) {
-	checksum := s.computeChecksum(imageData)
-	imageExt := s.imageExtension(sourceRef)
-
-	var entries []vision.ScheduleEntry
-	if s.store.GetJSON(checksum, &entries) {
-		return s.convertToServices(entries, sourceURL), nil
-	}
-
-	entries, err := s.vision.ExtractSchedule(ctx, imageData)
-	if err != nil {
-		return nil, fmt.Errorf("extracting schedule: %w", err)
-	}
-
-	if err := s.store.SetJSON(checksum, entries); err != nil {
-		// Log error but don't fail - we still have the data
-	}
-
-	// Save the source image alongside the JSON
-	if err := s.store.SetWithExtension(checksum, imageExt, imageData); err != nil {
-		// Log error but don't fail - we still have the data
-	}
-
-	return s.convertToServices(entries, sourceURL), nil
 }
 
 func (s *GomosScraper) downloadImage(ctx context.Context, imageURL string) ([]byte, error) {

@@ -23,6 +23,21 @@ type ScheduleEntry struct {
 	Occasion    string `json:"occasion,omitempty"`
 }
 
+// RawScheduleResult holds the raw OCR output from an image in its original language.
+type RawScheduleResult struct {
+	Language string             `json:"language"` // e.g. "Swedish", "Greek"
+	Entries  []RawScheduleEntry `json:"entries"`
+}
+
+// RawScheduleEntry is a single service entry in its original language.
+type RawScheduleEntry struct {
+	Date        string `json:"date"`
+	DayOfWeek   string `json:"day_of_week"`
+	Time        string `json:"time"`
+	ServiceName string `json:"service_name"`
+	Occasion    string `json:"occasion,omitempty"`
+}
+
 // Client is an OpenAI Vision API client.
 type Client struct {
 	apiKey     string
@@ -37,8 +52,10 @@ func NewClient(apiKey string) *Client {
 	}
 }
 
-// ExtractSchedule sends an image to OpenAI's vision API and extracts church service schedule entries.
-func (c *Client) ExtractSchedule(ctx context.Context, imageData []byte) ([]ScheduleEntry, error) {
+// ExtractScheduleRaw sends an image to OpenAI's vision API and extracts church service
+// schedule entries in their original language. Returns the structured result and the
+// raw API response content for diagnostics.
+func (c *Client) ExtractScheduleRaw(ctx context.Context, imageData []byte) (*RawScheduleResult, string, error) {
 	imageBase64 := base64.StdEncoding.EncodeToString(imageData)
 
 	mediaType := "image/jpeg"
@@ -46,18 +63,26 @@ func (c *Client) ExtractSchedule(ctx context.Context, imageData []byte) ([]Sched
 		mediaType = "image/png"
 	}
 
-	prompt := `Extract church service schedule information from this image.
-The image may be in any language (Greek, Swedish, etc.). ALL output must be translated to Swedish.
+	prompt := `Extract ALL church service schedule entries from this image. The schedule is dense and may contain 30+ entries — be extremely thorough and do not skip any.
 
-Return a JSON array of services with these fields:
-- date: in YYYY-MM-DD format (use year 2026 if not specified)
-- day_of_week: the day name in Swedish (e.g., "Måndag", "Söndag")
-- time: in HH:MM format (24-hour)
-- service_name: the name of the service translated to Swedish (e.g., "Θεία Λειτουργία" → "Gudomlig liturgi")
-- occasion: optional, any special occasion or holiday mentioned, translated to Swedish
+STEP 1: First, scan the entire image top to bottom and identify every date header (e.g., "Κυριακή 1 Μαρτίου", "Δευτέρα 2 Μαρτίου"). List them mentally — you must not miss any date section.
+
+STEP 2: For each date header, extract every service listed under it. A single date may have multiple services at different times.
+
+The image may be in any language (Greek, Swedish, etc.). Keep all text in its ORIGINAL language — do NOT translate.
+
+Return a JSON object with these fields:
+- language: the language of the schedule (e.g., "Swedish", "Greek", "English")
+- entries: an array of services, each with:
+  - date: in YYYY-MM-DD format (use year 2026 if not specified)
+  - day_of_week: the day name in the ORIGINAL language
+  - time: in HH:MM format (24-hour). Convert "π.μ." to AM and "μ.μ." to PM times in 24h format (e.g., 6:00 μ.μ. = 18:00)
+  - service_name: the name of the service in the ORIGINAL language
+  - occasion: optional, any special occasion or holiday mentioned, in the ORIGINAL language
 
 Only include entries that have both a date/day and a time specified.
-Return ONLY the JSON array, no other text.`
+IMPORTANT: Double-check that you have not skipped any date sections or services. The output should cover the ENTIRE schedule from first date to last date.
+Return ONLY the JSON object, no other text.`
 
 	reqBody := map[string]interface{}{
 		"model": "gpt-4o",
@@ -83,12 +108,12 @@ Return ONLY the JSON array, no other text.`
 
 	reqJSON, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling request: %w", err)
+		return nil, "", fmt.Errorf("marshaling request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		return nil, "", fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -96,17 +121,17 @@ Return ONLY the JSON array, no other text.`
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
+		return nil, "", fmt.Errorf("sending request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
+		return nil, "", fmt.Errorf("reading response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var apiResp struct {
@@ -118,11 +143,11 @@ Return ONLY the JSON array, no other text.`
 	}
 
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("parsing API response: %w", err)
+		return nil, "", fmt.Errorf("parsing API response: %w", err)
 	}
 
 	if len(apiResp.Choices) == 0 {
-		return nil, fmt.Errorf("no response from API")
+		return nil, "", fmt.Errorf("no response from API")
 	}
 
 	content := apiResp.Choices[0].Message.Content
@@ -132,12 +157,12 @@ Return ONLY the JSON array, no other text.`
 	content = strings.TrimSuffix(content, "```")
 	content = strings.TrimSpace(content)
 
-	var entries []ScheduleEntry
-	if err := json.Unmarshal([]byte(content), &entries); err != nil {
-		return nil, fmt.Errorf("parsing schedule entries: %w (content: %s)", err, content)
+	var result RawScheduleResult
+	if err := json.Unmarshal([]byte(content), &result); err != nil {
+		return nil, content, fmt.Errorf("parsing raw schedule result: %w (content: %s)", err, content)
 	}
 
-	return entries, nil
+	return &result, content, nil
 }
 
 // ExtractScheduleFromText sends text to OpenAI's API and extracts church service schedule entries.
@@ -227,75 +252,49 @@ Text to parse:
 	return entries, nil
 }
 
-// ImageComparisonResult holds the result of comparing two schedule images.
-type ImageComparisonResult struct {
-	SameSchedule    bool `json:"same_schedule"`
-	SwedishImageNum int  `json:"swedish_image_num"` // 1 or 2, only meaningful if SameSchedule is true
-}
-
-// CompareScheduleImages compares two images to determine if they contain the same schedule
-// in different languages. If so, it identifies which image is in Swedish.
-func (c *Client) CompareScheduleImages(ctx context.Context, image1Data, image2Data []byte) (*ImageComparisonResult, error) {
-	image1Base64 := base64.StdEncoding.EncodeToString(image1Data)
-	image2Base64 := base64.StdEncoding.EncodeToString(image2Data)
-
-	mediaType1 := "image/jpeg"
-	if len(image1Data) > 8 && string(image1Data[0:8]) == "\x89PNG\r\n\x1a\n" {
-		mediaType1 = "image/png"
+// TranslateScheduleEntries translates raw schedule entries to Swedish using a text-only
+// OpenAI call. Returns the translated entries and the raw API response content.
+func (c *Client) TranslateScheduleEntries(ctx context.Context, entries []RawScheduleEntry) ([]ScheduleEntry, string, error) {
+	entriesJSON, err := json.Marshal(entries)
+	if err != nil {
+		return nil, "", fmt.Errorf("marshaling entries: %w", err)
 	}
 
-	mediaType2 := "image/jpeg"
-	if len(image2Data) > 8 && string(image2Data[0:8]) == "\x89PNG\r\n\x1a\n" {
-		mediaType2 = "image/png"
-	}
+	today := time.Now().Format("January 2, 2006")
+	prompt := fmt.Sprintf(`Translate these church service schedule entries to Swedish.
+Today is %s.
 
-	prompt := `Compare these two images of church service schedules.
-Determine:
-1. Do they contain the same schedule information but in different languages?
-2. If yes, which image (1 or 2) is in Swedish?
+Input JSON:
+%s
 
-Return a JSON object with:
-- same_schedule: true if both images show the same schedule (same dates, times, services) but in different languages
-- swedish_image_num: 1 or 2, indicating which image is in Swedish (only meaningful if same_schedule is true)
+Return a JSON array of services with these fields:
+- date: in YYYY-MM-DD format (keep the same dates)
+- day_of_week: the day name in Swedish (e.g., "Måndag", "Söndag")
+- time: in HH:MM format (24-hour, keep the same times)
+- service_name: the name of the service translated to Swedish (e.g., "Θεία Λειτουργία" → "Gudomlig liturgi")
+- occasion: optional, any special occasion or holiday, translated to Swedish
 
-Return ONLY the JSON object, no other text.`
+Return ONLY the JSON array, no other text.`, today, string(entriesJSON))
 
 	reqBody := map[string]interface{}{
 		"model": "gpt-4o-mini",
 		"messages": []map[string]interface{}{
 			{
 				"role": "user",
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": prompt,
-					},
-					{
-						"type": "image_url",
-						"image_url": map[string]string{
-							"url": fmt.Sprintf("data:%s;base64,%s", mediaType1, image1Base64),
-						},
-					},
-					{
-						"type": "image_url",
-						"image_url": map[string]string{
-							"url": fmt.Sprintf("data:%s;base64,%s", mediaType2, image2Base64),
-						},
-					},
-				},
+				"content": prompt,
 			},
 		},
-		"max_tokens": 256,
+		"max_tokens": 16384,
 	}
 
 	reqJSON, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling request: %w", err)
+		return nil, "", fmt.Errorf("marshaling request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		return nil, "", fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -303,17 +302,17 @@ Return ONLY the JSON object, no other text.`
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
+		return nil, "", fmt.Errorf("sending request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
+		return nil, "", fmt.Errorf("reading response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var apiResp struct {
@@ -325,11 +324,11 @@ Return ONLY the JSON object, no other text.`
 	}
 
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("parsing API response: %w", err)
+		return nil, "", fmt.Errorf("parsing API response: %w", err)
 	}
 
 	if len(apiResp.Choices) == 0 {
-		return nil, fmt.Errorf("no response from API")
+		return nil, "", fmt.Errorf("no response from API")
 	}
 
 	content := apiResp.Choices[0].Message.Content
@@ -339,10 +338,113 @@ Return ONLY the JSON object, no other text.`
 	content = strings.TrimSuffix(content, "```")
 	content = strings.TrimSpace(content)
 
-	var result ImageComparisonResult
-	if err := json.Unmarshal([]byte(content), &result); err != nil {
-		return nil, fmt.Errorf("parsing comparison result: %w (content: %s)", err, content)
+	var translated []ScheduleEntry
+	if err := json.Unmarshal([]byte(content), &translated); err != nil {
+		return nil, content, fmt.Errorf("parsing translated entries: %w (content: %s)", err, content)
 	}
 
-	return &result, nil
+	return translated, content, nil
+}
+
+// MergeScheduleEntries merges multiple OCR results (from the same schedule in different
+// languages) into a single Swedish schedule. Includes all events from all versions,
+// uses Swedish names when available, and favors earlier times for the same event.
+func (c *Client) MergeScheduleEntries(ctx context.Context, schedules []RawScheduleResult) ([]ScheduleEntry, string, error) {
+	schedulesJSON, err := json.Marshal(schedules)
+	if err != nil {
+		return nil, "", fmt.Errorf("marshaling schedules: %w", err)
+	}
+
+	today := time.Now().Format("January 2, 2006")
+	prompt := fmt.Sprintf(`You are given church service schedule entries extracted from multiple images of the same monthly schedule in different languages.
+
+Merge them into a single, complete Swedish schedule following these rules:
+1. Include ALL events from ALL versions — do not drop any event that appears in any version.
+2. Use Swedish service names when available. If an event only appears in a non-Swedish version, translate its name to Swedish.
+3. Match events across versions by date and approximate time (within 30 minutes = same event).
+4. When the same event appears at slightly different times across versions, use the EARLIER time.
+5. day_of_week must be in Swedish (e.g., "Måndag", "Söndag").
+
+Today is %s.
+
+Input schedules (each with language and entries):
+%s
+
+Return a JSON array of merged services with these fields:
+- date: in YYYY-MM-DD format
+- day_of_week: in Swedish
+- time: in HH:MM format (24-hour)
+- service_name: in Swedish
+- occasion: optional, in Swedish
+
+Return ONLY the JSON array, no other text.`, today, string(schedulesJSON))
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 16384,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, "", fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, "", fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, "", fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, "", fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var merged []ScheduleEntry
+	if err := json.Unmarshal([]byte(content), &merged); err != nil {
+		return nil, content, fmt.Errorf("parsing merged entries: %w (content: %s)", err, content)
+	}
+
+	return merged, content, nil
 }
