@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -21,6 +23,10 @@ const (
 	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
 	gomosLocation    = "Stockholm, St. Georgios Cathedral, Birger Jarlsgatan 92"
 	gomosLanguage    = "Grekiska, svenska"
+	// Bump this version to invalidate all cached raw OCR results.
+	gomosOCRVersion = "v2"
+	// Bump this version to invalidate all cached merge results.
+	gomosMergeVersion = "v4"
 )
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
@@ -201,6 +207,8 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 				log.Printf("Gomos: merge failed for %s: %v", month, err)
 				continue
 			}
+			// Post-merge validation: recover any entries dropped by the AI merge
+			entries = recoverDroppedEntries(entries, g.items)
 		} else {
 			// Single image: convert directly or translate
 			chosen := g.items[0]
@@ -227,7 +235,7 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 // rawOCR extracts schedule entries from an image in the original language, with caching.
 func (s *GomosScraper) rawOCR(ctx context.Context, imageData []byte, sourceRef string) (*vision.RawScheduleResult, error) {
 	checksum := s.computeChecksum(imageData)
-	cacheKey := "raw-ocr/" + checksum
+	cacheKey := "raw-ocr/" + gomosOCRVersion + "/" + checksum
 
 	var cached vision.RawScheduleResult
 	if s.store.GetJSON(cacheKey, &cached) {
@@ -240,7 +248,31 @@ func (s *GomosScraper) rawOCR(ctx context.Context, imageData []byte, sourceRef s
 		return nil, fmt.Errorf("raw OCR for %s: %w", sourceRef, err)
 	}
 
-	// Persist structured result
+	// Persist first-pass raw API response
+	if werr := s.store.SetRaw(cacheKey+".pass1.response.txt", []byte(rawResponse)); werr != nil {
+		log.Printf("Gomos: failed to persist first-pass response: %v", werr)
+	}
+
+	// Second pass: verify extraction by asking the model to find missed events
+	log.Printf("Gomos: running verification pass for %s (%d entries from first pass)", sourceRef, len(result.Entries))
+	missed, verifyResponse, verifyErr := s.vision.VerifyScheduleExtraction(ctx, imageData, result)
+	if verifyErr != nil {
+		log.Printf("Gomos: verification pass failed for %s: %v", sourceRef, verifyErr)
+	} else if len(missed) > 0 {
+		log.Printf("Gomos: verification found %d missed entries for %s", len(missed), sourceRef)
+		result.Entries = append(result.Entries, missed...)
+	} else {
+		log.Printf("Gomos: verification confirmed all entries for %s", sourceRef)
+	}
+
+	// Persist verification response
+	if verifyResponse != "" {
+		if werr := s.store.SetRaw(cacheKey+".pass2.response.txt", []byte(verifyResponse)); werr != nil {
+			log.Printf("Gomos: failed to persist verification response: %v", werr)
+		}
+	}
+
+	// Persist final structured result (including any missed entries)
 	if data, merr := json.Marshal(result); merr == nil {
 		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
 			log.Printf("Gomos: failed to cache raw OCR result: %v", werr)
@@ -251,11 +283,6 @@ func (s *GomosScraper) rawOCR(ctx context.Context, imageData []byte, sourceRef s
 	imageExt := s.imageExtension(sourceRef)
 	if werr := s.store.SetRaw(cacheKey+imageExt, imageData); werr != nil {
 		log.Printf("Gomos: failed to persist source image: %v", werr)
-	}
-
-	// Persist raw API response
-	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
-		log.Printf("Gomos: failed to persist raw response: %v", werr)
 	}
 
 	return result, nil
@@ -296,7 +323,7 @@ func (s *GomosScraper) mergeEntries(ctx context.Context, items []ocrResult) ([]v
 	}
 	hash := sha256.Sum256(inputJSON)
 	hashStr := hex.EncodeToString(hash[:])
-	cacheKey := "merge/" + hashStr
+	cacheKey := "merge/" + gomosMergeVersion + "/" + hashStr
 
 	var cached []vision.ScheduleEntry
 	if s.store.GetJSON(cacheKey, &cached) {
@@ -373,6 +400,82 @@ func rawEntriesToSwedish(entries []vision.RawScheduleEntry) []vision.ScheduleEnt
 		}
 	}
 	return result
+}
+
+// recoverDroppedEntries checks whether the AI merge dropped any Swedish events.
+// Only Swedish entries are recovered since the Swedish schedule is the authoritative source.
+// Non-Swedish-only entries are not recovered as they may contain OCR date/time errors.
+func recoverDroppedEntries(merged []vision.ScheduleEntry, items []ocrResult) []vision.ScheduleEntry {
+	// Build a set of (date, timeMinutes) from merged entries for quick lookup
+	type dateTime struct {
+		date    string
+		minutes int
+	}
+	mergedSet := make(map[dateTime]bool)
+	for _, e := range merged {
+		if m, ok := parseTimeMinutes(e.Time); ok {
+			mergedSet[dateTime{e.Date, m}] = true
+		}
+	}
+
+	hasCloseMatch := func(date, timeStr string) bool {
+		m, ok := parseTimeMinutes(timeStr)
+		if !ok {
+			return false
+		}
+		for key := range mergedSet {
+			if key.date == date && math.Abs(float64(key.minutes-m)) <= 30 {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Only recover from Swedish entries (the authoritative source)
+	var recovered int
+	for _, item := range items {
+		lang := strings.ToLower(item.raw.Language)
+		if lang != "swedish" && lang != "svenska" {
+			continue
+		}
+		for _, e := range item.raw.Entries {
+			if !hasCloseMatch(e.Date, e.Time) {
+				log.Printf("Gomos: recovering dropped Swedish entry: %s %s %s", e.Date, e.Time, e.ServiceName)
+				entry := vision.ScheduleEntry{
+					Date:        e.Date,
+					DayOfWeek:   e.DayOfWeek,
+					Time:        e.Time,
+					ServiceName: e.ServiceName,
+					Occasion:    e.Occasion,
+				}
+				merged = append(merged, entry)
+				if m, ok := parseTimeMinutes(e.Time); ok {
+					mergedSet[dateTime{e.Date, m}] = true
+				}
+				recovered++
+			}
+		}
+	}
+
+	if recovered > 0 {
+		log.Printf("Gomos: recovered %d dropped entries after merge", recovered)
+	}
+
+	return merged
+}
+
+// parseTimeMinutes parses "HH:MM" to minutes since midnight.
+func parseTimeMinutes(t string) (int, bool) {
+	parts := strings.Split(t, ":")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	h, err1 := strconv.Atoi(parts[0])
+	m, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return 0, false
+	}
+	return h*60 + m, true
 }
 
 func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, error) {
