@@ -67,7 +67,7 @@ func (c *Client) ExtractScheduleRaw(ctx context.Context, imageData []byte) (*Raw
 
 STEP 1: First, scan the entire image top to bottom (and left column then right column if multi-column) and identify every date header (e.g., "Κυριακή 1 Μαρτίου", "Torsdag 26 mars"). List them mentally — you must not miss any date section.
 
-STEP 2: For each date header, extract every service listed under it. A single date may have multiple services at different times. Times may appear right-aligned or at the end of a wrapped line — look carefully for them.
+STEP 2: For each date header, extract every service listed under it. A single date may have multiple services at different times. Times may appear right-aligned or at the end of a wrapped line — look carefully for them. Also include any annotations, notes, or special entries marked with "NOTERING", "OBS", "NOTE" or similar — these are additional events (often at other locations) and must be extracted as separate entries.
 
 The image may be in any language (Greek, Swedish, etc.). Keep all text in its ORIGINAL language — do NOT translate.
 
@@ -302,7 +302,7 @@ Text to parse:
 `, today) + text
 
 	reqBody := map[string]interface{}{
-		"model": "gpt-4o-mini",
+		"model": "gpt-4o",
 		"messages": []map[string]interface{}{
 			{
 				"role": "user",
