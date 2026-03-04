@@ -289,7 +289,7 @@ func (c *Client) ExtractScheduleFromText(ctx context.Context, text string) ([]Sc
 	today := time.Now().Format("January 2, 2006")
 	prompt := fmt.Sprintf(`Extract church service schedule information from this text.
 Return a JSON array of services with these fields:
-- date: in YYYY-MM-DD format. IMPORTANT: Today is %s. Use the year indicated in the text; if not specified, use 2026.
+- date: in YYYY-MM-DD format. IMPORTANT: Today is %s. Church schedules are always for the current or upcoming period — never for the past. If the text mentions a year that would place all events in the past, it is likely a typo; use the current year instead. If no year is specified, use 2026.
 - day_of_week: the day name in Swedish (e.g., "Måndag", "Söndag")
 - time: in HH:MM format (24-hour)
 - service_name: the name of the service in Swedish
