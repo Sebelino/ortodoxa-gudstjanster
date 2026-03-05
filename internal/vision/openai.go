@@ -490,8 +490,11 @@ Examples:
 - "Stora kompletoriet med den heliga Andreasakanonen" → "Kompletoriet"
 - "Vesper" → "Vesper"
 - "Trefaldighetsafton" → "Trefaldighetsafton"
+- "Föreläsning för katekumener, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Katekes"
+- "Katekes" → "Katekes"
 
 IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, etc.) must get the title "Gudomlig Liturgi".
+IMPORTANT: Any service related to catechism or catechumens (katekumener, katekes, katekisundervisning, etc.) must get the title "Katekes".
 
 Return a JSON object mapping each input service name (exactly as given) to its short title.
 
