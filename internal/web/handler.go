@@ -89,7 +89,7 @@ func (h *Handler) SetSMTP(config *email.SMTPConfig) {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", h.noCache(h.handleIndex))
 	mux.HandleFunc("/services", h.noCache(h.handleServices))
-	mux.HandleFunc("/calendar.ics", h.handleICS)
+	mux.HandleFunc("/calendar.ics", h.noCache(h.handleICS))
 	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)

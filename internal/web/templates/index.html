@@ -403,11 +403,11 @@
 
         function getSubscribeUrl() {
             const base = window.location.origin + '/calendar.ics';
-            if (excludedSources.size === 0) {
-                return base;
-            }
             const params = new URLSearchParams();
-            params.set('exclude', [...excludedSources].join(','));
+            if (excludedSources.size > 0) {
+                params.set('exclude', [...excludedSources].join(','));
+            }
+            params.set('v', Math.random().toString(36).slice(2, 8));
             return base + '?' + params.toString();
         }
 
