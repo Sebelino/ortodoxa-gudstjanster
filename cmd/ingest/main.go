@@ -191,14 +191,16 @@ func main() {
 					result.services[i].EndTime = pt.End
 				}
 			}
-			// Copy Language → ParishLanguage
-			if result.services[i].Language != nil {
+			// Copy Language → ParishLanguage if not already set by the scraper
+			if result.services[i].Language != nil && result.services[i].ParishLanguage == nil {
 				result.services[i].ParishLanguage = result.services[i].Language
 			}
-			// Set EventLanguage from parsed results
-			mapKey := eventLangMapKey(result.services[i].ServiceName, result.services[i].Occasion, result.services[i].Notes)
-			if lang, ok := eventLangMap[mapKey]; ok {
-				result.services[i].EventLanguage = lang
+			// Set EventLanguage from parsed results, but only if detected and not already set
+			if result.services[i].EventLanguage == nil {
+				mapKey := eventLangMapKey(result.services[i].ServiceName, result.services[i].Occasion, result.services[i].Notes)
+				if lang, ok := eventLangMap[mapKey]; ok && lang != nil {
+					result.services[i].EventLanguage = lang
+				}
 			}
 		}
 
