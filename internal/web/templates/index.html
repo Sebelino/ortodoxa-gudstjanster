@@ -454,6 +454,9 @@
             if (excludedSources.size > 0) {
                 params.set('exclude', [...excludedSources].join(','));
             }
+            if (excludedLanguages.size > 0) {
+                params.set('excludeLang', [...excludedLanguages].join(','));
+            }
             params.set('v', Math.random().toString(36).slice(2, 8));
             return base + '?' + params.toString();
         }

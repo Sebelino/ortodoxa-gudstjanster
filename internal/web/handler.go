@@ -159,6 +159,22 @@ func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
 		services = filtered
 	}
 
+	// Parse excluded languages from query parameter
+	excludeLangParam := r.URL.Query().Get("excludeLang")
+	if excludeLangParam != "" {
+		excludedLangs := make(map[string]bool)
+		for _, lang := range strings.Split(excludeLangParam, ",") {
+			excludedLangs[strings.TrimSpace(lang)] = true
+		}
+		var filtered []model.ChurchService
+		for _, s := range services {
+			if !excludedLangs[langCategory(s)] {
+				filtered = append(filtered, s)
+			}
+		}
+		services = filtered
+	}
+
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", "inline; filename=\"ortodoxa-gudstjanster.ics\"")
 
@@ -307,6 +323,32 @@ func parseStartTime(timeStr string) string {
 	}
 
 	return ""
+}
+
+func langCategory(s model.ChurchService) string {
+	el := ""
+	if s.EventLanguage != nil {
+		el = *s.EventLanguage
+	}
+	pl := ""
+	if s.ParishLanguage != nil {
+		pl = strings.ToLower(*s.ParishLanguage)
+	}
+	if el == "Svenska" {
+		return "Svenska"
+	}
+	if el == "Engelska" {
+		return "Engelska"
+	}
+	if el == "" {
+		if strings.Contains(pl, "svenska") {
+			return "Svenska"
+		}
+		if strings.Contains(pl, "engelska") {
+			return "Engelska"
+		}
+	}
+	return "Övrigt"
 }
 
 func filterAndSort(services []model.ChurchService) []model.ChurchService {
