@@ -209,7 +209,7 @@ func generateICS(services []model.ChurchService) string {
 		if s.Title != "" {
 			summaryText = s.Title
 		}
-		if summaryText == "Morgongudstjänst" || summaryText == "Aftongudstjänst" {
+		if summaryText == "Morgongudstjänst" || summaryText == "Aftongudstjänst" || summaryText == "Kvällsgudstjänst" {
 			summaryText = "Gudstjänst"
 		}
 		summary := escapeICS(summaryText)
@@ -223,10 +223,8 @@ func generateICS(services []model.ChurchService) string {
 
 		// Description with additional details
 		var desc []string
-		if s.Title != "" {
-			desc = append(desc, fmt.Sprintf("Gudstjänst: %s", s.ServiceName))
-		}
 		desc = append(desc, fmt.Sprintf("Församling: %s", s.Parish))
+		desc = append(desc, fmt.Sprintf("Beskrivning: %s", s.ServiceName))
 		if s.Language != nil && *s.Language != "" {
 			desc = append(desc, fmt.Sprintf("Språk: %s", *s.Language))
 		}
