@@ -514,7 +514,9 @@
 
         function renderServices() {
             const content = document.getElementById('content');
+            const today = new Date().toISOString().slice(0, 10);
             const filteredServices = allServices.filter(s => {
+                if (s.date < today) return false;
                 if (excludedSources.has(s.parish)) return false;
                 if (excludedLanguages.has(getLangCategory(s))) return false;
                 return true;

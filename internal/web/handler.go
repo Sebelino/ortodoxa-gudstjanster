@@ -309,12 +309,11 @@ func parseStartTime(timeStr string) string {
 }
 
 func filterAndSort(services []model.ChurchService) []model.ChurchService {
-	today := time.Now().Format("2006-01-02")
+	cutoff := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 
-	// Filter out past events
 	var future []model.ChurchService
 	for _, s := range services {
-		if s.Date >= today {
+		if s.Date >= cutoff {
 			future = append(future, s)
 		}
 	}
