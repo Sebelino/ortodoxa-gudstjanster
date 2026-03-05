@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"text/tabwriter"
 
 	fs "ortodoxa-gudstjanster/internal/firestore"
@@ -34,6 +35,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get services: %v", err)
 	}
+
+	sort.Slice(services, func(i, j int) bool {
+		ti := services[i].Title
+		if ti == "" {
+			ti = services[i].ServiceName
+		}
+		tj := services[j].Title
+		if tj == "" {
+			tj = services[j].ServiceName
+		}
+		return ti < tj
+	})
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(w, "TITLE\tSERVICE_NAME\n")
