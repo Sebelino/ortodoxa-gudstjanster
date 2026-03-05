@@ -6,6 +6,11 @@
     <title>Ortodoxa Gudstjänster i Sverige – Kommande tider</title>
     <meta name="description" content="Samlade gudstjänsttider för ortodoxa kyrkor i Sverige. Se kommande gudstjänster från grekisk-ortodoxa, rysk-ortodoxa, serbisk-ortodoxa och finska ortodoxa församlingar.">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gudstjänster">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://ortodoxagudstjanster.se/">
     <meta property="og:type" content="website">
@@ -697,6 +702,10 @@
 
         loadServices();
         loadLastUpdated();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
     </script>
 </body>
 </html>

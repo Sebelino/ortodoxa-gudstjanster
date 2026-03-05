@@ -94,6 +94,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
 	mux.HandleFunc("/favicon.svg", h.handleFavicon)
+	mux.HandleFunc("/manifest.json", h.handleManifest)
+	mux.HandleFunc("/sw.js", h.handleServiceWorker)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
 	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
 }
@@ -404,6 +406,20 @@ func (h *Handler) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	data, _ := templates.ReadFile("templates/favicon.svg")
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(data)
+}
+
+func (h *Handler) handleManifest(w http.ResponseWriter, r *http.Request) {
+	data, _ := templates.ReadFile("templates/manifest.json")
+	w.Header().Set("Content-Type", "application/manifest+json; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(data)
+}
+
+func (h *Handler) handleServiceWorker(w http.ResponseWriter, r *http.Request) {
+	data, _ := templates.ReadFile("templates/sw.js")
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
 	w.Write(data)
 }
 
