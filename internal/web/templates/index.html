@@ -412,7 +412,7 @@
             }).join('');
 
             const langOptions = document.getElementById('lang-filter-options');
-            const langChoices = ['Svenska', 'Engelska', 'Ej angivet'];
+            const langChoices = ['Svenska', 'Engelska', 'Övrigt'];
             langOptions.innerHTML = langChoices.map(lang => {
                 const checked = !excludedLanguages.has(lang) ? 'checked' : '';
                 return `
@@ -480,12 +480,19 @@
             options.classList.toggle('hidden');
         }
 
+        function getLangCategory(s) {
+            const el = s.event_language || '';
+            const pl = (s.parish_language || '').toLowerCase();
+            if (el === 'Svenska' || pl.includes('svenska')) return 'Svenska';
+            if (el === 'Engelska' || pl.includes('engelska')) return 'Engelska';
+            return 'Övrigt';
+        }
+
         function renderServices() {
             const content = document.getElementById('content');
             const filteredServices = allServices.filter(s => {
                 if (excludedSources.has(s.parish)) return false;
-                const lang = s.event_language || 'Ej angivet';
-                if (excludedLanguages.has(lang)) return false;
+                if (excludedLanguages.has(getLangCategory(s))) return false;
                 return true;
             });
 
