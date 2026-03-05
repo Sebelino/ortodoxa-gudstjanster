@@ -174,7 +174,10 @@ func main() {
 	// Time parsing: collect unique (date, time) pairs, look up cache, call AI for uncached
 	timeMap := parseTimes(ctx, accepted, visionClient, gcsStore)
 
-	// Pass 2: Annotate services with titles and times, then write to Firestore
+	// Event language parsing: detect explicit language mentions in service names
+	eventLangMap := parseEventLanguages(ctx, accepted, visionClient, gcsStore)
+
+	// Pass 2: Annotate services with titles, times, and languages, then write to Firestore
 	totalServices := 0
 	for _, result := range accepted {
 		for i := range result.services {
@@ -187,6 +190,15 @@ func main() {
 					result.services[i].StartTime = &pt.Start
 					result.services[i].EndTime = pt.End
 				}
+			}
+			// Copy Language → ParishLanguage
+			if result.services[i].Language != nil {
+				result.services[i].ParishLanguage = result.services[i].Language
+			}
+			// Set EventLanguage from parsed results
+			mapKey := eventLangMapKey(result.services[i].ServiceName, result.services[i].Occasion, result.services[i].Notes)
+			if lang, ok := eventLangMap[mapKey]; ok {
+				result.services[i].EventLanguage = lang
 			}
 		}
 
@@ -368,6 +380,101 @@ func parseTimes(ctx context.Context, accepted []acceptedResult, visionClient *vi
 
 	log.Printf("Parsed %d time entries", len(parsed))
 	return timeMap
+}
+
+// eventLangCacheKey returns the GCS cache key for an event's language, based on
+// the combination of service_name, occasion, and notes.
+func eventLangCacheKey(serviceName string, occasion, notes *string) string {
+	occ := ""
+	if occasion != nil {
+		occ = *occasion
+	}
+	n := ""
+	if notes != nil {
+		n = *notes
+	}
+	hash := sha256.Sum256([]byte(serviceName + "|" + occ + "|" + n))
+	return "event-languages/v1/" + hex.EncodeToString(hash[:])
+}
+
+// eventLangMapKey returns a deduplication key for an event's relevant fields.
+func eventLangMapKey(serviceName string, occasion, notes *string) string {
+	occ := ""
+	if occasion != nil {
+		occ = *occasion
+	}
+	n := ""
+	if notes != nil {
+		n = *notes
+	}
+	return serviceName + "|" + occ + "|" + n
+}
+
+// cachedEventLang wraps a nullable string for JSON serialization in the cache.
+type cachedEventLang struct {
+	Language *string `json:"language"`
+}
+
+// parseEventLanguages collects unique (service_name, occasion, notes) combinations
+// from accepted results, checks the GCS cache, calls the AI for uncached ones, and
+// returns a map keyed by eventLangMapKey → *string (nil = no explicit language). Non-fatal.
+func parseEventLanguages(ctx context.Context, accepted []acceptedResult, visionClient *vision.Client, gcsStore *store.GCSStore) map[string]*string {
+	// Collect unique event info combinations
+	seen := make(map[string]struct{})
+	var uncachedEvents []vision.EventInfo
+	var uncachedKeys []string
+	langMap := make(map[string]*string)
+
+	for _, result := range accepted {
+		for _, svc := range result.services {
+			mapKey := eventLangMapKey(svc.ServiceName, svc.Occasion, svc.Notes)
+			if _, ok := seen[mapKey]; ok {
+				continue
+			}
+			seen[mapKey] = struct{}{}
+
+			cacheKey := eventLangCacheKey(svc.ServiceName, svc.Occasion, svc.Notes)
+			var cached cachedEventLang
+			if gcsStore.GetJSON(cacheKey, &cached) {
+				langMap[mapKey] = cached.Language
+			} else {
+				uncachedEvents = append(uncachedEvents, vision.EventInfo{
+					ServiceName: svc.ServiceName,
+					Occasion:    svc.Occasion,
+					Notes:       svc.Notes,
+				})
+				uncachedKeys = append(uncachedKeys, mapKey)
+			}
+		}
+	}
+
+	log.Printf("Event languages: %d cached, %d uncached", len(langMap), len(uncachedEvents))
+
+	if len(uncachedEvents) == 0 {
+		return langMap
+	}
+
+	// Call AI for uncached events
+	parsed, err := visionClient.ParseEventLanguages(ctx, uncachedEvents)
+	if err != nil {
+		log.Printf("WARNING: Event language parsing failed (proceeding without): %v", err)
+		return langMap
+	}
+
+	// Cache and merge results
+	for i, event := range uncachedEvents {
+		lang := parsed[i]
+		mapKey := uncachedKeys[i]
+		langMap[mapKey] = lang
+
+		cacheKey := eventLangCacheKey(event.ServiceName, event.Occasion, event.Notes)
+		if err := gcsStore.SetJSON(cacheKey, cachedEventLang{Language: lang}); err != nil {
+			log.Printf("WARNING: Failed to cache event language for %q: %v", event.ServiceName, err)
+		}
+	}
+
+	log.Printf("Parsed %d event languages", len(parsed))
+	return langMap
 }
 
 // saveDiagnostics serializes rejected services to GCS and returns the object path.

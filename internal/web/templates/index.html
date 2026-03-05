@@ -542,8 +542,10 @@
             if (service.location) {
                 details += `<div class="detail-item"><span class="detail-label">Plats:</span> ${escapeHtml(service.location)}</div>`;
             }
-            if (service.language) {
-                details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(service.language)}</div>`;
+            if (service.event_language) {
+                details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(service.event_language)}</div>`;
+            } else if (service.parish_language) {
+                details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(service.parish_language)} (ej angivet)</div>`;
             }
             if (service.occasion) {
                 details += `<div class="detail-item"><span class="detail-label">Tillfälle:</span> ${escapeHtml(service.occasion)}</div>`;

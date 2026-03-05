@@ -225,8 +225,10 @@ func generateICS(services []model.ChurchService) string {
 		var desc []string
 		desc = append(desc, fmt.Sprintf("Församling: %s", s.Parish))
 		desc = append(desc, fmt.Sprintf("Beskrivning: %s", s.ServiceName))
-		if s.Language != nil && *s.Language != "" {
-			desc = append(desc, fmt.Sprintf("Språk: %s", *s.Language))
+		if s.EventLanguage != nil && *s.EventLanguage != "" {
+			desc = append(desc, fmt.Sprintf("Språk: %s", *s.EventLanguage))
+		} else if s.ParishLanguage != nil && *s.ParishLanguage != "" {
+			desc = append(desc, fmt.Sprintf("Språk: %s (ej angivet)", *s.ParishLanguage))
 		}
 		if s.Occasion != nil && *s.Occasion != "" {
 			desc = append(desc, fmt.Sprintf("Tillfälle: %s", *s.Occasion))

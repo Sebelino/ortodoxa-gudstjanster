@@ -570,6 +570,127 @@ Return ONLY the JSON object, no other text.`, string(namesJSON))
 	return titles, nil
 }
 
+// EventInfo holds the relevant fields for determining an event's language.
+type EventInfo struct {
+	ServiceName string  `json:"service_name"`
+	Occasion    *string `json:"occasion,omitempty"`
+	Notes       *string `json:"notes,omitempty"`
+}
+
+// ParseEventLanguages examines event information and returns a map indicating which
+// events explicitly specify a language. The map is keyed by array index (as a string).
+// Returns nil values for events without an explicit language.
+func (c *Client) ParseEventLanguages(ctx context.Context, events []EventInfo) (map[int]*string, error) {
+	if len(events) == 0 {
+		return map[int]*string{}, nil
+	}
+
+	eventsJSON, err := json.Marshal(events)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling events: %w", err)
+	}
+
+	prompt := fmt.Sprintf(`You are given a JSON array of Orthodox church event objects, each with "service_name" and optionally "occasion" and "notes" fields (in Swedish). For each event, determine if it explicitly specifies the language of the event.
+
+Look for phrases like "på svenska", "på engelska", "på finska", "på grekiska", "på arabiska", "på kyrkoslaviska", "på rumänska", "på serbiska" etc. The language mention may appear in the service_name, occasion, or notes fields.
+
+For each event:
+- If any field explicitly mentions a language, return that language name in Swedish (e.g., "Svenska", "Engelska", "Finska", "Grekiska")
+- If no field explicitly mentions a language, return null
+
+Examples:
+- {"service_name": "Basileosliturgi på svenska"} → "Svenska"
+- {"service_name": "Föreläsning om fastan", "notes": "Hålls på engelska"} → "Engelska"
+- {"service_name": "Gudomlig liturgi"} → null
+- {"service_name": "Vesper", "occasion": "Pingstafton"} → null
+- {"service_name": "Liturgi på finska"} → "Finska"
+
+Return a JSON array (same length and order as input) where each element is a language string or null.
+
+Input:
+%s
+
+Return ONLY the JSON array, no other text.`, string(eventsJSON))
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 4096,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var raw []*string
+	if err := json.Unmarshal([]byte(content), &raw); err != nil {
+		return nil, fmt.Errorf("parsing event languages: %w (content: %s)", err, content)
+	}
+
+	if len(raw) != len(events) {
+		return nil, fmt.Errorf("expected %d results, got %d", len(events), len(raw))
+	}
+
+	result := make(map[int]*string, len(raw))
+	for i, lang := range raw {
+		result[i] = lang
+	}
+
+	return result, nil
+}
+
 // TimeEntry represents a date+time pair to be parsed into structured timestamps.
 type TimeEntry struct {
 	Date string `json:"date"` // "YYYY-MM-DD"

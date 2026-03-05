@@ -17,5 +17,7 @@ type ChurchService struct {
 	EndTime     *time.Time `json:"end_time,omitempty"`
 	Occasion    *string    `json:"occasion"`
 	Notes       *string    `json:"notes"`
-	Language    *string    `json:"language,omitempty"`
+	Language       *string    `json:"language,omitempty"`
+	ParishLanguage *string    `json:"parish_language,omitempty"`
+	EventLanguage  *string    `json:"event_language,omitempty"`
 }
