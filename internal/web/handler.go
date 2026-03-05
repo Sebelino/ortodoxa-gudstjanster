@@ -16,7 +16,7 @@ import (
 	"ortodoxa-gudstjanster/internal/model"
 )
 
-//go:embed templates/*.html
+//go:embed templates/*
 var templates embed.FS
 
 // ServiceFetcher is an interface for fetching church services.
@@ -93,6 +93,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
+	mux.HandleFunc("/favicon.svg", h.handleFavicon)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
 	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
 }
@@ -355,6 +356,13 @@ func (h *Handler) handleLastUpdated(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
+}
+
+func (h *Handler) handleFavicon(w http.ResponseWriter, r *http.Request) {
+	data, _ := templates.ReadFile("templates/favicon.svg")
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(data)
 }
 
 func (h *Handler) handleRobots(w http.ResponseWriter, r *http.Request) {
