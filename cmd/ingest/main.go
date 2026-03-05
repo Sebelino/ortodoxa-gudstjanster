@@ -171,12 +171,22 @@ func main() {
 	// Title generation: collect unique service names, look up cache, call AI for uncached
 	titleMap := generateTitles(ctx, accepted, visionClient, gcsStore)
 
-	// Pass 2: Annotate services with titles and write to Firestore
+	// Time parsing: collect unique (date, time) pairs, look up cache, call AI for uncached
+	timeMap := parseTimes(ctx, accepted, visionClient, gcsStore)
+
+	// Pass 2: Annotate services with titles and times, then write to Firestore
 	totalServices := 0
 	for _, result := range accepted {
 		for i := range result.services {
 			if title, ok := titleMap[result.services[i].ServiceName]; ok {
 				result.services[i].Title = title
+			}
+			if result.services[i].Time != nil {
+				key := result.services[i].Date + "|" + *result.services[i].Time
+				if pt, ok := timeMap[key]; ok {
+					result.services[i].StartTime = &pt.Start
+					result.services[i].EndTime = pt.End
+				}
 			}
 		}
 
@@ -259,6 +269,105 @@ func generateTitles(ctx context.Context, accepted []acceptedResult, visionClient
 
 	log.Printf("Generated %d titles", len(generated))
 	return titleMap
+}
+
+// timeCacheKey returns the GCS cache key for a (date, time) pair.
+func timeCacheKey(date, timeStr string) string {
+	hash := sha256.Sum256([]byte(date + "|" + timeStr))
+	return "times/v1/" + hex.EncodeToString(hash[:])
+}
+
+// cachedTime is the JSON structure stored in GCS for cached time parsing results.
+type cachedTime struct {
+	Start string  `json:"start"`
+	End   *string `json:"end"`
+}
+
+// parseTimes collects unique (date, time) pairs from accepted results, checks the
+// GCS cache, calls the AI for uncached pairs, and returns a complete map. Non-fatal.
+func parseTimes(ctx context.Context, accepted []acceptedResult, visionClient *vision.Client, gcsStore *store.GCSStore) map[string]vision.ParsedTime {
+	// Collect unique (date, time) pairs
+	type dateTime struct {
+		date, time string
+	}
+	seen := make(map[string]struct{})
+	var pairs []dateTime
+	for _, result := range accepted {
+		for _, svc := range result.services {
+			if svc.Time == nil {
+				continue
+			}
+			key := svc.Date + "|" + *svc.Time
+			if _, ok := seen[key]; !ok {
+				seen[key] = struct{}{}
+				pairs = append(pairs, dateTime{date: svc.Date, time: *svc.Time})
+			}
+		}
+	}
+
+	timeMap := make(map[string]vision.ParsedTime)
+	var uncached []vision.TimeEntry
+
+	// Check cache for each pair
+	for _, pair := range pairs {
+		key := timeCacheKey(pair.date, pair.time)
+		var ct cachedTime
+		if gcsStore.GetJSON(key, &ct) {
+			start, err := time.Parse(time.RFC3339, ct.Start)
+			if err != nil {
+				uncached = append(uncached, vision.TimeEntry{Date: pair.date, Time: pair.time})
+				continue
+			}
+			pt := vision.ParsedTime{Start: start}
+			if ct.End != nil {
+				end, err := time.Parse(time.RFC3339, *ct.End)
+				if err == nil {
+					pt.End = &end
+				}
+			}
+			mapKey := pair.date + "|" + pair.time
+			timeMap[mapKey] = pt
+		} else {
+			uncached = append(uncached, vision.TimeEntry{Date: pair.date, Time: pair.time})
+		}
+	}
+
+	log.Printf("Times: %d cached, %d uncached", len(timeMap), len(uncached))
+
+	if len(uncached) == 0 {
+		return timeMap
+	}
+
+	// Call AI for uncached pairs
+	parsed, err := visionClient.ParseTimes(ctx, uncached)
+	if err != nil {
+		log.Printf("WARNING: Time parsing failed (proceeding without timestamps): %v", err)
+		return timeMap
+	}
+
+	// Cache and merge results
+	for _, entry := range uncached {
+		mapKey := entry.Date + "|" + entry.Time
+		pt, ok := parsed[mapKey]
+		if !ok {
+			continue
+		}
+		timeMap[mapKey] = pt
+
+		// Cache result
+		ct := cachedTime{Start: pt.Start.Format(time.RFC3339)}
+		if pt.End != nil {
+			endStr := pt.End.Format(time.RFC3339)
+			ct.End = &endStr
+		}
+		cacheKey := timeCacheKey(entry.Date, entry.Time)
+		if err := gcsStore.SetJSON(cacheKey, ct); err != nil {
+			log.Printf("WARNING: Failed to cache time for %s %s: %v", entry.Date, entry.Time, err)
+		}
+	}
+
+	log.Printf("Parsed %d time entries", len(parsed))
+	return timeMap
 }
 
 // saveDiagnostics serializes rejected services to GCS and returns the object path.

@@ -475,7 +475,7 @@
                                     const details = buildDetails(service);
                                     return `
                                         <tr class="service-row" onclick="toggleDetails(${id})">
-                                            <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
+                                            <td class="col-time">${formatTime(service)}</td>
                                             <td class="col-name">${escapeHtml(service.title || service.service_name)}</td>
                                             <td class="col-source">${escapeHtml(getShortParish(service.parish))}</td>
                                         </tr>
@@ -500,6 +500,13 @@
             const months = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun',
                            'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
             return `${day} ${months[date.getMonth()]}`;
+        }
+
+        function formatTime(service) {
+            if (service.start_time) {
+                return new Date(service.start_time).toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit'});
+            }
+            return service.time ? escapeHtml(service.time) : '';
         }
 
         function getShortParish(parish) {

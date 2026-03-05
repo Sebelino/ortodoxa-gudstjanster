@@ -183,12 +183,20 @@ func generateICS(services []model.ChurchService) string {
 		sb.WriteString(fmt.Sprintf("UID:%s\r\n", uid))
 
 		// Date and time
-		if s.Time != nil && *s.Time != "" {
+		if s.StartTime != nil {
+			dtstart := s.StartTime.Format("20060102T150405")
+			sb.WriteString(fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s\r\n", dtstart))
+			if s.EndTime != nil {
+				dtend := s.EndTime.Format("20060102T150405")
+				sb.WriteString(fmt.Sprintf("DTEND;TZID=Europe/Stockholm:%s\r\n", dtend))
+			} else {
+				sb.WriteString("DURATION:PT1H\r\n")
+			}
+		} else if s.Time != nil && *s.Time != "" {
 			if startTime := parseStartTime(*s.Time); startTime != "" {
 				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + startTime
 				sb.WriteString(fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s\r\n", dtstart))
-				// Default 1 hour duration for services
-				sb.WriteString(fmt.Sprintf("DURATION:PT1H\r\n"))
+				sb.WriteString("DURATION:PT1H\r\n")
 			}
 		} else {
 			// All-day event

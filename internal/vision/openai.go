@@ -565,6 +565,148 @@ Return ONLY the JSON object, no other text.`, string(namesJSON))
 	return titles, nil
 }
 
+// TimeEntry represents a date+time pair to be parsed into structured timestamps.
+type TimeEntry struct {
+	Date string `json:"date"` // "YYYY-MM-DD"
+	Time string `json:"time"` // e.g. "18:00", "18:00 - 20:00", "18:00 - ca 20:30"
+}
+
+// ParsedTime holds the parsed start and optional end time.
+type ParsedTime struct {
+	Start time.Time  `json:"start"`
+	End   *time.Time `json:"end,omitempty"`
+}
+
+// ParseTimes sends unique (date, time) pairs to gpt-4o-mini and returns structured
+// timestamps in Europe/Stockholm timezone. The AI handles range parsing, "ca" prefix
+// stripping, midnight crossing, and various formats.
+func (c *Client) ParseTimes(ctx context.Context, entries []TimeEntry) (map[string]ParsedTime, error) {
+	if len(entries) == 0 {
+		return map[string]ParsedTime{}, nil
+	}
+
+	entriesJSON, err := json.Marshal(entries)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling time entries: %w", err)
+	}
+
+	prompt := fmt.Sprintf(`You are given a JSON array of objects with "date" (YYYY-MM-DD) and "time" (free-form string) fields from a church service schedule.
+
+For each entry, parse the time string and combine it with the date to produce start and end timestamps in Europe/Stockholm timezone (UTC+1 in winter, UTC+2 in summer).
+
+Rules:
+- Time strings may be a single time like "18:00" or a range like "18:00 - 20:00" or "18:00 - ca 20:30"
+- Strip prefixes like "ca", "ca.", "kl", "kl." from times
+- If only a start time is given, set end to null
+- If a range is given, parse both start and end
+- Handle midnight crossing: if end time is earlier than start time, it means the next day
+- Output timestamps in RFC3339 format with the correct Europe/Stockholm UTC offset
+
+Input:
+%s
+
+Return a JSON array (same order as input) of objects with:
+- "start": RFC3339 timestamp string
+- "end": RFC3339 timestamp string or null
+
+Return ONLY the JSON array, no other text.`, string(entriesJSON))
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 16384,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var results []struct {
+		Start string  `json:"start"`
+		End   *string `json:"end"`
+	}
+	if err := json.Unmarshal([]byte(content), &results); err != nil {
+		return nil, fmt.Errorf("parsing time results: %w (content: %s)", err, content)
+	}
+
+	if len(results) != len(entries) {
+		return nil, fmt.Errorf("expected %d results, got %d", len(entries), len(results))
+	}
+
+	parsed := make(map[string]ParsedTime, len(entries))
+	for i, entry := range entries {
+		r := results[i]
+		start, err := time.Parse(time.RFC3339, r.Start)
+		if err != nil {
+			return nil, fmt.Errorf("parsing start time for %s %s: %w", entry.Date, entry.Time, err)
+		}
+		pt := ParsedTime{Start: start}
+		if r.End != nil {
+			end, err := time.Parse(time.RFC3339, *r.End)
+			if err != nil {
+				return nil, fmt.Errorf("parsing end time for %s %s: %w", entry.Date, entry.Time, err)
+			}
+			pt.End = &end
+		}
+		key := entry.Date + "|" + entry.Time
+		parsed[key] = pt
+	}
+
+	return parsed, nil
+}
+
 // MergeScheduleEntries merges multiple OCR results (from the same schedule in different
 // languages) into a single Swedish schedule. Includes all events from all versions,
 // uses Swedish names and times when available.

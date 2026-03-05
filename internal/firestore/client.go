@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -239,6 +240,12 @@ func serviceToMap(svc model.ChurchService, scraperName string, batchID string) m
 	if svc.Language != nil {
 		m["language"] = *svc.Language
 	}
+	if svc.StartTime != nil {
+		m["start_time"] = svc.StartTime.Format(time.RFC3339)
+	}
+	if svc.EndTime != nil {
+		m["end_time"] = svc.EndTime.Format(time.RFC3339)
+	}
 	return m
 }
 
@@ -285,6 +292,16 @@ func mapToService(m map[string]interface{}) (model.ChurchService, error) {
 	}
 	if v, ok := m["language"].(string); ok {
 		svc.Language = &v
+	}
+	if v, ok := m["start_time"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			svc.StartTime = &t
+		}
+	}
+	if v, ok := m["end_time"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			svc.EndTime = &t
+		}
 	}
 
 	return svc, nil
