@@ -65,7 +65,35 @@ TOTAL                                         430
 }
 ```
 
-### Krav
+## list-titles.go
+
+Visar en tabell med titel och fullständigt gudstjänstnamn för alla tjänster i Firestore.
+
+### Användning
+
+```bash
+go run scripts/list-titles.go
+```
+
+### Exempel på utdata
+
+```
+TITLE               SERVICE_NAME
+-----               ------------
+Aftongudstjänst     Aftongudstjänst
+Doxologi            Doxologi för nationalfirandet
+Liturgi             Gudomlig liturgi / Jumalallinen liturgia
+Akathist            Akatist till Guds moder - Andra hälsningen, med Hans Eminens Ärkebiskop Cleopas av Sverige
+```
+
+### Miljövariabler
+
+| Variabel | Beskrivning | Standard |
+|----------|-------------|----------|
+| `GCP_PROJECT_ID` | GCP-projekt-ID | `ortodoxa-gudstjanster` |
+| `FIRESTORE_COLLECTION` | Firestore-collection | `services` |
+
+## Krav
 
 - Go 1.25+
 - GCP-autentisering (t.ex. `gcloud auth application-default login`)

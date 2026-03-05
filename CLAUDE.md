@@ -137,7 +137,8 @@ ortodoxa-gudstjanster/
 │       ├── handler.go       # HTTP handlers (uses ServiceFetcher interface)
 │       └── templates/       # Embedded HTML templates
 ├── scripts/
-│   └── inspect-firestore.go # CLI tool to inspect Firestore contents
+│   ├── inspect-firestore.go # CLI tool to inspect Firestore contents
+│   └── list-titles.go       # CLI tool to list title → service_name mappings
 ├── terraform/               # Infrastructure as code (Google Cloud)
 │   ├── main.tf              # Provider config
 │   ├── variables.tf         # Input variables
@@ -177,6 +178,14 @@ go run scripts/inspect-firestore.go -limit=0
 go run scripts/inspect-firestore.go -project=my-project -collection=my-collection -count
 ```
 
+### List Titles
+
+Show a table of title → service_name for all services in Firestore:
+
+```bash
+go run scripts/list-titles.go
+```
+
 ## Adding a New Scraper
 
 1. Create a new file in `internal/scraper/` (e.g., `mychurch.go`)
@@ -207,7 +216,7 @@ This prevents broken scrapers or flaky networks from silently replacing good dat
 
 Services are stored in the `services` collection with:
 - Document ID: SHA256 hash of `(source, date, service_name, time)`
-- Fields: `parish`, `source`, `source_url`, `date`, `day_of_week`, `service_name`, `location`, `time`, `occasion`, `notes`, `language`, `batch_id`
+- Fields: `parish`, `source`, `source_url`, `date`, `day_of_week`, `service_name`, `title`, `location`, `time`, `occasion`, `notes`, `language`, `batch_id`
 - `parish` identifies the church (used for UI filtering/grouping); `source` describes where the data came from (displayed as "Källa"). For most scrapers these are identical; the manual scraper can set them differently. Legacy docs without `parish` fall back to `source`.
 - Composite index on `source` + `date` for efficient queries
 
@@ -217,6 +226,14 @@ Permanent cache for OpenAI Vision API results:
 - Keyed by image checksum (SHA256)
 - Stored in GCS bucket `ortodoxa-gudstjanster-ortodoxa-store`
 - Prevents re-processing identical images
+
+### Title Cache (GCS)
+
+Permanent cache for AI-generated short titles (1-2 words) for service names:
+- Stored in GCS bucket `ortodoxa-gudstjanster-ortodoxa-store` under `titles/v1/`
+- Keyed by SHA256 hash of the `service_name` string
+- Generated during ingestion using `gpt-4o-mini`; cached per individual service name
+- Title generation failure is non-fatal — ingestion proceeds without titles
 
 ### Manual Upload Bucket (GCS)
 
@@ -232,6 +249,7 @@ Some scrapers (Gomos, Ryska) use OpenAI Vision API to extract schedules from ima
 - `ExtractSchedule`: OCR from schedule images (gpt-4o)
 - `ExtractScheduleFromText`: Parse schedule from extracted text (gpt-4o-mini)
 - `CompareScheduleImages`: Detect duplicate schedules in different languages (gpt-4o-mini)
+- `GenerateTitles`: Generate short 1-2 word titles from service names (gpt-4o-mini)
 
 The Gomos scraper filters duplicate images (same schedule in Swedish/Greek) before processing.
 
@@ -307,7 +325,7 @@ Secrets must be populated manually in Google Secret Manager:
 | Cloud Run Job | `ortodoxa-gudstjanster-ingest` | Ingestion (scraping) |
 | Cloud Scheduler | `ortodoxa-gudstjanster-ingest-schedule` | Triggers ingestion every 6h |
 | Firestore | `(default)` | Service data storage |
-| GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-store` | Vision API cache |
+| GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-store` | Vision API cache, title cache |
 | GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-uploads` | Manual schedule image uploads |
 | GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-manual-events` | Manual recurring event definitions |
 | Artifact Registry | `ortodoxa-gudstjanster` | Docker images |
