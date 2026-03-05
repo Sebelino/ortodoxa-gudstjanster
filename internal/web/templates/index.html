@@ -615,6 +615,9 @@
 
         function buildDetails(service) {
             let details = '';
+            if (service.parish) {
+                details += `<div class="detail-item"><span class="detail-label">Församling:</span> ${escapeHtml(service.parish)}</div>`;
+            }
             if (service.start_time) {
                 const fmt = t => new Date(t).toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit'});
                 const timeStr = service.end_time ? fmt(service.start_time) + ' - ' + fmt(service.end_time) : fmt(service.start_time);
