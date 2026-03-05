@@ -465,6 +465,106 @@ Return ONLY the JSON array, no other text.`, today, string(entriesJSON))
 	return translated, content, nil
 }
 
+// GenerateTitles sends a list of service names to gpt-4o-mini and returns
+// a map from service_name to a short 1-2 word title.
+func (c *Client) GenerateTitles(ctx context.Context, serviceNames []string) (map[string]string, error) {
+	if len(serviceNames) == 0 {
+		return map[string]string{}, nil
+	}
+
+	namesJSON, err := json.Marshal(serviceNames)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling service names: %w", err)
+	}
+
+	prompt := fmt.Sprintf(`You are given a JSON array of Orthodox church service names (in Swedish). For each service name, generate a short title of 1-2 words that captures the essence of the service. The title should be in Swedish.
+
+Examples:
+- "Gudomlig liturgi" → "Liturgi"
+- "Akathist till Guds moder - Andra hälsningen, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Akathist"
+- "Stora bönetimmarna och vesper med basiliusliturgi" → "Bönetimmar"
+- "Morgongudstjänst (Orthros/Matins)" → "Orthros"
+- "Stora kompletoriet med den heliga Andreasakanonen" → "Kompletoriet"
+- "Vesper" → "Vesper"
+- "Trefaldighetsafton" → "Trefaldighetsafton"
+
+Return a JSON object mapping each input service name (exactly as given) to its short title.
+
+Input:
+%s
+
+Return ONLY the JSON object, no other text.`, string(namesJSON))
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 4096,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var titles map[string]string
+	if err := json.Unmarshal([]byte(content), &titles); err != nil {
+		return nil, fmt.Errorf("parsing titles: %w (content: %s)", err, content)
+	}
+
+	return titles, nil
+}
+
 // MergeScheduleEntries merges multiple OCR results (from the same schedule in different
 // languages) into a single Swedish schedule. Includes all events from all versions,
 // uses Swedish names and times when available.

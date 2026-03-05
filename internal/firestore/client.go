@@ -218,6 +218,9 @@ func serviceToMap(svc model.ChurchService, scraperName string, batchID string) m
 		"service_name": svc.ServiceName,
 		"batch_id":     batchID,
 	}
+	if svc.Title != "" {
+		m["title"] = svc.Title
+	}
 	if svc.SourceURL != "" {
 		m["source_url"] = svc.SourceURL
 	}
@@ -264,6 +267,9 @@ func mapToService(m map[string]interface{}) (model.ChurchService, error) {
 	}
 	if v, ok := m["service_name"].(string); ok {
 		svc.ServiceName = v
+	}
+	if v, ok := m["title"].(string); ok {
+		svc.Title = v
 	}
 	if v, ok := m["location"].(string); ok {
 		svc.Location = &v

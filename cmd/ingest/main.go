@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -114,9 +116,9 @@ func main() {
 	batchID := time.Now().UTC().Format("20060102-150405")
 	log.Printf("Starting ingestion with batch ID: %s", batchID)
 
-	// Run each scraper sequentially
+	// Pass 1: Run scrapers and collect accepted results
 	scrapers := registry.Scrapers()
-	totalServices := 0
+	var accepted []acceptedResult
 	failedScrapers := 0
 
 	for _, s := range scrapers {
@@ -162,14 +164,29 @@ func main() {
 				continue
 			}
 
-			if err := fsClient.ReplaceServicesForScraper(ctx, scraperName, services, batchID); err != nil {
-				log.Printf("ERROR: Failed to store services for %s: %v", scraperName, err)
-				failedScrapers++
-				continue
-			}
-			log.Printf("Stored %d services for %s", len(services), scraperName)
-			totalServices += len(services)
+			accepted = append(accepted, acceptedResult{scraperName: scraperName, services: services})
 		}
+	}
+
+	// Title generation: collect unique service names, look up cache, call AI for uncached
+	titleMap := generateTitles(ctx, accepted, visionClient, gcsStore)
+
+	// Pass 2: Annotate services with titles and write to Firestore
+	totalServices := 0
+	for _, result := range accepted {
+		for i := range result.services {
+			if title, ok := titleMap[result.services[i].ServiceName]; ok {
+				result.services[i].Title = title
+			}
+		}
+
+		if err := fsClient.ReplaceServicesForScraper(ctx, result.scraperName, result.services, batchID); err != nil {
+			log.Printf("ERROR: Failed to store services for %s: %v", result.scraperName, err)
+			failedScrapers++
+			continue
+		}
+		log.Printf("Stored %d services for %s", len(result.services), result.scraperName)
+		totalServices += len(result.services)
 	}
 
 	log.Printf("Ingestion complete. Total services: %d, Failed scrapers: %d/%d",
@@ -179,6 +196,69 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Ingestion completed successfully")
+}
+
+type acceptedResult struct {
+	scraperName string
+	services    []model.ChurchService
+}
+
+// titleCacheKey returns the GCS cache key for a service name's title.
+func titleCacheKey(serviceName string) string {
+	hash := sha256.Sum256([]byte(serviceName))
+	return "titles/v1/" + hex.EncodeToString(hash[:])
+}
+
+// generateTitles collects unique service names from accepted results, checks the
+// GCS cache for existing titles, calls the AI for uncached names, and returns
+// a complete service_name → title map. Failures are non-fatal.
+func generateTitles(ctx context.Context, accepted []acceptedResult, visionClient *vision.Client, gcsStore *store.GCSStore) map[string]string {
+	// Collect unique service names
+	nameSet := make(map[string]struct{})
+	for _, result := range accepted {
+		for _, svc := range result.services {
+			nameSet[svc.ServiceName] = struct{}{}
+		}
+	}
+
+	titleMap := make(map[string]string)
+	var uncached []string
+
+	// Check cache for each name
+	for name := range nameSet {
+		key := titleCacheKey(name)
+		var title string
+		if gcsStore.GetJSON(key, &title) {
+			titleMap[name] = title
+		} else {
+			uncached = append(uncached, name)
+		}
+	}
+
+	log.Printf("Titles: %d cached, %d uncached", len(titleMap), len(uncached))
+
+	if len(uncached) == 0 {
+		return titleMap
+	}
+
+	// Call AI for uncached names
+	generated, err := visionClient.GenerateTitles(ctx, uncached)
+	if err != nil {
+		log.Printf("WARNING: Title generation failed (proceeding without titles): %v", err)
+		return titleMap
+	}
+
+	// Cache and merge results
+	for name, title := range generated {
+		titleMap[name] = title
+		key := titleCacheKey(name)
+		if err := gcsStore.SetJSON(key, title); err != nil {
+			log.Printf("WARNING: Failed to cache title for %q: %v", name, err)
+		}
+	}
+
+	log.Printf("Generated %d titles", len(generated))
+	return titleMap
 }
 
 // saveDiagnostics serializes rejected services to GCS and returns the object path.

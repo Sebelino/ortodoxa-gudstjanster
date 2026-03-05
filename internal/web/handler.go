@@ -196,8 +196,12 @@ func generateICS(services []model.ChurchService) string {
 			sb.WriteString(fmt.Sprintf("DTSTART;VALUE=DATE:%s\r\n", dtstart))
 		}
 
-		// Summary (service name)
-		summary := escapeICS(s.ServiceName)
+		// Summary (use short title if available, else full service name)
+		summaryText := s.ServiceName
+		if s.Title != "" {
+			summaryText = s.Title
+		}
+		summary := escapeICS(summaryText)
 		sb.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", summary))
 
 		// Location
@@ -208,6 +212,9 @@ func generateICS(services []model.ChurchService) string {
 
 		// Description with additional details
 		var desc []string
+		if s.Title != "" {
+			desc = append(desc, fmt.Sprintf("Gudstjänst: %s", s.ServiceName))
+		}
 		desc = append(desc, fmt.Sprintf("Församling: %s", s.Parish))
 		if s.Language != nil && *s.Language != "" {
 			desc = append(desc, fmt.Sprintf("Språk: %s", *s.Language))

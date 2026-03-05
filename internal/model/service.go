@@ -8,6 +8,7 @@ type ChurchService struct {
 	Date        string  `json:"date"`
 	DayOfWeek   string  `json:"day_of_week"`
 	ServiceName string  `json:"service_name"`
+	Title       string  `json:"title,omitempty"`
 	Location    *string `json:"location"`
 	Time        *string `json:"time"`
 	Occasion    *string `json:"occasion"`

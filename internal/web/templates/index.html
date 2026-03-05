@@ -476,7 +476,7 @@
                                     return `
                                         <tr class="service-row" onclick="toggleDetails(${id})">
                                             <td class="col-time">${service.time ? escapeHtml(service.time) : ''}</td>
-                                            <td class="col-name">${escapeHtml(service.service_name)}</td>
+                                            <td class="col-name">${escapeHtml(service.title || service.service_name)}</td>
                                             <td class="col-source">${escapeHtml(getShortParish(service.parish))}</td>
                                         </tr>
                                         <tr class="service-details" id="details-${id}">
@@ -522,6 +522,9 @@
 
         function buildDetails(service) {
             let details = '';
+            if (service.title) {
+                details += `<div class="detail-item"><span class="detail-label">Gudstjänst:</span> ${escapeHtml(service.service_name)}</div>`;
+            }
             if (service.location) {
                 details += `<div class="detail-item"><span class="detail-label">Plats:</span> ${escapeHtml(service.location)}</div>`;
             }
