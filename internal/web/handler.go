@@ -93,6 +93,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
+	mux.HandleFunc("/robots.txt", h.handleRobots)
+	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
 }
 
 func (h *Handler) noCache(next http.HandlerFunc) http.HandlerFunc {
@@ -354,6 +356,23 @@ func (h *Handler) handleLastUpdated(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
+}
+
+func (h *Handler) handleRobots(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, "User-agent: *\nAllow: /\nSitemap: https://ortodoxagudstjanster.se/sitemap.xml\n")
+}
+
+func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://ortodoxagudstjanster.se/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`)
 }
 
 func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
