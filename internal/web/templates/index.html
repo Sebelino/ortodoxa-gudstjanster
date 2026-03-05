@@ -483,8 +483,12 @@
         function getLangCategory(s) {
             const el = s.event_language || '';
             const pl = (s.parish_language || '').toLowerCase();
-            if (el === 'Svenska' || pl.includes('svenska')) return 'Svenska';
-            if (el === 'Engelska' || pl.includes('engelska')) return 'Engelska';
+            if (el === 'Svenska') return 'Svenska';
+            if (el === 'Engelska') return 'Engelska';
+            if (el === '') {
+                if (pl.includes('svenska')) return 'Svenska';
+                if (pl.includes('engelska')) return 'Engelska';
+            }
             return 'Övrigt';
         }
 
