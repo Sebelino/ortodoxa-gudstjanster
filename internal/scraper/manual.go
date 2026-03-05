@@ -3,6 +3,7 @@ package scraper
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -14,16 +15,20 @@ const manualScraperName = "Manuella händelser"
 
 // RecurringEvent defines a manually configured recurring event.
 type RecurringEvent struct {
-	Parish        string `json:"parish"`
-	Source        string `json:"source"`
-	SourceURL     string `json:"source_url,omitempty"`
-	ServiceName   string `json:"service_name"`
-	Location      string `json:"location"`
-	Time          string `json:"time"`
-	Language      string `json:"language"`
-	Notes         string `json:"notes,omitempty"`
-	StartDate     string `json:"start_date"` // "2006-01-02"
-	IntervalWeeks int    `json:"interval_weeks"`
+	Parish         string `json:"parish"`
+	Source         string `json:"source"`
+	SourceURL      string `json:"source_url,omitempty"`
+	ServiceName    string `json:"service_name"`
+	Title          string `json:"title,omitempty"`
+	Location       string `json:"location"`
+	StartTimeStr   string `json:"start_time,omitempty"`
+	EndTimeStr     string `json:"end_time,omitempty"`
+	Language       string `json:"language"`
+	ParishLanguage string `json:"parish_language,omitempty"`
+	EventLanguage  string `json:"event_language,omitempty"`
+	Notes          string `json:"notes,omitempty"`
+	StartDate      string `json:"start_date"` // "2006-01-02"
+	IntervalWeeks  int    `json:"interval_weeks"`
 }
 
 // ManualScraper generates events from recurring event definitions stored in GCS.
@@ -71,7 +76,6 @@ func (s *ManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 
 		for date := startDate; !date.After(endDate); date = date.Add(interval) {
 			location := event.Location
-			timeStr := event.Time
 			language := event.Language
 			svc := model.ChurchService{
 				Parish:      event.Parish,
@@ -80,19 +84,55 @@ func (s *ManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 				Date:        date.Format("2006-01-02"),
 				DayOfWeek:   swedishDayOfWeek(date.Weekday()),
 				ServiceName: event.ServiceName,
+				Title:       event.Title,
 				Location:    &location,
-				Time:        &timeStr,
 				Language:    &language,
+			}
+			if event.ParishLanguage != "" {
+				pl := event.ParishLanguage
+				svc.ParishLanguage = &pl
+			}
+			if event.EventLanguage != "" {
+				el := event.EventLanguage
+				svc.EventLanguage = &el
 			}
 			if event.Notes != "" {
 				notes := event.Notes
 				svc.Notes = &notes
+			}
+			if event.StartTimeStr != "" {
+				if t, err := parseHHMM(date, event.StartTimeStr); err == nil {
+					svc.StartTime = &t
+				}
+			}
+			if event.EndTimeStr != "" {
+				if t, err := parseHHMM(date, event.EndTimeStr); err == nil {
+					svc.EndTime = &t
+				}
 			}
 			services = append(services, svc)
 		}
 	}
 
 	return services, nil
+}
+
+var stockholm *time.Location
+
+func init() {
+	var err error
+	stockholm, err = time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		stockholm = time.UTC
+	}
+}
+
+func parseHHMM(date time.Time, s string) (time.Time, error) {
+	var h, m int
+	if _, err := fmt.Sscanf(s, "%d:%d", &h, &m); err != nil {
+		return time.Time{}, fmt.Errorf("invalid time format %q: %w", s, err)
+	}
+	return time.Date(date.Year(), date.Month(), date.Day(), h, m, 0, 0, stockholm), nil
 }
 
 func swedishDayOfWeek(day time.Weekday) string {
