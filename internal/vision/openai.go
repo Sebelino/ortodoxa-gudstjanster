@@ -480,13 +480,18 @@ func (c *Client) GenerateTitles(ctx context.Context, serviceNames []string) (map
 	prompt := fmt.Sprintf(`You are given a JSON array of Orthodox church service names (in Swedish). For each service name, generate a short title of 1-2 words that captures the essence of the service. The title should be in Swedish.
 
 Examples:
-- "Gudomlig liturgi" → "Liturgi"
+- "Gudomlig liturgi" → "Gudomlig Liturgi"
+- "Helig Liturgi" → "Gudomlig Liturgi"
+- "Liturgi" → "Gudomlig Liturgi"
+- "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Gudomlig Liturgi"
 - "Akathist till Guds moder - Andra hälsningen, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Akathist"
 - "Stora bönetimmarna och vesper med basiliusliturgi" → "Bönetimmar"
 - "Morgongudstjänst (Orthros/Matins)" → "Orthros"
 - "Stora kompletoriet med den heliga Andreasakanonen" → "Kompletoriet"
 - "Vesper" → "Vesper"
 - "Trefaldighetsafton" → "Trefaldighetsafton"
+
+IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, etc.) must get the title "Gudomlig Liturgi".
 
 Return a JSON object mapping each input service name (exactly as given) to its short title.
 
