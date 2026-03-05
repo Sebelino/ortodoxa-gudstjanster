@@ -585,6 +585,30 @@ func (c *Client) ParseEventLanguages(ctx context.Context, events []EventInfo) (m
 		return map[int]*string{}, nil
 	}
 
+	const batchSize = 30
+	result := make(map[int]*string, len(events))
+
+	for start := 0; start < len(events); start += batchSize {
+		end := start + batchSize
+		if end > len(events) {
+			end = len(events)
+		}
+		batch := events[start:end]
+
+		batchResult, err := c.parseEventLanguagesBatch(ctx, batch)
+		if err != nil {
+			return nil, fmt.Errorf("batch %d-%d: %w", start, end, err)
+		}
+
+		for i, lang := range batchResult {
+			result[start+i] = lang
+		}
+	}
+
+	return result, nil
+}
+
+func (c *Client) parseEventLanguagesBatch(ctx context.Context, events []EventInfo) (map[int]*string, error) {
 	eventsJSON, err := json.Marshal(events)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling events: %w", err)
@@ -605,15 +629,15 @@ Examples:
 - {"service_name": "Vesper", "occasion": "Pingstafton"} → null
 - {"service_name": "Liturgi på finska"} → "Finska"
 
-Return a JSON array (same length and order as input) where each element is a language string or null.
+Return a JSON array with EXACTLY %d elements (same length and order as input) where each element is a language string or null.
 
 Input:
 %s
 
-Return ONLY the JSON array, no other text.`, string(eventsJSON))
+Return ONLY the JSON array, no other text.`, len(events), string(eventsJSON))
 
 	reqBody := map[string]interface{}{
-		"model": "gpt-4o-mini",
+		"model": "gpt-4o",
 		"messages": []map[string]interface{}{
 			{
 				"role": "user",
