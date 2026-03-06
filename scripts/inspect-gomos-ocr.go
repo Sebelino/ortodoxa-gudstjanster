@@ -18,12 +18,22 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: go run scripts/inspect-gomos-ocr.go <image-checksum-or-file-path>\n")
+	jsonOutput := false
+	args := os.Args[1:]
+	for i := 0; i < len(args); i++ {
+		if args[i] == "-json" {
+			jsonOutput = true
+			args = append(args[:i], args[i+1:]...)
+			i--
+		}
+	}
+
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "Usage: go run scripts/inspect-gomos-ocr.go [-json] <image-checksum-or-file-path>\n")
 		os.Exit(1)
 	}
 
-	arg := os.Args[1]
+	arg := args[0]
 	checksum := arg
 
 	// If the argument looks like a file path, read it and compute checksum
@@ -34,7 +44,9 @@ func main() {
 		}
 		hash := sha256.Sum256(data)
 		checksum = hex.EncodeToString(hash[:])
-		fmt.Printf("File: %s\nChecksum: %s\n\n", arg, checksum)
+		if !jsonOutput {
+			fmt.Printf("File: %s\nChecksum: %s\n\n", arg, checksum)
+		}
 	}
 
 	bucket := os.Getenv("GCS_BUCKET")
@@ -62,6 +74,15 @@ func main() {
 	}
 	if err := json.NewDecoder(reader).Decode(&entry); err != nil {
 		log.Fatalf("Failed to decode JSON: %v", err)
+	}
+
+	if jsonOutput {
+		out, err := json.MarshalIndent(entry, "", "  ")
+		if err != nil {
+			log.Fatalf("Failed to marshal JSON: %v", err)
+		}
+		fmt.Println(string(out))
+		return
 	}
 
 	fmt.Printf("Language: %s\n", entry.Language)
