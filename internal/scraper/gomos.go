@@ -162,7 +162,7 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 // Results are cached by image checksum under gomos-ocr/v1/.
 func (s *GomosScraper) ocrImage(ctx context.Context, imageData []byte, sourceRef string) (*ocrCacheEntry, error) {
 	checksum := s.computeChecksum(imageData)
-	cacheKey := "gomos-ocr/v1/" + checksum
+	cacheKey := "gomos-ocr/v2/" + checksum
 
 	var cached ocrCacheEntry
 	if s.store.GetJSON(cacheKey, &cached) {

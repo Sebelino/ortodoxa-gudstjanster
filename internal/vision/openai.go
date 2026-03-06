@@ -85,7 +85,7 @@ IMPORTANT: Double-check that you have not skipped any date sections or services.
 Return ONLY the JSON object, no other text.`
 
 	reqBody := map[string]interface{}{
-		"model": "gpt-4o",
+		"model": "gpt-4.1",
 		"messages": []map[string]interface{}{
 			{
 				"role": "user",

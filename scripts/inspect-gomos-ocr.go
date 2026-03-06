@@ -61,7 +61,7 @@ func main() {
 	}
 	defer client.Close()
 
-	key := "gomos-ocr/v1/" + checksum + ".json"
+	key := "gomos-ocr/v2/" + checksum + ".json"
 	reader, err := client.Bucket(bucket).Object(key).NewReader(ctx)
 	if err != nil {
 		log.Fatalf("Failed to read %s from bucket %s: %v", key, bucket, err)
