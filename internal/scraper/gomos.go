@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
-	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -23,10 +21,6 @@ const (
 	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
 	gomosLocation    = "Stockholm, St. Georgios Cathedral, Birger Jarlsgatan 92"
 	gomosLanguage    = "Grekiska, svenska"
-	// Bump this version to invalidate all cached raw OCR results.
-	gomosOCRVersion = "v2"
-	// Bump this version to invalidate all cached merge results.
-	gomosMergeVersion = "v4"
 )
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
@@ -80,7 +74,7 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 		return nil, fmt.Errorf("no images found")
 	}
 
-	// Process all images together: raw OCR, deduplicate by fingerprint (prefer Swedish), translate if needed
+	// Process all images together: OCR, deduplicate by month, convert
 	services, err := s.processImages(ctx, allImages)
 	if err != nil {
 		return nil, err
@@ -94,6 +88,203 @@ type imageWithData struct {
 	data      []byte
 	sourceRef string // URL or bucket object name
 	sourceURL string // the URL to use as source in the service
+}
+
+// ocrResult pairs OCR-extracted Swedish entries with source metadata.
+type ocrResult struct {
+	language  string
+	entries   []vision.ScheduleEntry
+	sourceURL string
+}
+
+// ocrCacheEntry is the JSON structure stored in the cache.
+type ocrCacheEntry struct {
+	Language string                 `json:"language"`
+	Entries  []vision.ScheduleEntry `json:"entries"`
+}
+
+// processImages is the core pipeline: OCR each image to Swedish entries,
+// group by month, prefer Swedish source for same-month duplicates, convert.
+func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData) ([]model.ChurchService, error) {
+
+	// Step 1: OCR each image → Swedish ScheduleEntry slice
+	var results []ocrResult
+	for _, img := range images {
+		res, err := s.ocrImage(ctx, img.data, img.sourceRef)
+		if err != nil {
+			log.Printf("Gomos: OCR failed for %s: %v", img.sourceRef, err)
+			continue
+		}
+		results = append(results, ocrResult{
+			language:  res.Language,
+			entries:   res.Entries,
+			sourceURL: img.sourceURL,
+		})
+	}
+
+	// Step 2: Group by month
+	type group struct {
+		items []ocrResult
+	}
+	groups := make(map[string]*group)
+	var order []string
+	for _, r := range results {
+		month := scheduleMonthFromEntries(r.entries)
+		if _, ok := groups[month]; !ok {
+			groups[month] = &group{}
+			order = append(order, month)
+		}
+		groups[month].items = append(groups[month].items, r)
+	}
+
+	// Step 3: For each month group, prefer Swedish source
+	var allServices []model.ChurchService
+	for _, month := range order {
+		g := groups[month]
+
+		chosen := g.items[0]
+		for _, item := range g.items {
+			lang := strings.ToLower(item.language)
+			if lang == "swedish" || lang == "svenska" {
+				chosen = item
+				break
+			}
+		}
+
+		log.Printf("Gomos: using %s source for %s (%d entries)", chosen.language, month, len(chosen.entries))
+		allServices = append(allServices, s.convertToServices(chosen.entries, chosen.sourceURL)...)
+	}
+
+	return allServices, nil
+}
+
+// ocrImage extracts schedule entries from an image, returning Swedish entries.
+// Results are cached by image checksum under gomos-ocr/v1/.
+func (s *GomosScraper) ocrImage(ctx context.Context, imageData []byte, sourceRef string) (*ocrCacheEntry, error) {
+	checksum := s.computeChecksum(imageData)
+	cacheKey := "gomos-ocr/v1/" + checksum
+
+	var cached ocrCacheEntry
+	if s.store.GetJSON(cacheKey, &cached) {
+		log.Printf("Gomos: OCR cache hit for %s (checksum %s)", sourceRef, checksum[:12])
+		return &cached, nil
+	}
+
+	log.Printf("Gomos: OCR cache miss for %s (checksum %s), calling API", sourceRef, checksum[:12])
+
+	// Raw OCR in original language
+	raw, rawResponse, err := s.vision.ExtractScheduleRaw(ctx, imageData)
+	if err != nil {
+		return nil, fmt.Errorf("OCR for %s: %w", sourceRef, err)
+	}
+
+	// Persist raw API response for diagnostics
+	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
+		log.Printf("Gomos: failed to persist OCR response: %v", werr)
+	}
+
+	// Persist source image
+	imageExt := s.imageExtension(sourceRef)
+	if werr := s.store.SetRaw(cacheKey+imageExt, imageData); werr != nil {
+		log.Printf("Gomos: failed to persist source image: %v", werr)
+	}
+
+	// Convert to Swedish entries
+	var entries []vision.ScheduleEntry
+	lang := strings.ToLower(raw.Language)
+	if lang == "swedish" || lang == "svenska" {
+		entries = rawEntriesToSwedish(raw.Entries)
+	} else {
+		entries, err = s.translateEntries(ctx, raw.Entries)
+		if err != nil {
+			return nil, fmt.Errorf("translation for %s: %w", sourceRef, err)
+		}
+	}
+
+	result := &ocrCacheEntry{
+		Language: raw.Language,
+		Entries:  entries,
+	}
+
+	// Cache the result
+	if data, merr := json.Marshal(result); merr == nil {
+		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
+			log.Printf("Gomos: failed to cache OCR result: %v", werr)
+		}
+	}
+
+	log.Printf("Gomos: OCR extracted %d entries (%s) for %s", len(entries), raw.Language, sourceRef)
+	return result, nil
+}
+
+// scheduleMonthFromEntries returns the most common year-month (YYYY-MM) among entries.
+func scheduleMonthFromEntries(entries []vision.ScheduleEntry) string {
+	counts := make(map[string]int)
+	for _, e := range entries {
+		if len(e.Date) >= 7 {
+			counts[e.Date[:7]]++
+		}
+	}
+	best := ""
+	bestN := 0
+	for m, n := range counts {
+		if n > bestN {
+			best = m
+			bestN = n
+		}
+	}
+	return best
+}
+
+// translateEntries translates raw schedule entries to Swedish via the OpenAI API, with caching.
+func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.RawScheduleEntry) ([]vision.ScheduleEntry, error) {
+	entriesJSON, err := json.Marshal(entries)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling entries: %w", err)
+	}
+	hash := sha256.Sum256(entriesJSON)
+	hashStr := hex.EncodeToString(hash[:])
+	cacheKey := "translate/" + hashStr
+
+	var cached []vision.ScheduleEntry
+	if s.store.GetJSON(cacheKey, &cached) {
+		log.Printf("Gomos: translate cache hit")
+		return cached, nil
+	}
+
+	translated, rawResponse, err := s.vision.TranslateScheduleEntries(ctx, entries)
+	if err != nil {
+		return nil, fmt.Errorf("translating entries: %w", err)
+	}
+
+	// Persist structured result
+	if data, merr := json.Marshal(translated); merr == nil {
+		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
+			log.Printf("Gomos: failed to cache translated entries: %v", werr)
+		}
+	}
+
+	// Persist raw API response
+	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
+		log.Printf("Gomos: failed to persist translate response: %v", werr)
+	}
+
+	return translated, nil
+}
+
+// rawEntriesToSwedish converts RawScheduleEntry to ScheduleEntry directly (no API call needed).
+func rawEntriesToSwedish(entries []vision.RawScheduleEntry) []vision.ScheduleEntry {
+	result := make([]vision.ScheduleEntry, len(entries))
+	for i, e := range entries {
+		result[i] = vision.ScheduleEntry{
+			Date:        e.Date,
+			DayOfWeek:   e.DayOfWeek,
+			Time:        e.Time,
+			ServiceName: e.ServiceName,
+			Occasion:    e.Occasion,
+		}
+	}
+	return result
 }
 
 // fetchWebsiteImages downloads schedule images from the gomos.se website.
@@ -153,329 +344,6 @@ func (s *GomosScraper) fetchBucketImages(ctx context.Context) ([]imageWithData, 
 	}
 
 	return images, nil
-}
-
-// ocrResult pairs a raw OCR result with the source URL for the image.
-type ocrResult struct {
-	raw       *vision.RawScheduleResult
-	sourceURL string
-}
-
-// processImages is the core pipeline: raw OCR each image, deduplicate by month,
-// then merge, convert, or translate surviving entries to Swedish.
-func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData) ([]model.ChurchService, error) {
-
-	// Step 1: Raw OCR each image (cached)
-	var results []ocrResult
-	for _, img := range images {
-		raw, err := s.rawOCR(ctx, img.data, img.sourceRef)
-		if err != nil {
-			log.Printf("Gomos: raw OCR failed for %s: %v", img.sourceRef, err)
-			continue
-		}
-		results = append(results, ocrResult{raw: raw, sourceURL: img.sourceURL})
-	}
-
-	// Step 2: Group by month (images covering the same month are the same schedule)
-	type group struct {
-		items []ocrResult
-	}
-	groups := make(map[string]*group)
-	var order []string // preserve insertion order
-	for _, r := range results {
-		month := scheduleMonth(r.raw.Entries)
-		if _, ok := groups[month]; !ok {
-			groups[month] = &group{}
-			order = append(order, month)
-		}
-		groups[month].items = append(groups[month].items, r)
-	}
-
-	// Step 3+4: Per group, merge or convert entries
-	var allServices []model.ChurchService
-	for _, month := range order {
-		g := groups[month]
-
-		var entries []vision.ScheduleEntry
-		sourceURL := g.items[0].sourceURL
-
-		if len(g.items) > 1 {
-			// Multiple images for the same month: merge via AI
-			var err error
-			entries, err = s.mergeEntries(ctx, g.items)
-			if err != nil {
-				log.Printf("Gomos: merge failed for %s: %v", month, err)
-				continue
-			}
-			// Post-merge validation: recover any entries dropped by the AI merge
-			entries = recoverDroppedEntries(entries, g.items)
-		} else {
-			// Single image: convert directly or translate
-			chosen := g.items[0]
-			sourceURL = chosen.sourceURL
-			lang := strings.ToLower(chosen.raw.Language)
-			if lang == "swedish" || lang == "svenska" {
-				entries = rawEntriesToSwedish(chosen.raw.Entries)
-			} else {
-				var err error
-				entries, err = s.translateEntries(ctx, chosen.raw.Entries)
-				if err != nil {
-					log.Printf("Gomos: translation failed: %v", err)
-					continue
-				}
-			}
-		}
-
-		allServices = append(allServices, s.convertToServices(entries, sourceURL)...)
-	}
-
-	return allServices, nil
-}
-
-// rawOCR extracts schedule entries from an image in the original language, with caching.
-func (s *GomosScraper) rawOCR(ctx context.Context, imageData []byte, sourceRef string) (*vision.RawScheduleResult, error) {
-	checksum := s.computeChecksum(imageData)
-	cacheKey := "raw-ocr/" + gomosOCRVersion + "/" + checksum
-
-	var cached vision.RawScheduleResult
-	if s.store.GetJSON(cacheKey, &cached) {
-		log.Printf("Gomos: raw OCR cache hit for %s", sourceRef)
-		return &cached, nil
-	}
-
-	result, rawResponse, err := s.vision.ExtractScheduleRaw(ctx, imageData)
-	if err != nil {
-		return nil, fmt.Errorf("raw OCR for %s: %w", sourceRef, err)
-	}
-
-	// Persist first-pass raw API response
-	if werr := s.store.SetRaw(cacheKey+".pass1.response.txt", []byte(rawResponse)); werr != nil {
-		log.Printf("Gomos: failed to persist first-pass response: %v", werr)
-	}
-
-	// Second pass: verify extraction by asking the model to find missed events
-	log.Printf("Gomos: running verification pass for %s (%d entries from first pass)", sourceRef, len(result.Entries))
-	missed, verifyResponse, verifyErr := s.vision.VerifyScheduleExtraction(ctx, imageData, result)
-	if verifyErr != nil {
-		log.Printf("Gomos: verification pass failed for %s: %v", sourceRef, verifyErr)
-	} else if len(missed) > 0 {
-		log.Printf("Gomos: verification found %d missed entries for %s", len(missed), sourceRef)
-		result.Entries = append(result.Entries, missed...)
-	} else {
-		log.Printf("Gomos: verification confirmed all entries for %s", sourceRef)
-	}
-
-	// Persist verification response
-	if verifyResponse != "" {
-		if werr := s.store.SetRaw(cacheKey+".pass2.response.txt", []byte(verifyResponse)); werr != nil {
-			log.Printf("Gomos: failed to persist verification response: %v", werr)
-		}
-	}
-
-	// Persist final structured result (including any missed entries)
-	if data, merr := json.Marshal(result); merr == nil {
-		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
-			log.Printf("Gomos: failed to cache raw OCR result: %v", werr)
-		}
-	}
-
-	// Persist source image
-	imageExt := s.imageExtension(sourceRef)
-	if werr := s.store.SetRaw(cacheKey+imageExt, imageData); werr != nil {
-		log.Printf("Gomos: failed to persist source image: %v", werr)
-	}
-
-	return result, nil
-}
-
-// scheduleMonth returns the most common year-month (YYYY-MM) among entries,
-// used to group images covering the same monthly schedule.
-func scheduleMonth(entries []vision.RawScheduleEntry) string {
-	counts := make(map[string]int)
-	for _, e := range entries {
-		if len(e.Date) >= 7 {
-			counts[e.Date[:7]]++
-		}
-	}
-	best := ""
-	bestN := 0
-	for m, n := range counts {
-		if n > bestN {
-			best = m
-			bestN = n
-		}
-	}
-	return best
-}
-
-// mergeEntries merges multiple OCR results (same schedule, different languages) via the OpenAI API, with caching.
-func (s *GomosScraper) mergeEntries(ctx context.Context, items []ocrResult) ([]vision.ScheduleEntry, error) {
-	// Collect all raw schedule results
-	schedules := make([]vision.RawScheduleResult, len(items))
-	for i, item := range items {
-		schedules[i] = *item.raw
-	}
-
-	// Compute cache key from combined inputs
-	inputJSON, err := json.Marshal(schedules)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling schedules: %w", err)
-	}
-	hash := sha256.Sum256(inputJSON)
-	hashStr := hex.EncodeToString(hash[:])
-	cacheKey := "merge/" + gomosMergeVersion + "/" + hashStr
-
-	var cached []vision.ScheduleEntry
-	if s.store.GetJSON(cacheKey, &cached) {
-		log.Printf("Gomos: merge cache hit")
-		return cached, nil
-	}
-
-	merged, rawResponse, err := s.vision.MergeScheduleEntries(ctx, schedules)
-	if err != nil {
-		return nil, fmt.Errorf("merging entries: %w", err)
-	}
-
-	// Persist structured result
-	if data, merr := json.Marshal(merged); merr == nil {
-		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
-			log.Printf("Gomos: failed to cache merged entries: %v", werr)
-		}
-	}
-
-	// Persist raw API response
-	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
-		log.Printf("Gomos: failed to persist merge response: %v", werr)
-	}
-
-	return merged, nil
-}
-
-// translateEntries translates raw schedule entries to Swedish via the OpenAI API, with caching.
-func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.RawScheduleEntry) ([]vision.ScheduleEntry, error) {
-	entriesJSON, err := json.Marshal(entries)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling entries: %w", err)
-	}
-	hash := sha256.Sum256(entriesJSON)
-	hashStr := hex.EncodeToString(hash[:])
-	cacheKey := "translate/" + hashStr
-
-	var cached []vision.ScheduleEntry
-	if s.store.GetJSON(cacheKey, &cached) {
-		log.Printf("Gomos: translate cache hit")
-		return cached, nil
-	}
-
-	translated, rawResponse, err := s.vision.TranslateScheduleEntries(ctx, entries)
-	if err != nil {
-		return nil, fmt.Errorf("translating entries: %w", err)
-	}
-
-	// Persist structured result
-	if data, merr := json.Marshal(translated); merr == nil {
-		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
-			log.Printf("Gomos: failed to cache translated entries: %v", werr)
-		}
-	}
-
-	// Persist raw API response
-	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
-		log.Printf("Gomos: failed to persist translate response: %v", werr)
-	}
-
-	return translated, nil
-}
-
-// rawEntriesToSwedish converts RawScheduleEntry to ScheduleEntry directly (no API call needed).
-func rawEntriesToSwedish(entries []vision.RawScheduleEntry) []vision.ScheduleEntry {
-	result := make([]vision.ScheduleEntry, len(entries))
-	for i, e := range entries {
-		result[i] = vision.ScheduleEntry{
-			Date:        e.Date,
-			DayOfWeek:   e.DayOfWeek,
-			Time:        e.Time,
-			ServiceName: e.ServiceName,
-			Occasion:    e.Occasion,
-		}
-	}
-	return result
-}
-
-// recoverDroppedEntries checks whether the AI merge dropped any Swedish events.
-// Only Swedish entries are recovered since the Swedish schedule is the authoritative source.
-// Non-Swedish-only entries are not recovered as they may contain OCR date/time errors.
-func recoverDroppedEntries(merged []vision.ScheduleEntry, items []ocrResult) []vision.ScheduleEntry {
-	// Build a set of (date, timeMinutes) from merged entries for quick lookup
-	type dateTime struct {
-		date    string
-		minutes int
-	}
-	mergedSet := make(map[dateTime]bool)
-	for _, e := range merged {
-		if m, ok := parseTimeMinutes(e.Time); ok {
-			mergedSet[dateTime{e.Date, m}] = true
-		}
-	}
-
-	hasCloseMatch := func(date, timeStr string) bool {
-		m, ok := parseTimeMinutes(timeStr)
-		if !ok {
-			return false
-		}
-		for key := range mergedSet {
-			if key.date == date && math.Abs(float64(key.minutes-m)) <= 30 {
-				return true
-			}
-		}
-		return false
-	}
-
-	// Only recover from Swedish entries (the authoritative source)
-	var recovered int
-	for _, item := range items {
-		lang := strings.ToLower(item.raw.Language)
-		if lang != "swedish" && lang != "svenska" {
-			continue
-		}
-		for _, e := range item.raw.Entries {
-			if !hasCloseMatch(e.Date, e.Time) {
-				log.Printf("Gomos: recovering dropped Swedish entry: %s %s %s", e.Date, e.Time, e.ServiceName)
-				entry := vision.ScheduleEntry{
-					Date:        e.Date,
-					DayOfWeek:   e.DayOfWeek,
-					Time:        e.Time,
-					ServiceName: e.ServiceName,
-					Occasion:    e.Occasion,
-				}
-				merged = append(merged, entry)
-				if m, ok := parseTimeMinutes(e.Time); ok {
-					mergedSet[dateTime{e.Date, m}] = true
-				}
-				recovered++
-			}
-		}
-	}
-
-	if recovered > 0 {
-		log.Printf("Gomos: recovered %d dropped entries after merge", recovered)
-	}
-
-	return merged
-}
-
-// parseTimeMinutes parses "HH:MM" to minutes since midnight.
-func parseTimeMinutes(t string) (int, bool) {
-	parts := strings.Split(t, ":")
-	if len(parts) != 2 {
-		return 0, false
-	}
-	h, err1 := strconv.Atoi(parts[0])
-	m, err2 := strconv.Atoi(parts[1])
-	if err1 != nil || err2 != nil {
-		return 0, false
-	}
-	return h*60 + m, true
 }
 
 func (s *GomosScraper) findLatestSchedulePost(ctx context.Context) (string, error) {
