@@ -56,6 +56,8 @@ func ExtractRyskaScheduleTextFromHTML(htmlContent string) string {
 	// Strip HTML tags and decode entities
 	content := regexp.MustCompile(`<[^>]*>`).ReplaceAllString(htmlContent, " ")
 	content = html.UnescapeString(content)
+	// Remove zero-width and invisible Unicode characters that vary between Wix renders
+	content = regexp.MustCompile(`[\x{200B}\x{200C}\x{200D}\x{FEFF}\x{00A0}\x{2060}\x{200E}\x{200F}]`).ReplaceAllString(content, " ")
 	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
 
 	// Extract just the schedule section (from "Januari" to "bottom of page" or similar)
