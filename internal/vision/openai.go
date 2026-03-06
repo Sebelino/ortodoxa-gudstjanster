@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -737,15 +738,17 @@ Return ONLY the JSON array, no other text.`, string(entriesJSON))
 		r := results[i]
 		start, err := time.Parse(time.RFC3339, r.Start)
 		if err != nil {
-			return nil, fmt.Errorf("parsing start time for %s %s: %w", entry.Date, entry.Time, err)
+			log.Printf("WARNING: skipping bad start time for %s %s: %v", entry.Date, entry.Time, err)
+			continue
 		}
 		pt := ParsedTime{Start: start}
 		if r.End != nil {
 			end, err := time.Parse(time.RFC3339, *r.End)
 			if err != nil {
-				return nil, fmt.Errorf("parsing end time for %s %s: %w", entry.Date, entry.Time, err)
+				log.Printf("WARNING: ignoring bad end time for %s %s: %v", entry.Date, entry.Time, err)
+			} else {
+				pt.End = &end
 			}
-			pt.End = &end
 		}
 		key := entry.Date + "|" + entry.Time
 		parsed[key] = pt
