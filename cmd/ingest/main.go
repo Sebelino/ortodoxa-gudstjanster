@@ -116,6 +116,14 @@ func main() {
 	batchID := time.Now().UTC().Format("20060102-150405")
 	log.Printf("Starting ingestion with batch ID: %s", batchID)
 
+	// Clean up past events so the count guard compares apples to apples
+	deleted, err := fsClient.DeletePastServices(ctx)
+	if err != nil {
+		log.Printf("WARNING: Failed to delete past services: %v", err)
+	} else if deleted > 0 {
+		log.Printf("Deleted %d past services from Firestore", deleted)
+	}
+
 	// Pass 1: Run scrapers and collect accepted results
 	scrapers := registry.Scrapers()
 	var accepted []acceptedResult

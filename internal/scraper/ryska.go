@@ -107,9 +107,10 @@ func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 	// Compute checksum for caching
 	hash := sha256.Sum256([]byte(content))
 	checksum := hex.EncodeToString(hash[:])
+	cacheKey := "ryska-ocr/v2/" + checksum
 	// Check store for cached result
 	var entries []vision.ScheduleEntry
-	if s.store.GetJSON(checksum, &entries) {
+	if s.store.GetJSON(cacheKey, &entries) {
 		return s.entriesToServices(entries), nil
 	}
 
@@ -120,7 +121,7 @@ func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 	}
 
 	// Cache result
-	if err := s.store.SetJSON(checksum, entries); err != nil {
+	if err := s.store.SetJSON(cacheKey, entries); err != nil {
 		// Log but don't fail
 		fmt.Printf("warning: failed to cache ryska schedule: %v\n", err)
 	}
