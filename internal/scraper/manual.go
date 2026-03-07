@@ -78,46 +78,53 @@ func (s *ManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 		endDate := startDate.AddDate(0, 0, 26*7)
 
 		for date := startDate; !date.After(endDate); date = date.Add(interval) {
-			location := event.Location
-			language := event.Language
-			svc := model.ChurchService{
-				Parish:      event.Parish,
-				Source:      event.Source,
-				SourceURL:   event.SourceURL,
-				Date:        date.Format("2006-01-02"),
-				DayOfWeek:   swedishDayOfWeek(date.Weekday()),
-				ServiceName: event.ServiceName,
-				Title:       event.Title,
-				Location:    &location,
-				Language:    &language,
-			}
-			if event.ParishLanguage != "" {
-				pl := event.ParishLanguage
-				svc.ParishLanguage = &pl
-			}
-			if event.EventLanguage != "" {
-				el := event.EventLanguage
-				svc.EventLanguage = &el
-			}
-			if event.Notes != "" {
-				notes := event.Notes
-				svc.Notes = &notes
-			}
-			if event.StartTimeStr != "" {
-				if t, err := parseHHMM(date, event.StartTimeStr); err == nil {
-					svc.StartTime = &t
-				}
-			}
-			if event.EndTimeStr != "" {
-				if t, err := parseHHMM(date, event.EndTimeStr); err == nil {
-					svc.EndTime = &t
-				}
-			}
-			services = append(services, svc)
+			services = append(services, buildManualService(event, date))
 		}
 	}
 
 	return services, nil
+}
+
+// buildManualService converts a RecurringEvent and a specific date into a ChurchService.
+func buildManualService(event RecurringEvent, date time.Time) model.ChurchService {
+	location := event.Location
+	language := event.Language
+	svc := model.ChurchService{
+		Parish:      event.Parish,
+		Source:      event.Source,
+		SourceURL:   event.SourceURL,
+		Date:        date.Format("2006-01-02"),
+		DayOfWeek:   swedishDayOfWeek(date.Weekday()),
+		ServiceName: event.ServiceName,
+		Title:       event.Title,
+		Location:    &location,
+		Language:    &language,
+	}
+	if event.ParishLanguage != "" {
+		pl := event.ParishLanguage
+		svc.ParishLanguage = &pl
+	}
+	if event.EventLanguage != "" {
+		el := event.EventLanguage
+		svc.EventLanguage = &el
+	}
+	if event.Notes != "" {
+		notes := event.Notes
+		svc.Notes = &notes
+	}
+	if event.StartTimeStr != "" {
+		timeStr := event.StartTimeStr
+		svc.Time = &timeStr
+		if t, err := parseHHMM(date, event.StartTimeStr); err == nil {
+			svc.StartTime = &t
+		}
+	}
+	if event.EndTimeStr != "" {
+		if t, err := parseHHMM(date, event.EndTimeStr); err == nil {
+			svc.EndTime = &t
+		}
+	}
+	return svc
 }
 
 var stockholm *time.Location
