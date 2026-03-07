@@ -605,3 +605,39 @@ func TestHandleLastUpdated(t *testing.T) {
 		t.Errorf("batch_id = %q, want %q", result["batch_id"], "batch-123")
 	}
 }
+
+func TestGenerateIcon(t *testing.T) {
+	for _, size := range []int{180, 192, 512} {
+		img := generateIcon(size)
+		if img.Bounds().Dx() != size || img.Bounds().Dy() != size {
+			t.Errorf("generateIcon(%d) size = %dx%d", size, img.Bounds().Dx(), img.Bounds().Dy())
+		}
+		// Check center pixel is cross color (vertical shaft)
+		c := img.RGBAAt(size/2, size/2)
+		if c != crossColor {
+			t.Errorf("generateIcon(%d) center pixel = %v, want %v", size, c, crossColor)
+		}
+		// Check corner pixel is background (with rounded corners, the very corner is transparent)
+		corner := img.RGBAAt(0, 0)
+		if corner == crossColor {
+			t.Errorf("generateIcon(%d) corner pixel should not be cross color", size)
+		}
+	}
+}
+
+func TestServeIcon(t *testing.T) {
+	w := httptest.NewRecorder()
+	serveIcon(w, 192)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "image/png" {
+		t.Errorf("Content-Type = %q, want image/png", ct)
+	}
+	// PNG magic bytes
+	body := w.Body.Bytes()
+	if len(body) < 8 || string(body[1:4]) != "PNG" {
+		t.Errorf("response is not a valid PNG (len=%d)", len(body))
+	}
+}

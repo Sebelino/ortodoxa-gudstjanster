@@ -115,6 +115,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
 	mux.HandleFunc("/favicon.svg", h.handleFavicon)
+	mux.HandleFunc("/icon-192.png", h.handleIcon192)
+	mux.HandleFunc("/icon-512.png", h.handleIcon512)
+	mux.HandleFunc("/apple-touch-icon.png", h.handleAppleTouchIcon)
 	mux.HandleFunc("/manifest.json", h.handleManifest)
 	mux.HandleFunc("/sw.js", h.handleServiceWorker)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
@@ -454,6 +457,18 @@ func (h *Handler) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(data)
+}
+
+func (h *Handler) handleIcon192(w http.ResponseWriter, r *http.Request) {
+	serveIcon(w, 192)
+}
+
+func (h *Handler) handleIcon512(w http.ResponseWriter, r *http.Request) {
+	serveIcon(w, 512)
+}
+
+func (h *Handler) handleAppleTouchIcon(w http.ResponseWriter, r *http.Request) {
+	serveIcon(w, 180)
 }
 
 func (h *Handler) handleManifest(w http.ResponseWriter, r *http.Request) {
