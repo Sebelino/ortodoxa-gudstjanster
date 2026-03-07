@@ -2,7 +2,9 @@ package web
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -196,11 +198,17 @@ func generateICS(services []model.ChurchService) string {
 	sb.WriteString("X-WR-CALNAME:Ortodoxa Gudstjänster\r\n")
 	sb.WriteString("X-WR-TIMEZONE:Europe/Stockholm\r\n")
 
-	for i, s := range services {
+	for _, s := range services {
 		sb.WriteString("BEGIN:VEVENT\r\n")
 
-		// Generate unique ID
-		uid := fmt.Sprintf("%s-%d@ortodoxa-gudstjanster", s.Date, i)
+		// Generate stable UID from service fields
+		timeStr := ""
+		if s.Time != nil {
+			timeStr = *s.Time
+		}
+		uidData := fmt.Sprintf("%s|%s|%s|%s", s.Source, s.Date, s.ServiceName, timeStr)
+		uidHash := sha256.Sum256([]byte(uidData))
+		uid := hex.EncodeToString(uidHash[:16]) + "@ortodoxa-gudstjanster"
 		sb.WriteString(fmt.Sprintf("UID:%s\r\n", uid))
 
 		// Date and time
