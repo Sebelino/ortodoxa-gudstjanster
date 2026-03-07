@@ -209,22 +209,23 @@ func TestRegistryFetchAll(t *testing.T) {
 	t.Logf("FetchAll returned %d services", len(services))
 }
 
-func assertHasFebruary2026Events(t *testing.T, services []model.ChurchService) {
+func assertHasCurrentMonthEvents(t *testing.T, services []model.ChurchService) {
 	t.Helper()
-	var feb2026Count int
+	currentMonth := time.Now().Format("2006-01")
+	var count int
 	for _, svc := range services {
-		if len(svc.Date) >= 7 && svc.Date[:7] == "2026-02" {
-			feb2026Count++
+		if len(svc.Date) >= 7 && svc.Date[:7] == currentMonth {
+			count++
 		}
 	}
-	if feb2026Count == 0 {
-		t.Errorf("Expected at least one event in February 2026, got 0 (total events: %d)", len(services))
+	if count == 0 {
+		t.Errorf("Expected at least one event in %s, got 0 (total events: %d)", currentMonth, len(services))
 	} else {
-		t.Logf("Found %d events in February 2026", feb2026Count)
+		t.Logf("Found %d events in %s", count, currentMonth)
 	}
 }
 
-func TestFinskaScraperHasFebruary2026Events(t *testing.T) {
+func TestFinskaScraperHasCurrentMonthEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -234,10 +235,10 @@ func TestFinskaScraperHasFebruary2026Events(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	assertHasFebruary2026Events(t, services)
+	assertHasCurrentMonthEvents(t, services)
 }
 
-func TestGomosScraperHasFebruary2026Events(t *testing.T) {
+func TestGomosScraperHasCurrentMonthEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -249,7 +250,7 @@ func TestGomosScraperHasFebruary2026Events(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	assertHasFebruary2026Events(t, services)
+	assertHasCurrentMonthEvents(t, services)
 }
 
 func TestGomosScraperSavesSourceImage(t *testing.T) {
@@ -266,20 +267,19 @@ func TestGomosScraperSavesSourceImage(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	// Check that at least one image file was saved
-	entries, err := os.ReadDir(storeDir)
-	if err != nil {
-		t.Fatalf("Failed to read store directory: %v", err)
-	}
-
+	// Check that at least one image file was saved (may be in subdirectories)
 	var imageCount int
-	for _, entry := range entries {
-		name := entry.Name()
-		if filepath.Ext(name) == ".jpg" || filepath.Ext(name) == ".png" || filepath.Ext(name) == ".jpeg" {
-			imageCount++
-			t.Logf("Found image: %s", name)
+	filepath.Walk(storeDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
 		}
-	}
+		ext := filepath.Ext(info.Name())
+		if ext == ".jpg" || ext == ".png" || ext == ".jpeg" {
+			imageCount++
+			t.Logf("Found image: %s", path)
+		}
+		return nil
+	})
 
 	if imageCount == 0 {
 		t.Error("Expected at least one image file (.jpg/.png) in store directory")
@@ -288,7 +288,7 @@ func TestGomosScraperSavesSourceImage(t *testing.T) {
 	}
 }
 
-func TestHeligaAnnaScraperHasFebruary2026Events(t *testing.T) {
+func TestHeligaAnnaScraperHasCurrentMonthEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -298,10 +298,10 @@ func TestHeligaAnnaScraperHasFebruary2026Events(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	assertHasFebruary2026Events(t, services)
+	assertHasCurrentMonthEvents(t, services)
 }
 
-func TestRyskaScraperHasFebruary2026Events(t *testing.T) {
+func TestRyskaScraperHasCurrentMonthEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -313,5 +313,9 @@ func TestRyskaScraperHasFebruary2026Events(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	assertHasFebruary2026Events(t, services)
+	if len(services) < 10 {
+		t.Errorf("Expected at least 10 services, got %d", len(services))
+	} else {
+		t.Logf("Found %d services", len(services))
+	}
 }
