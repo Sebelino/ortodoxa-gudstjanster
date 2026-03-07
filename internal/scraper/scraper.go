@@ -25,6 +25,10 @@ func fetchURL(ctx context.Context, url string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, url)
+	}
+
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
@@ -45,6 +49,10 @@ func fetchDocument(ctx context.Context, url string) (*goquery.Document, error) {
 		return nil, fmt.Errorf("fetching URL: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, url)
+	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
