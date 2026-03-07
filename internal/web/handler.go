@@ -312,7 +312,11 @@ func parseStartTime(timeStr string) string {
 			minute = minute[:2]
 		}
 		if len(hour) <= 2 && len(minute) == 2 {
-			return fmt.Sprintf("%02s%s00", hour, minute)
+			h := 0
+			m := 0
+			fmt.Sscanf(hour, "%d", &h)
+			fmt.Sscanf(minute, "%d", &m)
+			return fmt.Sprintf("%02d%02d00", h, m)
 		}
 	}
 
