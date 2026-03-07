@@ -39,6 +39,9 @@ func main() {
 	}
 
 	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
+	if openaiAPIKey == "" {
+		log.Fatal("OPENAI_API_KEY environment variable is required")
+	}
 
 	// Initialize GCS store
 	gcsStore, err := store.NewGCS(ctx, gcsBucket)
