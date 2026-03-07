@@ -53,6 +53,9 @@ func (s *LocalStore) Set(key string, value []byte) error {
 	defer s.mu.Unlock()
 
 	path := s.keyPath(key)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	return os.WriteFile(path, value, 0644)
 }
 
@@ -80,6 +83,9 @@ func (s *LocalStore) SetWithExtension(key string, ext string, value []byte) erro
 	defer s.mu.Unlock()
 
 	path := filepath.Join(s.dir, key+ext)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	return os.WriteFile(path, value, 0644)
 }
 
