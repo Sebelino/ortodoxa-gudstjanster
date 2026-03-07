@@ -3,7 +3,7 @@ calendar.json
 /scrape
 disk/
 test-disk/
-cache/
+/cache/
 gitignore/
 /terraform/terraform.tfvars
 terraform.tfstate

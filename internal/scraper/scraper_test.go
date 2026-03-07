@@ -87,6 +87,9 @@ func validateService(t *testing.T, s model.ChurchService, scraperName string) {
 }
 
 func TestFinskaScraper(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -130,6 +133,9 @@ func TestFinskaScraper(t *testing.T) {
 }
 
 func TestGomosScraper(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -194,6 +200,9 @@ func TestRegistry(t *testing.T) {
 }
 
 func TestRegistryFetchAll(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -226,6 +235,9 @@ func assertHasCurrentMonthEvents(t *testing.T, services []model.ChurchService) {
 }
 
 func TestFinskaScraperHasCurrentMonthEvents(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -239,6 +251,9 @@ func TestFinskaScraperHasCurrentMonthEvents(t *testing.T) {
 }
 
 func TestGomosScraperHasCurrentMonthEvents(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -254,6 +269,9 @@ func TestGomosScraperHasCurrentMonthEvents(t *testing.T) {
 }
 
 func TestGomosScraperSavesSourceImage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -289,6 +307,9 @@ func TestGomosScraperSavesSourceImage(t *testing.T) {
 }
 
 func TestHeligaAnnaScraperHasCurrentMonthEvents(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -302,6 +323,9 @@ func TestHeligaAnnaScraperHasCurrentMonthEvents(t *testing.T) {
 }
 
 func TestRyskaScraperHasCurrentMonthEvents(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
