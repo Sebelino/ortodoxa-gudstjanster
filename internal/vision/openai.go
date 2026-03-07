@@ -78,7 +78,8 @@ func (c *Client) ExtractScheduleRaw(ctx context.Context, imageData []byte) (*Raw
 		mediaType = "image/png"
 	}
 
-	prompt := `Extract ALL church service schedule entries from this image. The schedule is dense and may contain 30+ entries — be extremely thorough and do not skip any.
+	currentYear := time.Now().Year()
+	prompt := fmt.Sprintf(`Extract ALL church service schedule entries from this image. The schedule is dense and may contain 30+ entries — be extremely thorough and do not skip any.
 
 STEP 1: First, scan the entire image top to bottom (and left column then right column if multi-column) and identify every date header (e.g., "Κυριακή 1 Μαρτίου", "Torsdag 26 mars"). List them mentally — you must not miss any date section.
 
@@ -89,7 +90,7 @@ The image may be in any language (Greek, Swedish, etc.). Keep all text in its OR
 Return a JSON object with these fields:
 - language: the language of the schedule (e.g., "Swedish", "Greek", "English")
 - entries: an array of services, each with:
-  - date: in YYYY-MM-DD format (use year 2026 if not specified)
+  - date: in YYYY-MM-DD format (use year %d if not specified)
   - day_of_week: the day name in the ORIGINAL language
   - time: in HH:MM format (24-hour). Convert "π.μ." to AM and "μ.μ." to PM times in 24h format (e.g., 6:00 μ.μ. = 18:00)
   - service_name: the name of the service in the ORIGINAL language
@@ -97,7 +98,7 @@ Return a JSON object with these fields:
 
 Only include entries that have both a date/day and a time specified. Note that NOTERING/NOTE entries also have times — the time typically appears right-aligned at the end of the last line of wrapped text (e.g., after a closing parenthesis).
 IMPORTANT: Double-check that you have not skipped any date sections or services. The output should cover the ENTIRE schedule from first date to last date. Count the number of date headers you found and verify none were skipped. Verify that no entry has time 00:00 unless it genuinely says midnight.
-Return ONLY the JSON object, no other text.`
+Return ONLY the JSON object, no other text.`, currentYear)
 
 	reqBody := map[string]interface{}{
 		"model": "gpt-4.1",
