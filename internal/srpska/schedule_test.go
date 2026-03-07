@@ -96,7 +96,7 @@ func TestParseDays(t *testing.T) {
 	}
 }
 
-// --- weekdayToSwedish ---
+// --- WeekdayToSwedish ---
 
 func TestWeekdayToSwedish(t *testing.T) {
 	tests := []struct {
@@ -114,9 +114,9 @@ func TestWeekdayToSwedish(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			got := weekdayToSwedish(tt.day)
+			got := WeekdayToSwedish(tt.day)
 			if got != tt.want {
-				t.Errorf("weekdayToSwedish(%v) = %q, want %q", tt.day, got, tt.want)
+				t.Errorf("WeekdayToSwedish(%v) = %q, want %q", tt.day, got, tt.want)
 			}
 		})
 	}

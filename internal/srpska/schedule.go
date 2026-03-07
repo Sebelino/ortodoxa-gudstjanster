@@ -191,7 +191,7 @@ func GenerateEvents(schedule *RecurringSchedule, weeks int) []CalendarEvent {
 			if shouldInclude {
 				events = append(events, CalendarEvent{
 					Date:        current.Format("2006-01-02"),
-					DayOfWeek:   weekdayToSwedish(currentWeekday),
+					DayOfWeek:   WeekdayToSwedish(currentWeekday),
 					ServiceName: svc.Name,
 					Time:        svc.Time,
 				})
@@ -204,7 +204,7 @@ func GenerateEvents(schedule *RecurringSchedule, weeks int) []CalendarEvent {
 	return events
 }
 
-func weekdayToSwedish(day time.Weekday) string {
+func WeekdayToSwedish(day time.Weekday) string {
 	switch day {
 	case time.Monday:
 		return "Måndag"

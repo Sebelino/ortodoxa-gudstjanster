@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/srpska"
 	"ortodoxa-gudstjanster/internal/store"
 )
 
@@ -94,7 +95,7 @@ func buildManualService(event RecurringEvent, date time.Time) model.ChurchServic
 		Source:      event.Source,
 		SourceURL:   event.SourceURL,
 		Date:        date.Format("2006-01-02"),
-		DayOfWeek:   swedishDayOfWeek(date.Weekday()),
+		DayOfWeek:   srpska.WeekdayToSwedish(date.Weekday()),
 		ServiceName: event.ServiceName,
 		Title:       event.Title,
 		Location:    &location,
@@ -145,23 +146,3 @@ func parseHHMM(date time.Time, s string) (time.Time, error) {
 	return time.Date(date.Year(), date.Month(), date.Day(), h, m, 0, 0, stockholm), nil
 }
 
-func swedishDayOfWeek(day time.Weekday) string {
-	switch day {
-	case time.Monday:
-		return "Måndag"
-	case time.Tuesday:
-		return "Tisdag"
-	case time.Wednesday:
-		return "Onsdag"
-	case time.Thursday:
-		return "Torsdag"
-	case time.Friday:
-		return "Fredag"
-	case time.Saturday:
-		return "Lördag"
-	case time.Sunday:
-		return "Söndag"
-	default:
-		return ""
-	}
-}

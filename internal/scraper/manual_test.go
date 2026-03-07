@@ -135,26 +135,3 @@ var _ = func(e RecurringEvent, d time.Time) model.ChurchService {
 	return buildManualService(e, d)
 }
 
-func TestSwedishDayOfWeek(t *testing.T) {
-	tests := []struct {
-		day  time.Weekday
-		want string
-	}{
-		{time.Monday, "Måndag"},
-		{time.Tuesday, "Tisdag"},
-		{time.Wednesday, "Onsdag"},
-		{time.Thursday, "Torsdag"},
-		{time.Friday, "Fredag"},
-		{time.Saturday, "Lördag"},
-		{time.Sunday, "Söndag"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			got := swedishDayOfWeek(tt.day)
-			if got != tt.want {
-				t.Errorf("swedishDayOfWeek(%v) = %q, want %q", tt.day, got, tt.want)
-			}
-		})
-	}
-}
