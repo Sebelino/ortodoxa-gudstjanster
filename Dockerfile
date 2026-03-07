@@ -18,10 +18,6 @@ WORKDIR /app
 COPY --from=builder /app/server .
 COPY --from=builder /app/ingest .
 
-# Create cache and store directories
-RUN mkdir -p /app/cache /app/disk
-ENV CACHE_DIR=/app/cache
-ENV STORE_DIR=/app/disk
 ENV CHROME_PATH=/usr/bin/chromium-browser
 
 EXPOSE 8080
