@@ -396,6 +396,7 @@ func parseTimes(ctx context.Context, accepted []acceptedResult, visionClient *vi
 }
 
 // eventLangMapKey returns a deduplication key for an event's relevant fields.
+// Uses a hash to avoid collisions from field values containing the separator.
 func eventLangMapKey(serviceName string, occasion, notes *string) string {
 	occ := ""
 	if occasion != nil {
@@ -405,7 +406,9 @@ func eventLangMapKey(serviceName string, occasion, notes *string) string {
 	if notes != nil {
 		n = *notes
 	}
-	return serviceName + "|" + occ + "|" + n
+	data := fmt.Sprintf("%d:%s\n%d:%s\n%d:%s", len(serviceName), serviceName, len(occ), occ, len(n), n)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:16])
 }
 
 
