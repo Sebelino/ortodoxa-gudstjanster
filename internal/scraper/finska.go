@@ -16,24 +16,24 @@ const (
 	finskaLanguage   = "Svenska, finska"
 )
 
-// FisnkaScraper scrapes the Finnish Orthodox Congregation calendar.
-type FisnkaScraper struct {
+// FinskaScraper scrapes the Finnish Orthodox Congregation calendar.
+type FinskaScraper struct {
 	url string
 }
 
 // NewFinskaScraper creates a new scraper for the Finnish Orthodox Congregation.
-func NewFinskaScraper(url string) *FisnkaScraper {
+func NewFinskaScraper(url string) *FinskaScraper {
 	if url == "" {
 		url = finskaDefaultURL
 	}
-	return &FisnkaScraper{url: url}
+	return &FinskaScraper{url: url}
 }
 
-func (s *FisnkaScraper) Name() string {
+func (s *FinskaScraper) Name() string {
 	return finskaSourceName
 }
 
-func (s *FisnkaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
 	doc, err := fetchDocument(ctx, s.url)
 	if err != nil {
 		return nil, err
