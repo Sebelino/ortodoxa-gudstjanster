@@ -39,7 +39,8 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 	}
 
 	var services []model.ChurchService
-	currentYear := time.Now().Year()
+	now := time.Now()
+	currentYear := now.Year()
 
 	// Pattern: <strong>Söndag 8/2</strong> kl. 09:00. Liturgi. Optional occasion
 	// The text after the service name (after the dot) might be an occasion
@@ -73,11 +74,16 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 				return
 			}
 
-			// Determine year (if month is before current month, it's next year)
+			// Determine year: try current year first. If the date would be
+			// more than 3 months in the past, assume next year. If more
+			// than 9 months in the future, assume previous year. This
+			// places events in a [-3, +9] month window around today.
 			year := currentYear
-			currentMonth := int(time.Now().Month())
-			if month < currentMonth {
+			candidate := time.Date(year, time.Month(month), day, 0, 0, 0, 0, now.Location())
+			if candidate.Before(now.AddDate(0, -3, 0)) {
 				year++
+			} else if candidate.After(now.AddDate(0, 9, 0)) {
+				year--
 			}
 
 			date := fmt.Sprintf("%d-%02d-%02d", year, month, day)
