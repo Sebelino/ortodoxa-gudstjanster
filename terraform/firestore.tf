@@ -30,3 +30,21 @@ resource "google_firestore_index" "services_source_date" {
 
   depends_on = [google_firestore_database.main]
 }
+
+# Composite index for counting future services per scraper
+resource "google_firestore_index" "services_scraper_date" {
+  database   = google_firestore_database.main.name
+  collection = "services"
+
+  fields {
+    field_path = "scraper_name"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "date"
+    order      = "ASCENDING"
+  }
+
+  depends_on = [google_firestore_database.main]
+}

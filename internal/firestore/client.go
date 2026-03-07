@@ -178,6 +178,30 @@ func (c *Client) CountServicesForScraper(ctx context.Context, scraperName string
 	return count, nil
 }
 
+// CountFutureServicesForScraper returns the number of stored services for a
+// given scraper with date >= today (YYYY-MM-DD).
+func (c *Client) CountFutureServicesForScraper(ctx context.Context, scraperName string) (int, error) {
+	today := time.Now().Format("2006-01-02")
+	query := c.client.Collection(c.collection).
+		Where("scraper_name", "==", scraperName).
+		Where("date", ">=", today)
+	count := 0
+
+	iter := query.Documents(ctx)
+	for {
+		_, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return 0, fmt.Errorf("counting future documents for scraper %s: %w", scraperName, err)
+		}
+		count++
+	}
+
+	return count, nil
+}
+
 // DeletePastServices deletes all services with date before today.
 func (c *Client) DeletePastServices(ctx context.Context) (int, error) {
 	today := time.Now().Format("2006-01-02")

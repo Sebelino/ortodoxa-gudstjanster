@@ -116,7 +116,8 @@ func main() {
 	batchID := time.Now().UTC().Format("20060102-150405")
 	log.Printf("Starting ingestion with batch ID: %s", batchID)
 
-	// Clean up past events so the count guard compares apples to apples
+	// Clean up past events
+	today := time.Now().Format("2006-01-02")
 	deleted, err := fsClient.DeletePastServices(ctx)
 	if err != nil {
 		log.Printf("WARNING: Failed to delete past services: %v", err)
@@ -143,14 +144,20 @@ func main() {
 		log.Printf("Scraper %s fetched %d services", scraperName, len(services))
 
 		if len(services) > 0 {
-			// Check if the new count is less than the existing count
-			existingCount, err := fsClient.CountServicesForScraper(ctx, scraperName)
+			// Count only non-past services on both sides to avoid race with DeletePastServices
+			newCount := 0
+			for _, svc := range services {
+				if svc.Date >= today {
+					newCount++
+				}
+			}
+			existingCount, err := fsClient.CountFutureServicesForScraper(ctx, scraperName)
 			if err != nil {
 				log.Printf("WARNING: Failed to count existing services for %s: %v", scraperName, err)
 				// Proceed with replacement if we can't count
-			} else if len(services) < existingCount {
-				log.Printf("WARNING: Scraper %s returned fewer services (%d) than currently stored (%d). Skipping replacement.",
-					scraperName, len(services), existingCount)
+			} else if newCount < existingCount {
+				log.Printf("WARNING: Scraper %s returned fewer future services (%d) than currently stored (%d). Skipping replacement.",
+					scraperName, newCount, existingCount)
 
 				// Save rejected data to GCS for diagnostics
 				gcsPath := saveDiagnostics(gcsStore, scraperName, services)
@@ -159,8 +166,8 @@ func main() {
 				if smtpConfig != nil {
 					subject := fmt.Sprintf("Ingestion alert: %s service count decreased", scraperName)
 					body := fmt.Sprintf(
-						"Scraper: %s\r\nExisting count: %d\r\nNew count: %d\r\nAction: Skipped replacement (existing data preserved)\r\nRejected data: gs://%s/%s",
-						scraperName, existingCount, len(services), gcsBucket, gcsPath,
+						"Scraper: %s\r\nExisting future count: %d\r\nNew future count: %d\r\nAction: Skipped replacement (existing data preserved)\r\nRejected data: gs://%s/%s",
+						scraperName, existingCount, newCount, gcsBucket, gcsPath,
 					)
 					if err := smtpConfig.Send(subject, body); err != nil {
 						log.Printf("ERROR: Failed to send alert email for %s: %v", scraperName, err)

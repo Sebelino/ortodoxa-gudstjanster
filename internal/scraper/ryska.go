@@ -107,7 +107,7 @@ func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 	// Compute checksum for caching
 	hash := sha256.Sum256([]byte(content))
 	checksum := hex.EncodeToString(hash[:])
-	cacheKey := "ryska-ocr/v3/" + checksum
+	cacheKey := "ryska-ocr/v4/" + checksum
 	// Check store for cached result
 	var entries []vision.ScheduleEntry
 	if s.store.GetJSON(cacheKey, &entries) {
