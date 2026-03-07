@@ -10,14 +10,7 @@ resource "google_storage_bucket" "store" {
     enabled = false
   }
 
-  lifecycle_rule {
-    condition {
-      age = 0 # Never delete - Vision API results are permanent
-    }
-    action {
-      type = "Delete"
-    }
-  }
+
 }
 
 # Cloud Storage bucket for manually uploaded schedule images (per parish)
