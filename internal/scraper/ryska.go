@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -123,7 +124,7 @@ func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 	// Cache result
 	if err := s.store.SetJSON(cacheKey, entries); err != nil {
 		// Log but don't fail
-		fmt.Printf("warning: failed to cache ryska schedule: %v\n", err)
+		log.Printf("warning: failed to cache ryska schedule: %v", err)
 	}
 
 	return s.entriesToServices(entries), nil
