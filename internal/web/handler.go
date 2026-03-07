@@ -519,12 +519,10 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 
 func getClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header (set by proxies/load balancers)
+	// Use the last IP — on Cloud Run the proxy appends the real client IP
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP in the list
-		if idx := strings.Index(xff, ","); idx != -1 {
-			return strings.TrimSpace(xff[:idx])
-		}
-		return strings.TrimSpace(xff)
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[len(parts)-1])
 	}
 	// Check X-Real-IP header
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
