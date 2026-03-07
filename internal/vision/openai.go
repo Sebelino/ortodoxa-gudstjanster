@@ -61,6 +61,12 @@ func NewClient(apiKey string) *Client {
 	}
 }
 
+// doRequest executes an OpenAI API request with logging.
+func (c *Client) doRequest(req *http.Request, caller string, model string) (*http.Response, error) {
+	log.Printf("OPENAI API CALL: %s (model: %s)", caller, model)
+	return c.httpClient.Do(req)
+}
+
 // ExtractScheduleRaw sends an image to OpenAI's vision API and extracts church service
 // schedule entries in their original language. Returns the structured result and the
 // raw API response content for diagnostics.
@@ -129,7 +135,7 @@ Return ONLY the JSON object, no other text.`
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req, "ExtractScheduleRaw", "gpt-4.1")
 	if err != nil {
 		return nil, "", fmt.Errorf("sending request: %w", err)
 	}
@@ -216,7 +222,7 @@ Text to parse:
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req, "ExtractScheduleFromText", "gpt-4o")
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -314,7 +320,7 @@ Return ONLY the JSON array, no other text.`, today, string(entriesJSON))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req, "TranslateScheduleEntries", "gpt-4o-mini")
 	if err != nil {
 		return nil, "", fmt.Errorf("sending request: %w", err)
 	}
@@ -422,7 +428,7 @@ Return ONLY the JSON object, no other text.`, string(namesJSON))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req, "GenerateTitles", "gpt-4o-mini")
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -558,7 +564,7 @@ Return ONLY the JSON array, no other text.`, len(events), string(eventsJSON))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req, "parseEventLanguagesBatch", "gpt-4o")
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -683,7 +689,7 @@ Return ONLY the JSON array, no other text.`, string(entriesJSON))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doRequest(req, "ParseTimes", "gpt-4o-mini")
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
