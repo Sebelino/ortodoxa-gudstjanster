@@ -153,9 +153,10 @@ type CalendarEvent struct {
 func GenerateEvents(schedule *RecurringSchedule, weeks int) []CalendarEvent {
 	var events []CalendarEvent
 
-	now := time.Now()
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	now := time.Now().In(stockholm)
 	// Start from today
-	current := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	current := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, stockholm)
 	// Generate for specified weeks
 	end := current.AddDate(0, 0, weeks*7)
 
