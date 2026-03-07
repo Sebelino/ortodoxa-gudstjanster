@@ -480,6 +480,8 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodPost {
+		r.Body = http.MaxBytesReader(w, r.Body, 64*1024) // 64 KB limit
+
 		var feedback struct {
 			Type      string `json:"type"`
 			Email     string `json:"email"`

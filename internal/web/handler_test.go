@@ -552,6 +552,23 @@ func TestHandleFeedbackPostMissingFields(t *testing.T) {
 	}
 }
 
+func TestHandleFeedbackPostOversizedBody(t *testing.T) {
+	h := New(&mockFetcher{})
+	w := httptest.NewRecorder()
+	// Valid JSON with a very large message field (2MB)
+	bigMsg := strings.Repeat("a", 2*1024*1024)
+	body := fmt.Sprintf(`{"type":"error","message":"%s","timestamp":1000}`, bigMsg)
+	r := httptest.NewRequest("POST", "/feedback", strings.NewReader(body))
+	r.RemoteAddr = "1.2.3.4:5678"
+
+	h.handleFeedback(w, r)
+
+	// Should be rejected — either 400 (bad request) or 413 (too large)
+	if w.Code == http.StatusOK || w.Code == http.StatusInternalServerError {
+		t.Errorf("oversized body should be rejected, got status %d", w.Code)
+	}
+}
+
 func TestHandleFeedbackMethodNotAllowed(t *testing.T) {
 	h := New(&mockFetcher{})
 	w := httptest.NewRecorder()
