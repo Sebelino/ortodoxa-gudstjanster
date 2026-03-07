@@ -135,7 +135,11 @@ func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	data, _ := templates.ReadFile("templates/index.html")
+	data, err := templates.ReadFile("templates/index.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write(data)
 }
@@ -442,21 +446,33 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleFavicon(w http.ResponseWriter, r *http.Request) {
-	data, _ := templates.ReadFile("templates/favicon.svg")
+	data, err := templates.ReadFile("templates/favicon.svg")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(data)
 }
 
 func (h *Handler) handleManifest(w http.ResponseWriter, r *http.Request) {
-	data, _ := templates.ReadFile("templates/manifest.json")
+	data, err := templates.ReadFile("templates/manifest.json")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/manifest+json; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(data)
 }
 
 func (h *Handler) handleServiceWorker(w http.ResponseWriter, r *http.Request) {
-	data, _ := templates.ReadFile("templates/sw.js")
+	data, err := templates.ReadFile("templates/sw.js")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Write(data)
@@ -481,7 +497,11 @@ func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		data, _ := templates.ReadFile("templates/feedback.html")
+		data, err := templates.ReadFile("templates/feedback.html")
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(data)
 		return
