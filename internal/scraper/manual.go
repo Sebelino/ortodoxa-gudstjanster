@@ -71,6 +71,9 @@ func (s *ManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			return nil, err
 		}
 
+		if event.IntervalWeeks <= 0 {
+			return nil, fmt.Errorf("event %q has invalid interval_weeks: %d", event.ServiceName, event.IntervalWeeks)
+		}
 		interval := time.Duration(event.IntervalWeeks) * 7 * 24 * time.Hour
 		endDate := startDate.AddDate(0, 0, 26*7)
 
