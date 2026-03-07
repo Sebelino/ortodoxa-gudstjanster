@@ -29,10 +29,11 @@ type ServiceFetcher interface {
 
 // rateLimiter tracks submissions per IP address.
 type rateLimiter struct {
-	mu       sync.Mutex
-	requests map[string][]time.Time
-	limit    int
-	window   time.Duration
+	mu        sync.Mutex
+	requests  map[string][]time.Time
+	limit     int
+	window    time.Duration
+	lastPrune time.Time
 }
 
 func newRateLimiter(limit int, window time.Duration) *rateLimiter {
@@ -50,7 +51,25 @@ func (rl *rateLimiter) allow(ip string) bool {
 	now := time.Now()
 	cutoff := now.Add(-rl.window)
 
-	// Filter out old requests
+	// Periodically prune expired IPs to prevent unbounded map growth
+	if now.Sub(rl.lastPrune) > rl.window {
+		for k, times := range rl.requests {
+			var recent []time.Time
+			for _, t := range times {
+				if t.After(cutoff) {
+					recent = append(recent, t)
+				}
+			}
+			if len(recent) == 0 {
+				delete(rl.requests, k)
+			} else {
+				rl.requests[k] = recent
+			}
+		}
+		rl.lastPrune = now
+	}
+
+	// Filter out old requests for this IP
 	var recent []time.Time
 	for _, t := range rl.requests[ip] {
 		if t.After(cutoff) {

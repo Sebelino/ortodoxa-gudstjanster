@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -230,6 +231,38 @@ func TestRateLimiterWindowExpiry(t *testing.T) {
 
 	if !rl.allow("1.2.3.4") {
 		t.Error("request after window expiry should be allowed")
+	}
+}
+
+func TestRateLimiterPrunesExpiredIPs(t *testing.T) {
+	rl := newRateLimiter(1, 10*time.Millisecond)
+
+	// Generate requests from many IPs
+	for i := 0; i < 100; i++ {
+		rl.allow(fmt.Sprintf("10.0.0.%d", i))
+	}
+
+	// All 100 IPs should be in the map
+	rl.mu.Lock()
+	countBefore := len(rl.requests)
+	rl.mu.Unlock()
+	if countBefore != 100 {
+		t.Errorf("expected 100 IPs tracked, got %d", countBefore)
+	}
+
+	// Wait for window to expire
+	time.Sleep(15 * time.Millisecond)
+
+	// Trigger a request which should prune expired entries
+	rl.allow("trigger")
+
+	rl.mu.Lock()
+	countAfter := len(rl.requests)
+	rl.mu.Unlock()
+
+	// After pruning, only "trigger" should remain (or very few)
+	if countAfter > 10 {
+		t.Errorf("expected expired IPs to be pruned, but %d IPs still tracked", countAfter)
 	}
 }
 
