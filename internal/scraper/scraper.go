@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -84,36 +83,6 @@ func NewRegistry() *Registry {
 // Register adds a scraper to the registry.
 func (r *Registry) Register(s Scraper) {
 	r.scrapers = append(r.scrapers, s)
-}
-
-// FetchAll runs all scrapers concurrently and returns combined results.
-// Errors from individual scrapers are logged but don't prevent other scrapers from running.
-func (r *Registry) FetchAll(ctx context.Context) []model.ChurchService {
-	var (
-		wg       sync.WaitGroup
-		mu       sync.Mutex
-		services []model.ChurchService
-	)
-
-	for _, s := range r.scrapers {
-		wg.Add(1)
-		go func(scraper Scraper) {
-			defer wg.Done()
-
-			result, err := scraper.Fetch(ctx)
-			if err != nil {
-				// Log but don't fail - partial results are acceptable
-				return
-			}
-
-			mu.Lock()
-			services = append(services, result...)
-			mu.Unlock()
-		}(s)
-	}
-
-	wg.Wait()
-	return services
 }
 
 // Scrapers returns the list of registered scrapers.

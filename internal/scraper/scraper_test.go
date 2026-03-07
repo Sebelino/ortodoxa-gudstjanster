@@ -199,25 +199,6 @@ func TestRegistry(t *testing.T) {
 	}
 }
 
-func TestRegistryFetchAll(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	registry := NewRegistry()
-	registry.Register(NewFinskaScraper(""))
-
-	services := registry.FetchAll(ctx)
-
-	if len(services) == 0 {
-		t.Error("FetchAll returned no services")
-	}
-
-	t.Logf("FetchAll returned %d services", len(services))
-}
-
 func assertHasCurrentMonthEvents(t *testing.T, services []model.ChurchService) {
 	t.Helper()
 	currentMonth := time.Now().Format("2006-01")
