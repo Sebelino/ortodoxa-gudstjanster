@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
 	"ortodoxa-gudstjanster/internal/model"
 )
+
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // fetchURL fetches the content of a URL and returns the response body as bytes.
 func fetchURL(ctx context.Context, url string) ([]byte, error) {
@@ -18,7 +21,7 @@ func fetchURL(ctx context.Context, url string) ([]byte, error) {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching URL: %w", err)
 	}
@@ -43,7 +46,7 @@ func fetchDocument(ctx context.Context, url string) (*goquery.Document, error) {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching URL: %w", err)
 	}
