@@ -202,44 +202,6 @@ func (c *Client) CountFutureServicesForScraper(ctx context.Context, scraperName 
 	return count, nil
 }
 
-// DeletePastServices deletes all services with date before today.
-func (c *Client) DeletePastServices(ctx context.Context) (int, error) {
-	today := time.Now().Format("2006-01-02")
-	query := c.client.Collection(c.collection).Where("date", "<", today)
-	total := 0
-
-	for {
-		iter := query.Limit(batchSize).Documents(ctx)
-		batch := c.client.Batch()
-		n := 0
-
-		for {
-			doc, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				return total, fmt.Errorf("iterating past documents: %w", err)
-			}
-			batch.Delete(doc.Ref)
-			n++
-		}
-
-		if n == 0 {
-			return total, nil
-		}
-
-		if _, err := batch.Commit(ctx); err != nil {
-			return total, fmt.Errorf("committing delete batch: %w", err)
-		}
-		total += n
-
-		if n < batchSize {
-			return total, nil
-		}
-	}
-}
-
 // GetLatestBatchID returns the most recent batch_id from the collection.
 func (c *Client) GetLatestBatchID(ctx context.Context) (string, error) {
 	iter := c.client.Collection(c.collection).
