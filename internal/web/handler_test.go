@@ -46,6 +46,10 @@ func TestParseStartTime(t *testing.T) {
 		{"08:30", "083000"},
 		{"", ""},
 		{"TBD", ""},
+		// Invalid values should be rejected
+		{"99:99", ""},
+		{"25:00", ""},
+		{"12:60", ""},
 	}
 
 	for _, tt := range tests {

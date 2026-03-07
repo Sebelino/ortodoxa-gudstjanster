@@ -335,7 +335,9 @@ func parseStartTime(timeStr string) string {
 			m := 0
 			fmt.Sscanf(hour, "%d", &h)
 			fmt.Sscanf(minute, "%d", &m)
-			return fmt.Sprintf("%02d%02d00", h, m)
+			if h >= 0 && h <= 23 && m >= 0 && m <= 59 {
+				return fmt.Sprintf("%02d%02d00", h, m)
+			}
 		}
 	}
 
@@ -351,7 +353,13 @@ func parseStartTime(timeStr string) string {
 			}
 		}
 		if isDigits {
-			return candidate + "00"
+			h := 0
+			m := 0
+			fmt.Sscanf(candidate[:2], "%d", &h)
+			fmt.Sscanf(candidate[2:], "%d", &m)
+			if h >= 0 && h <= 23 && m >= 0 && m <= 59 {
+				return candidate + "00"
+			}
 		}
 	}
 
