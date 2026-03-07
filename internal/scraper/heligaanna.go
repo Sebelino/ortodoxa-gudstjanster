@@ -64,8 +64,14 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 			}
 
 			dayOfWeek := capitalize(dateMatch[1])
-			day, _ := strconv.Atoi(dateMatch[2])
-			month, _ := strconv.Atoi(dateMatch[3])
+			day, err := strconv.Atoi(dateMatch[2])
+			if err != nil || day < 1 || day > 31 {
+				return
+			}
+			month, err := strconv.Atoi(dateMatch[3])
+			if err != nil || month < 1 || month > 12 {
+				return
+			}
 
 			// Determine year (if month is before current month, it's next year)
 			year := currentYear
