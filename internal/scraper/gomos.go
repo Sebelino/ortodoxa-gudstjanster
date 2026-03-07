@@ -404,10 +404,10 @@ func (s *GomosScraper) computeChecksum(data []byte) string {
 
 func (s *GomosScraper) imageExtension(url string) string {
 	lower := strings.ToLower(url)
-	if strings.Contains(lower, ".png") {
+	if strings.HasSuffix(lower, ".png") {
 		return ".png"
 	}
-	if strings.Contains(lower, ".jpeg") {
+	if strings.HasSuffix(lower, ".jpeg") {
 		return ".jpeg"
 	}
 	return ".jpg"
