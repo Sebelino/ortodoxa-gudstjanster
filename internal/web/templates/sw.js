@@ -1,5 +1,5 @@
-const CACHE_NAME = 'ortodoxa-v1';
-const SHELL = ['/favicon.svg', '/manifest.json'];
+const CACHE_NAME = 'ortodoxa-v2';
+const SHELL = ['/', '/favicon.svg', '/manifest.json'];
 
 self.addEventListener('install', event => {
     event.waitUntil(
@@ -20,11 +20,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
-    // Network-first for API and dynamic content
-    if (url.pathname === '/services' || url.pathname === '/calendar.ics' || url.pathname === '/last-updated') {
-        event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-        return;
-    }
+    // Only handle GET requests
+    if (event.request.method !== 'GET') return;
 
     // Cache-first for static assets
     if (url.pathname === '/favicon.svg' || url.pathname === '/manifest.json') {
@@ -34,8 +31,20 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Network-first for everything else (HTML)
-    event.respondWith(
-        fetch(event.request).catch(() => caches.match(event.request))
-    );
+    // Network-first with cache update for API and dynamic content
+    if (url.pathname === '/services' || url.pathname === '/last-updated' || url.pathname === '/') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    // Default: network only
+    event.respondWith(fetch(event.request));
 });

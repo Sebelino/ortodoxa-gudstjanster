@@ -6,6 +6,7 @@
     <title>Ortodoxa Gudstjänster i Sverige – Kommande tider</title>
     <meta name="description" content="Samlade gudstjänsttider för ortodoxa kyrkor i Sverige. Se kommande gudstjänster från grekisk-ortodoxa, rysk-ortodoxa, serbisk-ortodoxa och finska ortodoxa församlingar.">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/favicon.svg">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1a365d">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -311,6 +312,20 @@
             opacity: 1;
         }
 
+        .offline-banner {
+            display: none;
+            background: #f6ad55;
+            color: #744210;
+            text-align: center;
+            padding: 0.4rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .offline-banner.visible {
+            display: block;
+        }
+
         @media (max-width: 500px) {
             .service-row td {
                 padding: 0.4rem 0.5rem;
@@ -333,6 +348,7 @@
     </script>
 </head>
 <body>
+    <div id="offline-banner" class="offline-banner">Du är offline – visar sparade data</div>
     <header>
         <h1>Ortodoxa Gudstjänster</h1>
         <div id="last-updated" class="last-updated"></div>
@@ -706,6 +722,13 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').catch(() => {});
         }
+
+        function updateOnlineStatus() {
+            document.getElementById('offline-banner').classList.toggle('visible', !navigator.onLine);
+        }
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
     </script>
 </body>
 </html>
