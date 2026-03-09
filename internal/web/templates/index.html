@@ -611,7 +611,7 @@
 
         function formatTime(service) {
             if (service.start_time) {
-                return new Date(service.start_time).toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit'});
+                return new Date(service.start_time).toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm'});
             }
             return service.time ? escapeHtml(service.time) : '';
         }
@@ -640,9 +640,14 @@
                 details += `<div class="detail-item"><span class="detail-label">Församling:</span> ${escapeHtml(service.parish)}</div>`;
             }
             if (service.start_time) {
-                const fmt = t => new Date(t).toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit'});
+                const opts = {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm'};
+                const fmt = t => new Date(t).toLocaleTimeString('sv-SE', opts);
                 const timeStr = service.end_time ? fmt(service.start_time) + ' - ' + fmt(service.end_time) : fmt(service.start_time);
-                const tid = timeStr + ', ' + service.date;
+                const d = new Date(service.start_time);
+                const dayName = d.toLocaleDateString('sv-SE', {weekday: 'long', timeZone: 'Europe/Stockholm'});
+                const dayCapitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                const tz = service.start_time.includes('+02:00') ? 'CEST' : 'CET';
+                const tid = dayCapitalized + ' ' + timeStr + ', ' + service.date + ' ' + tz;
                 details += `<div class="detail-item"><span class="detail-label">Tid:</span> ${escapeHtml(tid)}</div>`;
             }
             if (service.title) {
