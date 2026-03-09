@@ -182,8 +182,8 @@ func main() {
 	// Title generation: collect unique service names, look up cache, call AI for uncached
 	titleMap := generateTitles(ctx, accepted, visionClient, gcsStore)
 
-	// Time parsing: collect unique (date, time) pairs, look up cache, call AI for uncached
-	timeMap := parseTimes(ctx, accepted, visionClient, gcsStore)
+	// Time parsing: deterministic parsing with correct DST handling
+	timeMap := parseTimes(accepted)
 
 	// Event language parsing: detect explicit language mentions in service names
 	eventLangMap := parseEventLanguages(accepted)
@@ -296,24 +296,17 @@ func generateTitles(ctx context.Context, accepted []acceptedResult, visionClient
 	return titleMap
 }
 
-// timeCacheKey returns the GCS cache key for a (date, time) pair.
-func timeCacheKey(date, timeStr string) string {
-	hash := sha256.Sum256([]byte(date + "|" + timeStr))
-	return "times/v1/" + hex.EncodeToString(hash[:])
-}
+// parseTimes deterministically parses (date, time) pairs into Stockholm-timezone
+// timestamps. Handles formats like "18:00", "18:00 - 20:00", "14:30 - ca 16:00".
+// DST is handled correctly via time.LoadLocation.
+func parseTimes(accepted []acceptedResult) map[string]vision.ParsedTime {
+	stockholm, err := time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		panic(fmt.Sprintf("failed to load Europe/Stockholm timezone: %v", err))
+	}
 
-// cachedTime is the JSON structure stored in GCS for cached time parsing results.
-type cachedTime struct {
-	Start string  `json:"start"`
-	End   *string `json:"end"`
-}
-
-// parseTimes collects unique (date, time) pairs from accepted results, checks the
-// GCS cache, calls the AI for uncached pairs, and returns a complete map. Non-fatal.
-func parseTimes(ctx context.Context, accepted []acceptedResult, visionClient *vision.Client, gcsStore *store.GCSStore) map[string]vision.ParsedTime {
-	// Collect unique (date, time) pairs
 	type dateTime struct {
-		date, time string
+		date, timeStr string
 	}
 	seen := make(map[string]struct{})
 	var pairs []dateTime
@@ -325,74 +318,72 @@ func parseTimes(ctx context.Context, accepted []acceptedResult, visionClient *vi
 			key := svc.Date + "|" + *svc.Time
 			if _, ok := seen[key]; !ok {
 				seen[key] = struct{}{}
-				pairs = append(pairs, dateTime{date: svc.Date, time: *svc.Time})
+				pairs = append(pairs, dateTime{date: svc.Date, timeStr: *svc.Time})
 			}
 		}
 	}
 
 	timeMap := make(map[string]vision.ParsedTime)
-	var uncached []vision.TimeEntry
-
-	// Check cache for each pair
 	for _, pair := range pairs {
-		key := timeCacheKey(pair.date, pair.time)
-		var ct cachedTime
-		if gcsStore.GetJSON(key, &ct) {
-			start, err := time.Parse(time.RFC3339, ct.Start)
-			if err != nil {
-				uncached = append(uncached, vision.TimeEntry{Date: pair.date, Time: pair.time})
-				continue
-			}
-			pt := vision.ParsedTime{Start: start}
-			if ct.End != nil {
-				end, err := time.Parse(time.RFC3339, *ct.End)
-				if err == nil {
-					pt.End = &end
-				}
-			}
-			mapKey := pair.date + "|" + pair.time
-			timeMap[mapKey] = pt
-		} else {
-			uncached = append(uncached, vision.TimeEntry{Date: pair.date, Time: pair.time})
-		}
-	}
-
-	log.Printf("Times: %d cached, %d uncached", len(timeMap), len(uncached))
-
-	if len(uncached) == 0 {
-		return timeMap
-	}
-
-	// Call AI for uncached pairs
-	parsed, err := visionClient.ParseTimes(ctx, uncached)
-	if err != nil {
-		log.Printf("WARNING: Time parsing failed (proceeding without timestamps): %v", err)
-		return timeMap
-	}
-
-	// Cache and merge results
-	for _, entry := range uncached {
-		mapKey := entry.Date + "|" + entry.Time
-		pt, ok := parsed[mapKey]
-		if !ok {
+		pt, err := parseTimeString(pair.date, pair.timeStr, stockholm)
+		if err != nil {
+			log.Printf("WARNING: skipping unparseable time %q for %s: %v", pair.timeStr, pair.date, err)
 			continue
 		}
-		timeMap[mapKey] = pt
-
-		// Cache result
-		ct := cachedTime{Start: pt.Start.Format(time.RFC3339)}
-		if pt.End != nil {
-			endStr := pt.End.Format(time.RFC3339)
-			ct.End = &endStr
-		}
-		cacheKey := timeCacheKey(entry.Date, entry.Time)
-		if err := gcsStore.SetJSON(cacheKey, ct); err != nil {
-			log.Printf("WARNING: Failed to cache time for %s %s: %v", entry.Date, entry.Time, err)
-		}
+		key := pair.date + "|" + pair.timeStr
+		timeMap[key] = pt
 	}
 
-	log.Printf("Parsed %d time entries", len(parsed))
+	log.Printf("Parsed %d time entries", len(timeMap))
 	return timeMap
+}
+
+// parseTimeString parses a time string like "18:00" or "18:00 - ca 20:00"
+// combined with a date string into a ParsedTime in the given timezone.
+func parseTimeString(dateStr, timeStr string, loc *time.Location) (vision.ParsedTime, error) {
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return vision.ParsedTime{}, fmt.Errorf("invalid date %q: %w", dateStr, err)
+	}
+
+	makeTime := func(hhmm string) (time.Time, error) {
+		// Strip common prefixes
+		s := strings.TrimSpace(hhmm)
+		s = strings.TrimPrefix(s, "ca ")
+		s = strings.TrimPrefix(s, "ca. ")
+		s = strings.TrimPrefix(s, "kl ")
+		s = strings.TrimPrefix(s, "kl. ")
+		s = strings.TrimSpace(s)
+
+		var h, m int
+		if _, err := fmt.Sscanf(s, "%d:%d", &h, &m); err != nil {
+			return time.Time{}, fmt.Errorf("invalid time %q: %w", hhmm, err)
+		}
+		return time.Date(date.Year(), date.Month(), date.Day(), h, m, 0, 0, loc), nil
+	}
+
+	// Check for range: "HH:MM - HH:MM" or "HH:MM - ca HH:MM"
+	if parts := strings.SplitN(timeStr, " - ", 2); len(parts) == 2 {
+		start, err := makeTime(parts[0])
+		if err != nil {
+			return vision.ParsedTime{}, err
+		}
+		end, err := makeTime(parts[1])
+		if err != nil {
+			return vision.ParsedTime{}, err
+		}
+		// Handle midnight crossing
+		if end.Before(start) {
+			end = end.AddDate(0, 0, 1)
+		}
+		return vision.ParsedTime{Start: start, End: &end}, nil
+	}
+
+	start, err := makeTime(timeStr)
+	if err != nil {
+		return vision.ParsedTime{}, err
+	}
+	return vision.ParsedTime{Start: start}, nil
 }
 
 // eventLangMapKey returns a deduplication key for an event's relevant fields.
