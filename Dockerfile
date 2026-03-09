@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o ingest ./cmd/ingest
 
 FROM alpine:3.21
 
-RUN apk --no-cache add ca-certificates chromium
+RUN apk --no-cache add ca-certificates chromium tzdata
 
 WORKDIR /app
 COPY --from=builder /app/server .

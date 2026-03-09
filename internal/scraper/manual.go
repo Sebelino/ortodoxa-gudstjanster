@@ -134,7 +134,7 @@ func init() {
 	var err error
 	stockholm, err = time.LoadLocation("Europe/Stockholm")
 	if err != nil {
-		stockholm = time.UTC
+		panic(fmt.Sprintf("failed to load Europe/Stockholm timezone: %v", err))
 	}
 }
 

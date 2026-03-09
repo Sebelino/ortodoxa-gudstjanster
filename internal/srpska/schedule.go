@@ -153,7 +153,10 @@ type CalendarEvent struct {
 func GenerateEvents(schedule *RecurringSchedule, weeks int) []CalendarEvent {
 	var events []CalendarEvent
 
-	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	stockholm, err := time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		panic(fmt.Sprintf("failed to load Europe/Stockholm timezone: %v", err))
+	}
 	now := time.Now().In(stockholm)
 	// Start from today
 	current := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, stockholm)
