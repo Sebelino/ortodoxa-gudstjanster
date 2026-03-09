@@ -28,7 +28,8 @@ type RecurringEvent struct {
 	ParishLanguage string `json:"parish_language,omitempty"`
 	EventLanguage  string `json:"event_language,omitempty"`
 	Notes          string `json:"notes,omitempty"`
-	StartDate      string `json:"start_date"` // "2006-01-02"
+	StartDate      string `json:"start_date"`            // "2006-01-02"
+	EndDate        string `json:"end_date,omitempty"`    // "2006-01-02" (optional, defaults to start_date + 26 weeks)
 	IntervalWeeks  int    `json:"interval_weeks"`
 }
 
@@ -77,6 +78,12 @@ func (s *ManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 		}
 		interval := time.Duration(event.IntervalWeeks) * 7 * 24 * time.Hour
 		endDate := startDate.AddDate(0, 0, 26*7)
+		if event.EndDate != "" {
+			endDate, err = time.Parse("2006-01-02", event.EndDate)
+			if err != nil {
+				return nil, fmt.Errorf("event %q has invalid end_date: %w", event.ServiceName, err)
+			}
+		}
 
 		for date := startDate; !date.After(endDate); date = date.Add(interval) {
 			services = append(services, buildManualService(event, date))
