@@ -781,8 +781,8 @@ func (c *Client) ExtractCampEvents(ctx context.Context, text string) ([]CampEven
 Today is %s.
 
 Generate the following events:
-1. For the camp itself: create ONE event per day the camp runs (e.g., a Monday-Thursday camp = 4 events). Each day's service_name should be "Ortodoxt sommarlager" and notes should include the location and any relevant info (e.g., "Dag 1 av 4. Sjöbonäs lägergård, Kinnarumma").
-2. For the registration deadline: create ONE event on the deadline date with service_name "Sista anmälningsdag: Ortodoxt sommarlager" and notes with registration details (price, link, etc).
+1. For the camp itself: create ONE event per day the camp runs (e.g., a Monday-Thursday camp = 4 events). Each day's service_name should be "Ortodoxt sommarläger" and notes should include the location and any relevant info (e.g., "Dag 1 av 4. Sjöbonäs lägergård, Kinnarumma").
+2. For the registration deadline: create ONE event on the deadline date with service_name "Sista anmälningsdag: Ortodoxt sommarläger" and notes with registration details (price, link, etc).
 
 Return a JSON array with these fields:
 - date: YYYY-MM-DD format

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	sommarlagerSourceName = "Ortodoxt sommarlager"
+	sommarlagerSourceName = "Ortodoxt sommarläger"
 	sommarlagerURL        = "https://ortodoxtsommarlager.se"
 )
 

@@ -44,8 +44,8 @@ func TestFetchPageText(t *testing.T) {
 func TestSommarlagerEventsToServices(t *testing.T) {
 	s := &SommarlagerScraper{}
 	events := []vision.CampEvent{
-		{Date: "2026-07-13", DayOfWeek: "Måndag", ServiceName: "Ortodoxt sommarlager", Notes: "Dag 1 av 4"},
-		{Date: "2026-06-10", DayOfWeek: "Onsdag", ServiceName: "Sista anmälningsdag: Ortodoxt sommarlager"},
+		{Date: "2026-07-13", DayOfWeek: "Måndag", ServiceName: "Ortodoxt sommarläger", Notes: "Dag 1 av 4"},
+		{Date: "2026-06-10", DayOfWeek: "Onsdag", ServiceName: "Sista anmälningsdag: Ortodoxt sommarläger"},
 	}
 
 	services := s.eventsToServices(events)
