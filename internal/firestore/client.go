@@ -283,14 +283,16 @@ func serviceToMap(svc model.ChurchService, scraperName string, batchID string) m
 func mapToService(m map[string]interface{}) (model.ChurchService, error) {
 	svc := model.ChurchService{}
 
+	parishSet := false
 	if v, ok := m["parish"].(string); ok {
 		svc.Parish = v
+		parishSet = true
 	}
 	if v, ok := m["source"].(string); ok {
 		svc.Source = v
 	}
-	// Fall back to source if parish is absent (backward compat with existing docs)
-	if svc.Parish == "" {
+	// Fall back to source only if parish field was absent (backward compat with legacy docs)
+	if !parishSet {
 		svc.Parish = svc.Source
 	}
 	if v, ok := m["source_url"].(string); ok {

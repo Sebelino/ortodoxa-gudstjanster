@@ -141,6 +141,24 @@ func TestMapToServiceParishFallback(t *testing.T) {
 	}
 }
 
+func TestMapToServiceEmptyParishStaysEmpty(t *testing.T) {
+	m := map[string]interface{}{
+		"parish":       "",
+		"source":       "Some Source",
+		"date":         "2026-03-08",
+		"service_name": "Event",
+	}
+
+	svc, err := mapToService(m)
+	if err != nil {
+		t.Fatalf("mapToService: %v", err)
+	}
+
+	if svc.Parish != "" {
+		t.Errorf("Parish = %q, want empty (should not fall back to Source)", svc.Parish)
+	}
+}
+
 func TestMapToServiceLanguageFallback(t *testing.T) {
 	m := map[string]interface{}{
 		"source":       "Test",
