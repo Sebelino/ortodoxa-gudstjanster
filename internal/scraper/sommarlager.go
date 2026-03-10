@@ -155,7 +155,6 @@ func (s *SommarlagerScraper) eventsToServices(events []vision.CampEvent) []model
 		}
 
 		services = append(services, model.ChurchService{
-			Parish:    sommarlagerSourceName,
 			Source:    sommarlagerSourceName,
 			SourceURL: sommarlagerURL,
 			Date:      event.Date,

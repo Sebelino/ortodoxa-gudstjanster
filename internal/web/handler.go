@@ -182,7 +182,7 @@ func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
 		}
 		var filtered []model.ChurchService
 		for _, s := range services {
-			if !excluded[s.Parish] {
+			if !excluded[parishGroup(s)] {
 				filtered = append(filtered, s)
 			}
 		}
@@ -278,7 +278,7 @@ func generateICS(services []model.ChurchService) string {
 
 		// Description with additional details
 		var desc []string
-		desc = append(desc, fmt.Sprintf("Församling: %s", s.Parish))
+		desc = append(desc, fmt.Sprintf("Församling: %s", parishGroup(s)))
 		desc = append(desc, fmt.Sprintf("Beskrivning: %s", s.ServiceName))
 		if s.EventLanguage != nil && *s.EventLanguage != "" {
 			desc = append(desc, fmt.Sprintf("Språk: %s", *s.EventLanguage))
@@ -300,7 +300,7 @@ func generateICS(services []model.ChurchService) string {
 		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", description))
 
 		// Categories
-		sb.WriteString(fmt.Sprintf("CATEGORIES:%s\r\n", escapeICS(s.Parish)))
+		sb.WriteString(fmt.Sprintf("CATEGORIES:%s\r\n", escapeICS(parishGroup(s))))
 
 		// Timestamp
 		now := time.Now().UTC().Format("20060102T150405Z")
@@ -311,6 +311,14 @@ func generateICS(services []model.ChurchService) string {
 
 	sb.WriteString("END:VCALENDAR\r\n")
 	return sb.String()
+}
+
+// parishGroup returns the parish name, or "Övrigt" for services without a parish.
+func parishGroup(s model.ChurchService) string {
+	if s.Parish == "" {
+		return "Övrigt"
+	}
+	return s.Parish
 }
 
 func escapeICS(s string) string {

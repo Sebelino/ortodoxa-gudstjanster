@@ -57,8 +57,8 @@ func TestSommarlagerEventsToServices(t *testing.T) {
 	if services[0].Date != "2026-07-13" {
 		t.Errorf("date = %q, want 2026-07-13", services[0].Date)
 	}
-	if services[0].Parish != sommarlagerSourceName {
-		t.Errorf("parish = %q, want %q", services[0].Parish, sommarlagerSourceName)
+	if services[0].Parish != "" {
+		t.Errorf("parish = %q, want empty", services[0].Parish)
 	}
 	if services[0].SourceURL != sommarlagerURL {
 		t.Errorf("source_url = %q, want %q", services[0].SourceURL, sommarlagerURL)

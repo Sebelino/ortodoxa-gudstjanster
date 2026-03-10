@@ -437,8 +437,12 @@
             localStorage.setItem('excludedLanguages', JSON.stringify([...excludedLanguages]));
         }
 
+        function getParishGroup(s) {
+            return s.parish || 'Övrigt';
+        }
+
         function buildFilterPanel() {
-            const parishes = [...new Set(allServices.map(s => s.parish))].sort();
+            const parishes = [...new Set(allServices.map(s => getParishGroup(s)))].sort();
             const filterOptions = document.getElementById('filter-options');
             const filterPanel = document.getElementById('filter-panel');
 
@@ -542,7 +546,7 @@
             const today = new Date().toISOString().slice(0, 10);
             const filteredServices = allServices.filter(s => {
                 if (s.date < today) return false;
-                if (excludedSources.has(s.parish)) return false;
+                if (excludedSources.has(getParishGroup(s))) return false;
                 if (excludedLanguages.has(getLangCategory(s))) return false;
                 return true;
             });
@@ -584,7 +588,7 @@
                                         <tr class="service-row" onclick="toggleDetails(${id})">
                                             <td class="col-time">${formatTime(service)}</td>
                                             <td class="col-name">${escapeHtml(service.title || service.service_name)}</td>
-                                            <td class="col-source">${escapeHtml(getShortParish(service.parish))}</td>
+                                            <td class="col-source">${escapeHtml(getShortParish(getParishGroup(service)))}</td>
                                         </tr>
                                         <tr class="service-details" id="details-${id}">
                                             <td colspan="3">${details}</td>
