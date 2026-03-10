@@ -764,3 +764,104 @@ Return ONLY the JSON array, no other text.`, string(entriesJSON))
 	return parsed, nil
 }
 
+// CampEvent represents a single event extracted from a camp/event website.
+type CampEvent struct {
+	Date        string `json:"date"`         // YYYY-MM-DD
+	DayOfWeek   string `json:"day_of_week"`  // Swedish day name
+	ServiceName string `json:"service_name"` // Event description in Swedish
+	Notes       string `json:"notes,omitempty"`
+}
+
+// ExtractCampEvents sends webpage text to OpenAI and extracts camp/event information.
+// Returns individual day events for multi-day camps and reminder events for deadlines.
+func (c *Client) ExtractCampEvents(ctx context.Context, text string) ([]CampEvent, error) {
+	today := time.Now().Format("January 2, 2006")
+	prompt := fmt.Sprintf(`Extract event information from this webpage text about an Orthodox summer camp.
+
+Today is %s.
+
+Generate the following events:
+1. For the camp itself: create ONE event per day the camp runs (e.g., a Monday-Thursday camp = 4 events). Each day's service_name should be "Ortodoxt sommarlager" and notes should include the location and any relevant info (e.g., "Dag 1 av 4. Sjöbonäs lägergård, Kinnarumma").
+2. For the registration deadline: create ONE event on the deadline date with service_name "Sista anmälningsdag: Ortodoxt sommarlager" and notes with registration details (price, link, etc).
+
+Return a JSON array with these fields:
+- date: YYYY-MM-DD format
+- day_of_week: Swedish day name (e.g., "Måndag", "Tisdag")
+- service_name: event description in Swedish
+- notes: additional details
+
+Return ONLY the JSON array, no other text.
+
+Webpage text:
+`, today) + text
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 4096,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.doRequest(req, "ExtractCampEvents", "gpt-4o-mini")
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var events []CampEvent
+	if err := json.Unmarshal([]byte(content), &events); err != nil {
+		return nil, fmt.Errorf("parsing camp events: %w (content: %s)", err, content)
+	}
+
+	return events, nil
+}
+
