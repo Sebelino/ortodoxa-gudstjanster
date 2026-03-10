@@ -3,7 +3,10 @@ package scraper
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/PuerkitoBio/goquery"
 
 	"ortodoxa-gudstjanster/internal/vision"
 )
@@ -67,6 +70,53 @@ func TestSommarlagerEventsToServices(t *testing.T) {
 	// Deadline event — no notes
 	if services[1].Notes != nil {
 		t.Errorf("deadline notes = %v, want nil", services[1].Notes)
+	}
+}
+
+func TestFindRegistrationLink(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{
+			name: "finds Anmälan link",
+			html: `<body><a href="/?page_id=60">Anmälan</a></body>`,
+			want: sommarlagerURL + "/?page_id=60",
+		},
+		{
+			name: "finds anmälning link",
+			html: `<body><a href="/register">Anmälning här</a></body>`,
+			want: sommarlagerURL + "/register",
+		},
+		{
+			name: "finds registrera link",
+			html: `<body><a href="https://example.com/reg">Registrera dig</a></body>`,
+			want: "https://example.com/reg",
+		},
+		{
+			name: "ignores non-registration links",
+			html: `<body><a href="/about">Om oss</a><a href="/contact">Kontakt</a></body>`,
+			want: "",
+		},
+		{
+			name: "no links at all",
+			html: `<body><p>No links here</p></body>`,
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(tt.html))
+			if err != nil {
+				t.Fatalf("parse html: %v", err)
+			}
+			got := findRegistrationLink(doc)
+			if got != tt.want {
+				t.Errorf("findRegistrationLink() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

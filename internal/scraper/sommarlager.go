@@ -18,7 +18,6 @@ import (
 const (
 	sommarlagerSourceName = "Ortodoxt sommarlager"
 	sommarlagerURL        = "https://ortodoxtsommarlager.se"
-	sommarlagerRegURL     = "https://ortodoxtsommarlager.se/?page_id=60"
 )
 
 // SommarlagerScraper scrapes the Orthodox summer camp website.
@@ -40,16 +39,28 @@ func (s *SommarlagerScraper) Name() string {
 }
 
 func (s *SommarlagerScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
-	// Fetch main page and registration page
-	mainText, err := fetchPageText(ctx, sommarlagerURL)
+	// Fetch main page
+	mainDoc, err := fetchDocument(ctx, sommarlagerURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching main page: %w", err)
 	}
 
-	regText, err := fetchPageText(ctx, sommarlagerRegURL)
-	if err != nil {
-		log.Printf("sommarlager: failed to fetch registration page: %v", err)
-		regText = ""
+	mainDoc.Find("script, style, noscript").Remove()
+	mainText := strings.TrimSpace(mainDoc.Find("body").Text())
+
+	// Discover registration page link from main page
+	regText := ""
+	regURL := findRegistrationLink(mainDoc)
+	if regURL != "" {
+		log.Printf("sommarlager: found registration link: %s", regURL)
+		text, err := fetchPageText(ctx, regURL)
+		if err != nil {
+			log.Printf("sommarlager: failed to fetch registration page: %v", err)
+		} else {
+			regText = text
+		}
+	} else {
+		log.Printf("sommarlager: no registration link found on main page")
 	}
 
 	combined := mainText
@@ -103,6 +114,34 @@ func fetchPageText(ctx context.Context, url string) (string, error) {
 	})
 
 	return strings.Join(parts, "\n"), nil
+}
+
+// findRegistrationLink searches the page for a link whose text suggests
+// registration (e.g., "Anmälan", "Anmälning", "Registrera").
+func findRegistrationLink(doc *goquery.Document) string {
+	keywords := []string{"anmäl", "registrer"}
+	var found string
+	doc.Find("a[href]").Each(func(_ int, a *goquery.Selection) {
+		if found != "" {
+			return
+		}
+		text := strings.ToLower(strings.TrimSpace(a.Text()))
+		href, exists := a.Attr("href")
+		if !exists || href == "" {
+			return
+		}
+		for _, kw := range keywords {
+			if strings.Contains(text, kw) {
+				// Make absolute if relative
+				if strings.HasPrefix(href, "/") || strings.HasPrefix(href, "?") {
+					href = sommarlagerURL + href
+				}
+				found = href
+				return
+			}
+		}
+	})
+	return found
 }
 
 func (s *SommarlagerScraper) eventsToServices(events []vision.CampEvent) []model.ChurchService {
