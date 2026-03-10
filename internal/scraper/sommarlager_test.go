@@ -44,7 +44,7 @@ func TestFetchPageText(t *testing.T) {
 func TestSommarlagerEventsToServices(t *testing.T) {
 	s := &SommarlagerScraper{}
 	events := []vision.CampEvent{
-		{Date: "2026-07-13", DayOfWeek: "Måndag", ServiceName: "Ortodoxt sommarläger", Notes: "Dag 1 av 4"},
+		{Date: "2026-07-13", EndDate: "2026-07-16", DayOfWeek: "Måndag", ServiceName: "Ortodoxt sommarläger", Notes: "Sjöbonäs lägergård, Kinnarumma"},
 		{Date: "2026-06-10", DayOfWeek: "Onsdag", ServiceName: "Sista anmälningsdag: Ortodoxt sommarläger"},
 	}
 
@@ -53,7 +53,7 @@ func TestSommarlagerEventsToServices(t *testing.T) {
 		t.Fatalf("expected 2 services, got %d", len(services))
 	}
 
-	// Camp event
+	// Camp event — multi-day
 	if services[0].Date != "2026-07-13" {
 		t.Errorf("date = %q, want 2026-07-13", services[0].Date)
 	}
@@ -63,13 +63,25 @@ func TestSommarlagerEventsToServices(t *testing.T) {
 	if services[0].SourceURL != sommarlagerURL {
 		t.Errorf("source_url = %q, want %q", services[0].SourceURL, sommarlagerURL)
 	}
-	if services[0].Notes == nil || *services[0].Notes != "Dag 1 av 4" {
-		t.Errorf("notes = %v, want 'Dag 1 av 4'", services[0].Notes)
+	if services[0].StartTime == nil {
+		t.Fatal("camp event StartTime should be set")
+	}
+	if services[0].EndTime == nil {
+		t.Fatal("camp event EndTime should be set")
+	}
+	if services[0].StartTime.Day() != 13 || services[0].StartTime.Hour() != 0 {
+		t.Errorf("StartTime = %v, want July 13 00:00", services[0].StartTime)
+	}
+	if services[0].EndTime.Day() != 16 || services[0].EndTime.Hour() != 23 || services[0].EndTime.Minute() != 59 {
+		t.Errorf("EndTime = %v, want July 16 23:59", services[0].EndTime)
 	}
 
-	// Deadline event — no notes
-	if services[1].Notes != nil {
-		t.Errorf("deadline notes = %v, want nil", services[1].Notes)
+	// Deadline event — single day, no start/end time
+	if services[1].StartTime != nil {
+		t.Errorf("deadline StartTime should be nil, got %v", services[1].StartTime)
+	}
+	if services[1].EndTime != nil {
+		t.Errorf("deadline EndTime should be nil, got %v", services[1].EndTime)
 	}
 }
 

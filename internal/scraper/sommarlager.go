@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -154,14 +155,29 @@ func (s *SommarlagerScraper) eventsToServices(events []vision.CampEvent) []model
 			notesPtr = &notes
 		}
 
-		services = append(services, model.ChurchService{
-			Source:    sommarlagerSourceName,
-			SourceURL: sommarlagerURL,
-			Date:      event.Date,
-			DayOfWeek: event.DayOfWeek,
+		svc := model.ChurchService{
+			Source:      sommarlagerSourceName,
+			SourceURL:   sommarlagerURL,
+			Date:        event.Date,
+			DayOfWeek:   event.DayOfWeek,
 			ServiceName: event.ServiceName,
-			Notes:     notesPtr,
-		})
+			Notes:       notesPtr,
+		}
+
+		// For multi-day events, set start time to 00:00 on start date
+		// and end time to 23:59 on end date
+		if event.EndDate != "" {
+			startDate, err1 := time.Parse("2006-01-02", event.Date)
+			endDate, err2 := time.Parse("2006-01-02", event.EndDate)
+			if err1 == nil && err2 == nil {
+				start := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, stockholm)
+				end := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 0, 0, stockholm)
+				svc.StartTime = &start
+				svc.EndTime = &end
+			}
+		}
+
+		services = append(services, svc)
 	}
 
 	return services

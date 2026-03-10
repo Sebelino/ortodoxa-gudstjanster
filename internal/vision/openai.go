@@ -766,9 +766,10 @@ Return ONLY the JSON array, no other text.`, string(entriesJSON))
 
 // CampEvent represents a single event extracted from a camp/event website.
 type CampEvent struct {
-	Date        string `json:"date"`         // YYYY-MM-DD
-	DayOfWeek   string `json:"day_of_week"`  // Swedish day name
-	ServiceName string `json:"service_name"` // Event description in Swedish
+	Date        string `json:"date"`                   // YYYY-MM-DD (start date)
+	EndDate     string `json:"end_date,omitempty"`      // YYYY-MM-DD (for multi-day events)
+	DayOfWeek   string `json:"day_of_week"`             // Swedish day name
+	ServiceName string `json:"service_name"`            // Event description in Swedish
 	Notes       string `json:"notes,omitempty"`
 }
 
@@ -781,12 +782,13 @@ func (c *Client) ExtractCampEvents(ctx context.Context, text string) ([]CampEven
 Today is %s.
 
 Generate the following events:
-1. For the camp itself: create ONE event per day the camp runs (e.g., a Monday-Thursday camp = 4 events). Each day's service_name should be "Ortodoxt sommarläger" and notes should include the location and any relevant info (e.g., "Dag 1 av 4. Sjöbonäs lägergård, Kinnarumma").
-2. For the registration deadline: create ONE event on the deadline date with service_name "Sista anmälningsdag: Ortodoxt sommarläger" and notes with registration details (price, link, etc).
+1. For the camp itself: create ONE single event with service_name "Ortodoxt sommarläger". Set date to the first day and end_date to the last day. Notes should include the location and any relevant info (e.g., "Sjöbonäs lägergård, Kinnarumma").
+2. For the registration deadline: create ONE event on the deadline date with service_name "Sista anmälningsdag: Ortodoxt sommarläger" and notes with registration details (price, link, etc). No end_date needed.
 
 Return a JSON array with these fields:
-- date: YYYY-MM-DD format
-- day_of_week: Swedish day name (e.g., "Måndag", "Tisdag")
+- date: YYYY-MM-DD format (start date)
+- end_date: YYYY-MM-DD format (only for multi-day events, omit for single-day)
+- day_of_week: Swedish day name of the start date (e.g., "Måndag", "Tisdag")
 - service_name: event description in Swedish
 - notes: additional details
 
