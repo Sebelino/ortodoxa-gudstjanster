@@ -512,8 +512,11 @@ func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://ortodoxagudstjanster.se/</loc>
-    <changefreq>daily</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://ortodoxagudstjanster.se/feedback</loc>
+    <priority>0.3</priority>
   </url>
 </urlset>`)
 }
