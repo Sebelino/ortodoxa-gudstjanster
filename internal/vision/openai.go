@@ -867,3 +867,139 @@ Webpage text:
 	return events, nil
 }
 
+// ImageEventResult holds the extracted information from a church event image.
+type ImageEventResult struct {
+	Parish   string            `json:"parish"`
+	Location string            `json:"location"`
+	Language string            `json:"language"`
+	Events   []ImageEventEntry `json:"events"`
+}
+
+// ImageEventEntry is a single event extracted from an image.
+type ImageEventEntry struct {
+	Date        string `json:"date"`
+	EndDate     string `json:"end_date,omitempty"`
+	DayOfWeek   string `json:"day_of_week"`
+	Time        string `json:"time,omitempty"`
+	ServiceName string `json:"service_name"`
+	Occasion    string `json:"occasion,omitempty"`
+	Notes       string `json:"notes,omitempty"`
+}
+
+// ExtractEventsFromImage sends an image to OpenAI's vision API and extracts church/parish
+// information and one or more events. Designed for arbitrary church event images (flyers,
+// schedule screenshots, posters, etc.). Returns the structured result and raw API response.
+func (c *Client) ExtractEventsFromImage(ctx context.Context, imageData []byte) (*ImageEventResult, string, error) {
+	imageBase64 := base64.StdEncoding.EncodeToString(imageData)
+
+	mediaType := "image/jpeg"
+	if len(imageData) > 8 && string(imageData[0:8]) == "\x89PNG\r\n\x1a\n" {
+		mediaType = "image/png"
+	}
+
+	currentYear := time.Now().Year()
+	prompt := fmt.Sprintf(`Extract event information from this church-related image (flyer, poster, schedule, etc.).
+
+Identify:
+1. The parish/church name (e.g., "Serbisk-ortodoxa Kyrkan i Stockholm", "St. Georgios Cathedral")
+2. The location/address if mentioned
+3. The language of the event (e.g., "Svenska", "Grekiska", "Serbiska")
+4. One or more events with date, time, and description
+
+Return a JSON object with:
+- parish: the church/parish name
+- location: full address if available, otherwise the venue name
+- language: the primary language of the event
+- events: array of event objects, each with:
+  - date: YYYY-MM-DD format (use year %d if not specified)
+  - end_date: YYYY-MM-DD if multi-day event, omit otherwise
+  - day_of_week: Swedish day name (e.g., "Lördag", "Söndag")
+  - time: HH:MM format (24-hour), empty string if no specific time
+  - service_name: description of the event in Swedish
+  - occasion: optional, any special occasion or holiday
+  - notes: optional, any additional details worth noting
+
+Translate all service_name and notes to Swedish if the image is in another language.
+Return ONLY the JSON object, no other text.`, currentYear)
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4.1",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": prompt,
+					},
+					{
+						"type": "image_url",
+						"image_url": map[string]interface{}{
+							"url":    fmt.Sprintf("data:%s;base64,%s", mediaType, imageBase64),
+							"detail": "high",
+						},
+					},
+				},
+			},
+		},
+		"max_tokens": 4096,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, "", fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, "", fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.doRequest(req, "ExtractEventsFromImage", "gpt-4.1")
+	if err != nil {
+		return nil, "", fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, "", fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, "", fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var result ImageEventResult
+	if err := json.Unmarshal([]byte(content), &result); err != nil {
+		return nil, content, fmt.Errorf("parsing image event result: %w (content: %s)", err, content)
+	}
+
+	return &result, content, nil
+}

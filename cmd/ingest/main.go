@@ -115,6 +115,9 @@ func main() {
 	registry.Register(scraper.NewSrpskaScraper())
 	registry.Register(scraper.NewSommarlagerScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewManualScraper(manualEventsReader))
+	if uploadReader != nil {
+		registry.Register(scraper.NewUploadsScraper(gcsStore, visionClient, uploadReader, gcsUploadBucket))
+	}
 
 	// Generate batch ID for this ingestion run
 	batchID := time.Now().UTC().Format("20060102-150405")

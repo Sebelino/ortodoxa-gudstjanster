@@ -398,8 +398,7 @@ func (s *GomosScraper) downloadImage(ctx context.Context, imageURL string) ([]by
 }
 
 func (s *GomosScraper) computeChecksum(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
+	return computeChecksum(data)
 }
 
 func (s *GomosScraper) imageExtension(url string) string {
