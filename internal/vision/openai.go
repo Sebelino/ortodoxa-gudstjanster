@@ -901,13 +901,19 @@ func (c *Client) ExtractEventsFromImage(ctx context.Context, imageData []byte) (
 	prompt := fmt.Sprintf(`Extract event information from this church-related image (flyer, poster, schedule, etc.).
 
 Identify:
-1. The parish/church name (e.g., "Serbisk-ortodoxa Kyrkan i Stockholm", "St. Georgios Cathedral")
+1. The parish/church name — you MUST map it to one of these known Orthodox parishes in Sweden:
+   - "Sankt Sava" — the Serbian Orthodox parish in Stockholm (also known as "Serbisk-ortodoxa Kyrkan i Stockholm", "SPC Stockholm", "@spcstockholm")
+   - "St. Georgios Cathedral" — the Greek Orthodox cathedral in Stockholm (also known as "Gomos", "Hagios Georgios")
+   - "Finska Ortodoxa Församlingen" — the Finnish Orthodox parish in Stockholm (also known as "Helige Nikolai")
+   - "Heliga Anna av Novgorod" — a parish in Stockholm
+   - "Kristi Förklarings Ortodoxa Församling" — the Russian Orthodox parish in Stockholm (also known as "Ryska ortodoxa kyrkan")
+   If the church does not match any of the above, use the name as given in the image.
 2. The location/address if mentioned
 3. The language of the event (e.g., "Svenska", "Grekiska", "Serbiska")
 4. One or more events with date, time, and description
 
 Return a JSON object with:
-- parish: the church/parish name
+- parish: the church/parish name (must use the canonical name from the list above if it matches)
 - location: full address if available, otherwise the venue name
 - language: the primary language of the event
 - events: array of event objects, each with:
