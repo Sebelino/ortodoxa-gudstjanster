@@ -143,8 +143,77 @@ func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	html := string(data)
+
+	// Inject Event JSON-LD for SEO (search engines don't execute JS)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if services, err := h.fetcher.GetAllServices(ctx); err == nil {
+		services = filterAndSort(services)
+		if jsonLD := buildEventJSONLD(services); jsonLD != "" {
+			html = strings.Replace(html, "</head>", jsonLD+"\n</head>", 1)
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(data)
+	w.Write([]byte(html))
+}
+
+func buildEventJSONLD(services []model.ChurchService) string {
+	const maxEvents = 50
+	n := len(services)
+	if n == 0 {
+		return ""
+	}
+	if n > maxEvents {
+		n = maxEvents
+	}
+
+	var events []map[string]interface{}
+	for _, s := range services[:n] {
+		event := map[string]interface{}{
+			"@type": "Event",
+			"name":  s.ServiceName,
+		}
+
+		if s.StartTime != nil {
+			event["startDate"] = s.StartTime.Format(time.RFC3339)
+			if s.EndTime != nil {
+				event["endDate"] = s.EndTime.Format(time.RFC3339)
+			}
+		} else if s.Date != "" {
+			event["startDate"] = s.Date
+		}
+
+		if s.Location != nil && *s.Location != "" {
+			event["location"] = map[string]interface{}{
+				"@type": "Place",
+				"name":  *s.Location,
+			}
+		}
+
+		if s.Parish != "" {
+			event["organizer"] = map[string]interface{}{
+				"@type": "Organization",
+				"name":  s.Parish,
+			}
+		}
+
+		events = append(events, event)
+	}
+
+	wrapper := map[string]interface{}{
+		"@context": "https://schema.org",
+		"@graph":   events,
+	}
+
+	jsonBytes, err := json.Marshal(wrapper)
+	if err != nil {
+		return ""
+	}
+
+	return `    <script type="application/ld+json">` + string(jsonBytes) + `</script>`
 }
 
 func (h *Handler) handleServices(w http.ResponseWriter, r *http.Request) {
