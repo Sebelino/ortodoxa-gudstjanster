@@ -173,8 +173,15 @@ func buildEventJSONLD(services []model.ChurchService) string {
 	var events []map[string]interface{}
 	for _, s := range services[:n] {
 		event := map[string]interface{}{
-			"@type": "Event",
-			"name":  s.ServiceName,
+			"@type":       "Event",
+			"name":        s.ServiceName,
+			"eventStatus": "https://schema.org/EventScheduled",
+		}
+
+		if s.Title != "" {
+			event["description"] = s.ServiceName
+		} else if s.Notes != nil && *s.Notes != "" {
+			event["description"] = *s.Notes
 		}
 
 		if s.StartTime != nil {
@@ -190,14 +197,23 @@ func buildEventJSONLD(services []model.ChurchService) string {
 			event["location"] = map[string]interface{}{
 				"@type": "Place",
 				"name":  *s.Location,
+				"address": map[string]interface{}{
+					"@type":          "PostalAddress",
+					"streetAddress":  *s.Location,
+					"addressCountry": "SE",
+				},
 			}
 		}
 
 		if s.Parish != "" {
-			event["organizer"] = map[string]interface{}{
+			organizer := map[string]interface{}{
 				"@type": "Organization",
 				"name":  s.Parish,
 			}
+			if s.SourceURL != "" {
+				organizer["url"] = s.SourceURL
+			}
+			event["organizer"] = organizer
 		}
 
 		events = append(events, event)
