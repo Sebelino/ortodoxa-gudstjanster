@@ -20,7 +20,7 @@ const (
 	gomosSourceName  = "St. Georgios Cathedral"
 	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
 	gomosLocation    = "Stockholm, St. Georgios Cathedral, Birger Jarlsgatan 92"
-	gomosLanguage    = "Grekiska, svenska"
+	gomosLanguage    = "Grekiska, svenska, engelska"
 )
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
