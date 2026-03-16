@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"sort"
@@ -111,6 +112,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", h.noCache(h.handleIndex))
 	mux.HandleFunc("/services", h.noCache(h.handleServices))
 	mux.HandleFunc("/calendar.ics", h.noCache(h.handleICS))
+	mux.HandleFunc("/parishes", h.handleParishes)
+	mux.HandleFunc("/parish/", h.handleParish)
 	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
@@ -599,17 +602,93 @@ func (h *Handler) handleRobots(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-	fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://ortodoxagudstjanster.se/</loc>
     <priority>1.0</priority>
-  </url>
+  </url>`)
+	for _, p := range parishes {
+		fmt.Fprintf(&sb, `
+  <url>
+    <loc>https://ortodoxagudstjanster.se/parish/%s</loc>
+    <priority>0.7</priority>
+  </url>`, p.Slug)
+	}
+	sb.WriteString(`
   <url>
     <loc>https://ortodoxagudstjanster.se/feedback</loc>
     <priority>0.3</priority>
   </url>
 </urlset>`)
+	w.Write([]byte(sb.String()))
+}
+
+func (h *Handler) handleParishes(w http.ResponseWriter, r *http.Request) {
+	type parishJSON struct {
+		Slug      string   `json:"slug"`
+		Name      string   `json:"name"`
+		ShortName string   `json:"short_name"`
+		Address   string   `json:"address"`
+		City      string   `json:"city"`
+		Website   string   `json:"website"`
+		Languages []string `json:"languages"`
+		Tradition string   `json:"tradition"`
+	}
+	result := make([]parishJSON, len(parishes))
+	for i, p := range parishes {
+		result[i] = parishJSON{
+			Slug:      p.Slug,
+			Name:      p.Name,
+			ShortName: p.ShortName,
+			Address:   p.Address,
+			City:      p.City,
+			Website:   p.Website,
+			Languages: p.Languages,
+			Tradition: p.Tradition,
+		}
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
+	slug := strings.TrimPrefix(r.URL.Path, "/parish/")
+	p, ok := parishBySlug[slug]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	tmplData, err := templates.ReadFile("templates/parish.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	tmpl, err := template.New("parish").Parse(string(tmplData))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	websiteDisplay := strings.TrimPrefix(p.Website, "https://")
+	websiteDisplay = strings.TrimPrefix(websiteDisplay, "www.")
+
+	data := struct {
+		ParishInfo
+		LanguagesStr   string
+		WebsiteDisplay string
+	}{
+		ParishInfo:     p,
+		LanguagesStr:   strings.Join(p.Languages, ", "),
+		WebsiteDisplay: websiteDisplay,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl.Execute(w, data)
 }
 
 func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {

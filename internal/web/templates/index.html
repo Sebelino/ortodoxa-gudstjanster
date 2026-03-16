@@ -391,6 +391,8 @@
 
     <script>
         let allServices = [];
+        let allParishes = [];
+        let parishByName = {};
         let excludedSources = new Set();
         let excludedLanguages = new Set();
 
@@ -398,10 +400,18 @@
             const content = document.getElementById('content');
 
             try {
-                const response = await fetch('/services');
-                if (!response.ok) throw new Error('Failed to fetch services');
+                const [servicesRes, parishesRes] = await Promise.all([
+                    fetch('/services'),
+                    fetch('/parishes')
+                ]);
+                if (!servicesRes.ok) throw new Error('Failed to fetch services');
 
-                allServices = await response.json();
+                allServices = await servicesRes.json();
+                if (parishesRes.ok) {
+                    allParishes = await parishesRes.json();
+                    parishByName = {};
+                    allParishes.forEach(p => { parishByName[p.name] = p; });
+                }
 
                 if (allServices.length === 0) {
                     content.innerHTML = '<p class="loading">Inga gudstjänster hittades.</p>';
@@ -636,11 +646,8 @@
         }
 
         function getShortParish(parish) {
-            if (parish.includes('Finska')) return 'Helige Nikolai';
-            if (parish.includes('Georgios')) return 'St. Georgios';
-            if (parish.includes('Anna')) return 'Heliga Anna';
-            if (parish.includes('Förklaring')) return 'Kristi Förkl.';
-            return parish;
+            const p = parishByName[parish];
+            return p ? p.short_name : parish;
         }
 
         function escapeHtml(text) {
@@ -656,7 +663,12 @@
         function buildDetails(service) {
             let details = '';
             if (service.parish) {
-                details += `<div class="detail-item"><span class="detail-label">Församling:</span> ${escapeHtml(service.parish)}</div>`;
+                const p = parishByName[service.parish];
+                if (p) {
+                    details += `<div class="detail-item"><span class="detail-label">Församling:</span> <a href="/parish/${p.slug}">${escapeHtml(service.parish)}</a></div>`;
+                } else {
+                    details += `<div class="detail-item"><span class="detail-label">Församling:</span> ${escapeHtml(service.parish)}</div>`;
+                }
             }
             if (service.start_time) {
                 const startDate = new Date(service.start_time);
