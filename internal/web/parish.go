@@ -22,7 +22,7 @@ var parishes = []ParishInfo{
 		City:      "Stockholm",
 		Website:   "https://gomos.se",
 		Languages: []string{"Grekiska", "Svenska", "Engelska"},
-		Tradition: "Grekisk-ortodox",
+		Tradition: "Grekisk-ortodox (Ekumeniska patriarkatet)",
 		MapQuery:  "St+Georgios+Cathedral+Birger+Jarlsgatan+92+Stockholm",
 	},
 	{
@@ -33,7 +33,7 @@ var parishes = []ParishInfo{
 		City:      "Stockholm",
 		Website:   "https://www.ryskaortodoxakyrkan.se",
 		Languages: []string{"Kyrkoslaviska", "Svenska"},
-		Tradition: "Rysk-ortodox",
+		Tradition: "Rysk-ortodox (Bulgariska patriarkatet)",
 		MapQuery:  "Birger+Jarlsgatan+98+Stockholm",
 	},
 	{
@@ -44,7 +44,7 @@ var parishes = []ParishInfo{
 		City:      "Stocksund",
 		Website:   "https://heligaanna.nu",
 		Languages: []string{"Svenska"},
-		Tradition: "Ortodox (Ekumeniska patriarkatet)",
+		Tradition: "Svensk-ortodox (Georgiska patriarkatet)",
 		MapQuery:  "Kyrkvägen+27+Stocksund",
 	},
 	{
@@ -55,7 +55,7 @@ var parishes = []ParishInfo{
 		City:      "Stockholm",
 		Website:   "https://www.ortodox-finsk.se",
 		Languages: []string{"Svenska", "Finska"},
-		Tradition: "Finsk-ortodox",
+		Tradition: "Finsk-ortodox (Ekumeniska patriarkatet)",
 		MapQuery:  "Köpmangatan+3+Gamla+Stan+Stockholm",
 	},
 	{
