@@ -11,6 +11,8 @@ type ParishInfo struct {
 	Languages  []string
 	Tradition  string
 	MapQuery   string
+	Lat        float64
+	Lng        float64
 }
 
 var parishes = []ParishInfo{
@@ -24,6 +26,8 @@ var parishes = []ParishInfo{
 		Languages: []string{"Grekiska", "Svenska", "Engelska"},
 		Tradition: "Grekisk-ortodox (Ekumeniska patriarkatet)",
 		MapQuery:  "St+Georgios+Cathedral+Birger+Jarlsgatan+92+Stockholm",
+		Lat:       59.3402,
+		Lng:       18.0743,
 	},
 	{
 		Slug:      "kristi-forklarings",
@@ -35,6 +39,8 @@ var parishes = []ParishInfo{
 		Languages: []string{"Kyrkoslaviska", "Svenska"},
 		Tradition: "Rysk-ortodox (Bulgariska patriarkatet)",
 		MapQuery:  "Birger+Jarlsgatan+98+Stockholm",
+		Lat:       59.3410,
+		Lng:       18.0745,
 	},
 	{
 		Slug:      "heliga-anna",
@@ -46,6 +52,8 @@ var parishes = []ParishInfo{
 		Languages: []string{"Svenska"},
 		Tradition: "Svensk-ortodox (Georgiska patriarkatet)",
 		MapQuery:  "Kyrkvägen+27+Stocksund",
+		Lat:       59.3856,
+		Lng:       18.0548,
 	},
 	{
 		Slug:      "finska-ortodoxa",
@@ -57,6 +65,8 @@ var parishes = []ParishInfo{
 		Languages: []string{"Svenska", "Finska"},
 		Tradition: "Finsk-ortodox (Ekumeniska patriarkatet)",
 		MapQuery:  "Bellmansgatan+13+Stockholm",
+		Lat:       59.3190,
+		Lng:       18.0668,
 	},
 	{
 		Slug:      "sankt-sava",
@@ -68,6 +78,8 @@ var parishes = []ParishInfo{
 		Languages: []string{"Kyrkoslaviska"},
 		Tradition: "Serbisk-ortodox",
 		MapQuery:  "Bägerstavägen+68+Enskede",
+		Lat:       59.2770,
+		Lng:       18.0710,
 	},
 }
 

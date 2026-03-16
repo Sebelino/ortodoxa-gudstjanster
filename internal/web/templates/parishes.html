@@ -22,6 +22,7 @@
     <meta property="og:url" content="https://ortodoxagudstjanster.se/parishes">
     <meta property="og:title" content="Ortodoxa församlingar i Stockholm">
     <meta property="og:description" content="Lista över ortodoxa församlingar i Stockholmsområdet.">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <style>
         * {
             margin: 0;
@@ -68,6 +69,13 @@
 
         .breadcrumb a:hover {
             text-decoration: underline;
+        }
+
+        #map {
+            height: 350px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
         }
 
         .parish-list {
@@ -123,6 +131,8 @@
             <a href="/">Alla gudstj&auml;nster</a> &rsaquo; F&ouml;rsamlingar
         </div>
 
+        <div id="map"></div>
+
         <div class="parish-list">
             {{range .}}
             <a class="parish-card" href="/parish/{{.Slug}}">
@@ -135,5 +145,29 @@
             {{end}}
         </div>
     </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        var parishes = [
+            {{range .}}
+            {name: "{{.ShortName}}", slug: "{{.Slug}}", lat: {{.Lat}}, lng: {{.Lng}}, address: "{{.Address}}"},
+            {{end}}
+        ];
+
+        var map = L.map('map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 18
+        }).addTo(map);
+
+        var bounds = [];
+        parishes.forEach(function(p) {
+            var marker = L.marker([p.lat, p.lng]).addTo(map);
+            marker.bindPopup('<b><a href="/parish/' + p.slug + '">' + p.name + '</a></b><br>' + p.address);
+            bounds.push([p.lat, p.lng]);
+        });
+
+        map.fitBounds(bounds, {padding: [30, 30]});
+    </script>
 </body>
 </html>
