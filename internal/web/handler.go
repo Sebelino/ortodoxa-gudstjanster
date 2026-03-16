@@ -112,7 +112,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", h.noCache(h.handleIndex))
 	mux.HandleFunc("/services", h.noCache(h.handleServices))
 	mux.HandleFunc("/calendar.ics", h.noCache(h.handleICS))
-	mux.HandleFunc("/parishes", h.handleParishes)
+	mux.HandleFunc("/api/parishes", h.handleParishesAPI)
+	mux.HandleFunc("/parishes", h.handleParishesPage)
 	mux.HandleFunc("/parish/", h.handleParish)
 	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
@@ -608,6 +609,10 @@ func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
   <url>
     <loc>https://ortodoxagudstjanster.se/</loc>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://ortodoxagudstjanster.se/parishes</loc>
+    <priority>0.8</priority>
   </url>`)
 	for _, p := range parishes {
 		fmt.Fprintf(&sb, `
@@ -625,7 +630,7 @@ func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(sb.String()))
 }
 
-func (h *Handler) handleParishes(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 	type parishJSON struct {
 		Slug      string   `json:"slug"`
 		Name      string   `json:"name"`
@@ -652,6 +657,23 @@ func (h *Handler) handleParishes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	json.NewEncoder(w).Encode(result)
+}
+
+func (h *Handler) handleParishesPage(w http.ResponseWriter, r *http.Request) {
+	tmplData, err := templates.ReadFile("templates/parishes.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	tmpl, err := template.New("parishes").Parse(string(tmplData))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl.Execute(w, parishes)
 }
 
 func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
