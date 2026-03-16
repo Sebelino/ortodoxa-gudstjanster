@@ -198,9 +198,10 @@ func buildEventJSONLD(services []model.ChurchService) string {
 				"@type": "Place",
 				"name":  *s.Location,
 				"address": map[string]interface{}{
-					"@type":          "PostalAddress",
-					"streetAddress":  *s.Location,
-					"addressCountry": "SE",
+					"@type":           "PostalAddress",
+					"streetAddress":   *s.Location,
+					"addressLocality": "Stockholm",
+					"addressCountry":  "SE",
 				},
 			}
 		}
