@@ -74,7 +74,7 @@ var parishes = []ParishInfo{
 		ShortName: "St. Ignatios",
 		Address:   "Nygatan 2, Södertälje",
 		City:      "Södertälje",
-		Website:   "https://sanktignatios.se",
+		Website:   "https://heligaanna.nu",
 		Languages: []string{"Svenska", "Grekiska", "Serbiska"},
 		Tradition: "Svensk-ortodox (Georgiska patriarkatet)",
 		MapQuery:  "Sankt+Ignatios+Folkhögskola+Nygatan+2+Södertälje",
