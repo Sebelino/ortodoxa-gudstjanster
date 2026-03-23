@@ -508,6 +508,8 @@ func filterAndSort(services []model.ChurchService) []model.ChurchService {
 		}
 	}
 
+	future = deduplicateServices(future)
+
 	// Sort by date (and time if available)
 	sort.Slice(future, func(i, j int) bool {
 		if future[i].Date != future[j].Date {
@@ -526,6 +528,69 @@ func filterAndSort(services []model.ChurchService) []model.ChurchService {
 	})
 
 	return future
+}
+
+// deduplicateServices removes duplicate events that share the same parish,
+// date, and start time (first component of the time range). When duplicates
+// are found, the event with the most detail is kept.
+func deduplicateServices(services []model.ChurchService) []model.ChurchService {
+	type dedupeKey struct {
+		parish string
+		date   string
+		time   string
+	}
+
+	best := make(map[dedupeKey]int) // key → index in result
+	var result []model.ChurchService
+
+	for _, s := range services {
+		t := ""
+		if s.Time != nil {
+			// Use only the start time for deduplication (before " - ")
+			t = *s.Time
+			if idx := strings.Index(t, " - "); idx >= 0 {
+				t = t[:idx]
+			}
+		}
+		key := dedupeKey{parish: parishGroup(s), date: s.Date, time: t}
+
+		if existingIdx, ok := best[key]; ok {
+			// Keep the one with more detail
+			if serviceDetail(s) > serviceDetail(result[existingIdx]) {
+				result[existingIdx] = s
+			}
+		} else {
+			best[key] = len(result)
+			result = append(result, s)
+		}
+	}
+
+	return result
+}
+
+// serviceDetail returns a score representing how much detail a service has.
+// Higher is more detailed.
+func serviceDetail(s model.ChurchService) int {
+	score := 0
+	if s.Occasion != nil && *s.Occasion != "" {
+		score++
+	}
+	if s.Notes != nil && *s.Notes != "" {
+		score++
+	}
+	if s.Location != nil && *s.Location != "" {
+		score++
+	}
+	if s.Time != nil && *s.Time != "" {
+		score++
+	}
+	if s.Title != "" {
+		score++
+	}
+	if s.EventLanguage != nil {
+		score++
+	}
+	return score
 }
 
 func (h *Handler) handleLastUpdated(w http.ResponseWriter, r *http.Request) {

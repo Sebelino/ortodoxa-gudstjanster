@@ -641,3 +641,64 @@ func TestServeIcon(t *testing.T) {
 		t.Errorf("response is not a valid PNG (len=%d)", len(body))
 	}
 }
+
+func TestDeduplicateServices(t *testing.T) {
+	today := time.Now().Format("2006-01-02")
+
+	services := []model.ChurchService{
+		{
+			Parish:      "Heliga Anna av Novgorod",
+			Source:      "Heliga Anna av Novgorod",
+			Date:        today,
+			DayOfWeek:   "Söndag",
+			ServiceName: "Liturgi",
+			Time:        ptr("9:00"),
+			Occasion:    ptr("Palmsöndagen"),
+		},
+		{
+			Parish:      "Heliga Anna av Novgorod",
+			Source:      "Google Calendar (Heliga Anna / St. Ignatios)",
+			Date:        today,
+			DayOfWeek:   "Söndag",
+			ServiceName: "Divine Liturgy (Palm Sunday) at Heliga Anna",
+			Time:        ptr("9:00 - 11:00"),
+		},
+		{
+			Parish:      "St. Ignatios",
+			Source:      "Google Calendar (Heliga Anna / St. Ignatios)",
+			Date:        today,
+			DayOfWeek:   "Söndag",
+			ServiceName: "Divine Liturgy",
+			Time:        ptr("9:00 - 10:30"),
+		},
+	}
+
+	result := deduplicateServices(services)
+
+	if len(result) != 2 {
+		t.Fatalf("expected 2 services after dedup, got %d", len(result))
+	}
+
+	// The Heliga Anna duplicate should be resolved - the one with Occasion wins
+	var ha model.ChurchService
+	for _, s := range result {
+		if s.Parish == "Heliga Anna av Novgorod" {
+			ha = s
+			break
+		}
+	}
+	if ha.Occasion == nil || *ha.Occasion != "Palmsöndagen" {
+		t.Errorf("expected Heliga Anna event with Occasion, got %+v", ha)
+	}
+
+	// St. Ignatios should remain
+	var found bool
+	for _, s := range result {
+		if s.Parish == "St. Ignatios" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("St. Ignatios event should not be deduplicated")
+	}
+}
