@@ -6,7 +6,7 @@ En webbtjänst som samlar gudstjänstscheman från östortodoxa församlingar i 
 
 ## Funktioner
 
-- Samlar scheman från flera östortodoxa församlingar i Stockholm
+- Samlar scheman från flera östortodoxa församlingar i Sverige
 - Webbgränssnitt för att bläddra bland kommande gudstjänster
 - Filtrera efter församling
 - ICS-kalenderflöde för prenumeration i Google Kalender, Apple Kalender m.fl.
