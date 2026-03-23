@@ -282,14 +282,7 @@ terraform apply
 ### Deploy New Version
 
 ```bash
-# Build and push Docker image
-docker build --platform linux/amd64 -t europe-north1-docker.pkg.dev/PROJECT_ID/ortodoxa-gudstjanster/ortodoxa-gudstjanster:latest .
-docker push europe-north1-docker.pkg.dev/PROJECT_ID/ortodoxa-gudstjanster/ortodoxa-gudstjanster:latest
-
-# Deploy web service
-gcloud run deploy ortodoxa-gudstjanster \
-  --image=europe-north1-docker.pkg.dev/PROJECT_ID/ortodoxa-gudstjanster/ortodoxa-gudstjanster:latest \
-  --region=europe-north1
+./scripts/deploy.sh
 
 # The ingestion job automatically uses the latest image on next run
 ```
