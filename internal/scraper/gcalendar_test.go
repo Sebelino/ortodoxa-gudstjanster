@@ -76,7 +76,7 @@ END:VCALENDAR`
 	}
 
 	// Fourth: Ryska location (should be skipped by matchLocation)
-	parish, _ := matchLocation(events[3].location)
+	parish, _, _ := matchLocation(events[3].location)
 	if parish != "" {
 		t.Errorf("event 3 should not match any parish, got %q", parish)
 	}
@@ -102,7 +102,7 @@ func TestMatchLocation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		parish, _ := matchLocation(tt.location)
+		parish, _, _ := matchLocation(tt.location)
 		if parish != tt.wantParish {
 			t.Errorf("matchLocation(%q) parish = %q, want %q", tt.location, parish, tt.wantParish)
 		}

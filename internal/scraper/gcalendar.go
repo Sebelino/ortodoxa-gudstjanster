@@ -21,16 +21,17 @@ const (
 
 // locationMapping maps a substring in the LOCATION field to a parish and display location.
 var locationMapping = []struct {
-	substring string
-	parish    string
-	location  string
+	substring      string
+	parish         string
+	location       string
+	parishLanguage string
 }{
-	{"Petruskyrkan", parishHeligaAnna, "Petruskyrkan, Kyrkvägen 27, Stocksund"},
-	{"Heliga Annas Ortodoxa", parishHeligaAnna, "Heliga Annas Ortodoxa kyrkoförsamling, Kyrkvägen 27, Stocksund"},
-	{"Sankt Ignatios Folkhögskola", parishStIgnatios, "Sankt Ignatios Folkhögskola, Nygatan 2, Södertälje"},
-	{"Sankt Ignatios andliga akademi", parishStIgnatios, "Sankt Ignatios andliga akademi, Nygatan 2, Södertälje"},
+	{"Petruskyrkan", parishHeligaAnna, "Petruskyrkan, Kyrkvägen 27, Stocksund", "Svenska"},
+	{"Heliga Annas Ortodoxa", parishHeligaAnna, "Heliga Annas Ortodoxa kyrkoförsamling, Kyrkvägen 27, Stocksund", "Svenska"},
+	{"Sankt Ignatios Folkhögskola", parishStIgnatios, "Sankt Ignatios Folkhögskola, Nygatan 2, Södertälje", "Svenska, grekiska, serbiska"},
+	{"Sankt Ignatios andliga akademi", parishStIgnatios, "Sankt Ignatios andliga akademi, Nygatan 2, Södertälje", "Svenska, grekiska, serbiska"},
 	// Catch-all for Södertälje addresses not matching above
-	{"Södertälje", parishStIgnatios, "Nygatan 2, Södertälje"},
+	{"Södertälje", parishStIgnatios, "Nygatan 2, Södertälje", "Svenska, grekiska, serbiska"},
 }
 
 // GCalendarScraper fetches events from a public Google Calendar ICS feed.
@@ -68,7 +69,7 @@ func (s *GCalendarScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 		}
 
 		// Map location to parish
-		parish, location := matchLocation(ev.location)
+		parish, location, parishLang := matchLocation(ev.location)
 		if parish == "" {
 			continue
 		}
@@ -107,15 +108,16 @@ func (s *GCalendarScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 		}
 
 		svc := model.ChurchService{
-			Parish:      parish,
-			Source:      gcalendarSourceName,
-			SourceURL:   gcalendarSourcePage,
-			Date:        date,
-			DayOfWeek:   dayOfWeek,
-			ServiceName: serviceName,
-			Location:    &location,
-			Time:        timeStr,
-			Notes:       notes,
+			Parish:         parish,
+			Source:         gcalendarSourceName,
+			SourceURL:      gcalendarSourcePage,
+			Date:           date,
+			DayOfWeek:      dayOfWeek,
+			ServiceName:    serviceName,
+			Location:       &location,
+			Time:           timeStr,
+			Notes:          notes,
+			ParishLanguage: &parishLang,
 		}
 		services = append(services, svc)
 	}
@@ -123,15 +125,15 @@ func (s *GCalendarScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 	return services, nil
 }
 
-// matchLocation returns the parish name and display location for an ICS LOCATION string.
+// matchLocation returns the parish name, display location, and parish language for an ICS LOCATION string.
 // Returns empty strings if the location doesn't match any known parish.
-func matchLocation(loc string) (parish, location string) {
+func matchLocation(loc string) (parish, location, parishLanguage string) {
 	for _, m := range locationMapping {
 		if strings.Contains(loc, m.substring) {
-			return m.parish, m.location
+			return m.parish, m.location, m.parishLanguage
 		}
 	}
-	return "", ""
+	return "", "", ""
 }
 
 // icsEvent represents a parsed VEVENT from an ICS feed.
