@@ -73,20 +73,24 @@ func (s *ManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			return nil, err
 		}
 
-		if event.IntervalWeeks <= 0 || event.IntervalWeeks > 52 {
-			return nil, fmt.Errorf("event %q has invalid interval_weeks: %d", event.ServiceName, event.IntervalWeeks)
-		}
-		interval := time.Duration(event.IntervalWeeks) * 7 * 24 * time.Hour
-		endDate := startDate.AddDate(0, 0, 26*7)
-		if event.EndDate != "" {
-			endDate, err = time.Parse("2006-01-02", event.EndDate)
-			if err != nil {
-				return nil, fmt.Errorf("event %q has invalid end_date: %w", event.ServiceName, err)
+		if event.IntervalWeeks == 0 {
+			// One-time event
+			services = append(services, buildManualService(event, startDate))
+		} else if event.IntervalWeeks > 0 && event.IntervalWeeks <= 52 {
+			// Recurring event
+			interval := time.Duration(event.IntervalWeeks) * 7 * 24 * time.Hour
+			endDate := startDate.AddDate(0, 0, 26*7)
+			if event.EndDate != "" {
+				endDate, err = time.Parse("2006-01-02", event.EndDate)
+				if err != nil {
+					return nil, fmt.Errorf("event %q has invalid end_date: %w", event.ServiceName, err)
+				}
 			}
-		}
-
-		for date := startDate; !date.After(endDate); date = date.Add(interval) {
-			services = append(services, buildManualService(event, date))
+			for date := startDate; !date.After(endDate); date = date.Add(interval) {
+				services = append(services, buildManualService(event, date))
+			}
+		} else {
+			return nil, fmt.Errorf("event %q has invalid interval_weeks: %d", event.ServiceName, event.IntervalWeeks)
 		}
 	}
 
