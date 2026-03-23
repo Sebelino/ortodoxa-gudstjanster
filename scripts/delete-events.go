@@ -13,7 +13,8 @@ import (
 )
 
 func main() {
-	source := flag.String("source", "", "Filter by source/parish name")
+	source := flag.String("source", "", "Filter by source name")
+	parish := flag.String("parish", "", "Filter by parish name")
 	date := flag.String("date", "", "Filter by date (YYYY-MM-DD)")
 	serviceName := flag.String("service-name", "", "Filter by service_name (substring match)")
 	docID := flag.String("id", "", "Delete a specific document by ID")
@@ -22,8 +23,8 @@ func main() {
 	collection := flag.String("collection", "services", "Firestore collection name")
 	flag.Parse()
 
-	if *source == "" && *date == "" && *serviceName == "" && *docID == "" {
-		log.Fatal("At least one filter is required: -source, -date, -service-name, or -id")
+	if *source == "" && *parish == "" && *date == "" && *serviceName == "" && *docID == "" {
+		log.Fatal("At least one filter is required: -source, -parish, -date, -service-name, or -id")
 	}
 
 	ctx := context.Background()
@@ -44,6 +45,7 @@ func main() {
 		}
 		data := snap.Data()
 		fmt.Printf("Document: %s\n", snap.Ref.ID)
+		fmt.Printf("  parish:       %v\n", data["parish"])
 		fmt.Printf("  date:         %v\n", data["date"])
 		fmt.Printf("  service_name: %v\n", data["service_name"])
 		fmt.Printf("  source:       %v\n", data["source"])
@@ -64,6 +66,9 @@ func main() {
 	query = coll.Query
 	if *source != "" {
 		query = query.Where("source", "==", *source)
+	}
+	if *parish != "" {
+		query = query.Where("parish", "==", *parish)
 	}
 	if *date != "" {
 		query = query.Where("date", "==", *date)
@@ -97,6 +102,7 @@ func main() {
 	for _, doc := range matches {
 		data := doc.Data()
 		fmt.Printf("Document: %s\n", doc.Ref.ID)
+		fmt.Printf("  parish:       %v\n", data["parish"])
 		fmt.Printf("  date:         %v\n", data["date"])
 		fmt.Printf("  service_name: %v\n", data["service_name"])
 		fmt.Printf("  source:       %v\n", data["source"])
