@@ -24,6 +24,15 @@ func (m *mockFetcher) GetAllServices(ctx context.Context) ([]model.ChurchService
 	return m.services, m.err
 }
 
+func (m *mockFetcher) GetServiceByID(ctx context.Context, id string) (*model.ChurchService, error) {
+	for _, s := range m.services {
+		if s.ID == id {
+			return &s, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
 func (m *mockFetcher) GetLatestBatchID(ctx context.Context) (string, error) {
 	return m.batchID, m.err
 }

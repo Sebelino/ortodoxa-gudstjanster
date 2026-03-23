@@ -4,6 +4,7 @@ import "time"
 
 // ChurchService represents a single church service event.
 type ChurchService struct {
+	ID          string     `json:"id,omitempty"`
 	Parish      string     `json:"parish"`
 	Source      string     `json:"source"`
 	SourceURL   string     `json:"source_url,omitempty"`

@@ -25,6 +25,7 @@ var templates embed.FS
 // ServiceFetcher is an interface for fetching church services.
 type ServiceFetcher interface {
 	GetAllServices(ctx context.Context) ([]model.ChurchService, error)
+	GetServiceByID(ctx context.Context, id string) (*model.ChurchService, error)
 	GetLatestBatchID(ctx context.Context) (string, error)
 }
 
@@ -115,6 +116,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/parishes", h.handleParishesAPI)
 	mux.HandleFunc("/parishes", h.handleParishesPage)
 	mux.HandleFunc("/parish/", h.handleParish)
+	mux.HandleFunc("/event/", h.handleEvent)
 	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
@@ -772,6 +774,110 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 		ParishInfo:     p,
 		LanguagesStr:   strings.Join(p.Languages, ", "),
 		WebsiteDisplay: websiteDisplay,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl.Execute(w, data)
+}
+
+func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/event/")
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	svc, err := h.fetcher.GetServiceByID(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	tmplData, err := templates.ReadFile("templates/event.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	tmpl, err := template.New("event").Parse(string(tmplData))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Look up parish slug
+	var parishSlug string
+	for _, p := range parishes {
+		if p.Name == svc.Parish {
+			parishSlug = p.Slug
+			break
+		}
+	}
+
+	// Build language display string
+	var language string
+	if svc.EventLanguage != nil {
+		language = *svc.EventLanguage
+	} else if svc.ParishLanguage != nil {
+		language = *svc.ParishLanguage + " (ej angivet)"
+	}
+
+	// Determine timezone abbreviation from the event date
+	tz := "CET"
+	if svc.StartTime != nil {
+		_, offset := svc.StartTime.Zone()
+		if offset == 7200 {
+			tz = "CEST"
+		}
+	} else if d, err := time.Parse("2006-01-02", svc.Date); err == nil {
+		stockholm, _ := time.LoadLocation("Europe/Stockholm")
+		_, offset := time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, stockholm).Zone()
+		if offset == 7200 {
+			tz = "CEST"
+		}
+	}
+
+	data := struct {
+		ServiceName string
+		Title       string
+		Date        string
+		DayOfWeek   string
+		Time        string
+		Timezone    string
+		Parish      string
+		ParishSlug  string
+		Location    string
+		Language    string
+		Occasion    string
+		Notes       string
+		Source      string
+		SourceURL   string
+	}{
+		ServiceName: svc.ServiceName,
+		Title:       svc.Title,
+		Date:        svc.Date,
+		DayOfWeek:   svc.DayOfWeek,
+		Timezone:    tz,
+		Parish:      svc.Parish,
+		ParishSlug:  parishSlug,
+		Source:      svc.Source,
+		SourceURL:   svc.SourceURL,
+		Language:    language,
+	}
+	if svc.Time != nil {
+		data.Time = *svc.Time
+	}
+	if svc.Location != nil {
+		data.Location = *svc.Location
+	}
+	if svc.Occasion != nil {
+		data.Occasion = *svc.Occasion
+	}
+	if svc.Notes != nil {
+		data.Notes = *svc.Notes
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

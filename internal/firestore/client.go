@@ -152,10 +152,25 @@ func (c *Client) GetAllServices(ctx context.Context) ([]model.ChurchService, err
 		if err != nil {
 			return nil, fmt.Errorf("parsing document %s: %w", doc.Ref.ID, err)
 		}
+		svc.ID = doc.Ref.ID
 		services = append(services, svc)
 	}
 
 	return services, nil
+}
+
+// GetServiceByID retrieves a single service by its Firestore document ID.
+func (c *Client) GetServiceByID(ctx context.Context, id string) (*model.ChurchService, error) {
+	doc, err := c.client.Collection(c.collection).Doc(id).Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting document %s: %w", id, err)
+	}
+	svc, err := mapToService(doc.Data())
+	if err != nil {
+		return nil, fmt.Errorf("parsing document %s: %w", id, err)
+	}
+	svc.ID = doc.Ref.ID
+	return &svc, nil
 }
 
 // CountServicesForScraper returns the number of stored services for a given scraper.

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HWYRT0Y0BY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-HWYRT0Y0BY');
+    </script>
+    <title>{{if .Title}}{{.Title}}{{else}}{{.ServiceName}}{{end}} – {{.Date}} – Ortodoxa Gudstjänster</title>
+    <meta name="description" content="{{.ServiceName}} den {{.Date}} hos {{.Parish}}.">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <meta name="robots" content="index, follow">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        header .subtitle {
+            font-size: 0.85rem;
+            opacity: 0.85;
+            margin-top: 0.25rem;
+        }
+
+        main {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .breadcrumb {
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            color: #666;
+        }
+
+        .breadcrumb a {
+            color: #2c5282;
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .info-card {
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .info-card-header {
+            background: #2c5282;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .info-card-body {
+            padding: 0.75rem;
+        }
+
+        .info-row {
+            display: flex;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            width: 120px;
+            flex-shrink: 0;
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        .info-value {
+            flex: 1;
+        }
+
+        .info-value a {
+            color: #2c5282;
+            text-decoration: none;
+        }
+
+        .info-value a:hover {
+            text-decoration: underline;
+        }
+
+        .cta {
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .cta a {
+            display: inline-block;
+            background: #2c5282;
+            color: white;
+            padding: 0.5rem 1.25rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .cta a:hover {
+            background: #1a365d;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>{{if .Title}}{{.Title}}{{else}}{{.ServiceName}}{{end}}</h1>
+        <div class="subtitle">{{.DayOfWeek}} {{.Date}}{{if .Time}} {{.Time}}{{end}}</div>
+    </header>
+
+    <main>
+        <div class="breadcrumb">
+            <a href="/">Gudstjänster</a> &rsaquo; Händelse
+        </div>
+
+        <div class="info-card">
+            <div class="info-card-header">Detaljer</div>
+            <div class="info-card-body">
+                <div class="info-row">
+                    <div class="info-label">Gudstjänst</div>
+                    <div class="info-value">{{.ServiceName}}</div>
+                </div>
+                {{if .Title}}
+                <div class="info-row">
+                    <div class="info-label">Kort titel</div>
+                    <div class="info-value">{{.Title}}</div>
+                </div>
+                {{end}}
+                <div class="info-row">
+                    <div class="info-label">Datum</div>
+                    <div class="info-value">{{.DayOfWeek}} {{.Date}}</div>
+                </div>
+                {{if .Time}}
+                <div class="info-row">
+                    <div class="info-label">Tid</div>
+                    <div class="info-value">{{.Time}} {{.Timezone}}</div>
+                </div>
+                {{end}}
+                <div class="info-row">
+                    <div class="info-label">Församling</div>
+                    <div class="info-value">{{if .ParishSlug}}<a href="/parish/{{.ParishSlug}}">{{.Parish}}</a>{{else}}{{.Parish}}{{end}}</div>
+                </div>
+                {{if .Location}}
+                <div class="info-row">
+                    <div class="info-label">Plats</div>
+                    <div class="info-value">{{.Location}}</div>
+                </div>
+                {{end}}
+                {{if .Language}}
+                <div class="info-row">
+                    <div class="info-label">Språk</div>
+                    <div class="info-value">{{.Language}}</div>
+                </div>
+                {{end}}
+                {{if .Occasion}}
+                <div class="info-row">
+                    <div class="info-label">Tillfälle</div>
+                    <div class="info-value">{{.Occasion}}</div>
+                </div>
+                {{end}}
+                {{if .Notes}}
+                <div class="info-row">
+                    <div class="info-label">Notering</div>
+                    <div class="info-value">{{.Notes}}</div>
+                </div>
+                {{end}}
+                <div class="info-row">
+                    <div class="info-label">Källa</div>
+                    <div class="info-value">{{if .SourceURL}}<a href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Source}}</a>{{else}}{{.Source}}{{end}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cta">
+            <a href="/">Tillbaka till alla gudstjänster</a>
+        </div>
+    </main>
+</body>
+</html>
