@@ -127,6 +127,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/apple-touch-icon.png", h.handleAppleTouchIcon)
 	mux.HandleFunc("/manifest.json", h.handleManifest)
 	mux.HandleFunc("/sw.js", h.handleServiceWorker)
+	mux.HandleFunc("/about", h.handleAbout)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
 	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
 }
@@ -953,6 +954,16 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func (h *Handler) handleAbout(w http.ResponseWriter, r *http.Request) {
+	data, err := templates.ReadFile("templates/about.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
 }
 
 func getClientIP(r *http.Request) string {
