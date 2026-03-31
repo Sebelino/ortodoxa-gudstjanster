@@ -18,6 +18,14 @@ resource "google_project_iam_member" "cloudrun_firestore_access" {
   member  = "serviceAccount:${google_service_account.cloudrun.email}"
 }
 
+# Grant collaborators Editor access
+resource "google_project_iam_member" "collaborator_editor" {
+  for_each = toset(var.collaborators)
+  project  = var.project_id
+  role     = "roles/editor"
+  member   = "user:${each.value}"
+}
+
 # Allow unauthenticated access to Cloud Run service
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
   location = google_cloud_run_v2_service.app.location

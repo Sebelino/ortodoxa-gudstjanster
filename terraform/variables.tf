@@ -15,6 +15,12 @@ variable "service_name" {
   default     = "ortodoxa-gudstjanster"
 }
 
+variable "collaborators" {
+  description = "List of user emails to grant Editor access"
+  type        = list(string)
+  default     = []
+}
+
 variable "image_tag" {
   description = "Docker image tag to deploy"
   type        = string
