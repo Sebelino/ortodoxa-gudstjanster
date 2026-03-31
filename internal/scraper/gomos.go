@@ -137,17 +137,17 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 		groups[month].items = append(groups[month].items, r)
 	}
 
-	// Step 3: For each month group, prefer Swedish source
+	// Step 3: For each month group, prefer Swedish > English > other (Greek fallback)
 	var allServices []model.ChurchService
 	for _, month := range order {
 		g := groups[month]
 
 		chosen := g.items[0]
-		for _, item := range g.items {
-			lang := strings.ToLower(item.language)
-			if lang == "swedish" || lang == "svenska" {
+		chosenPriority := langPriority(chosen.language)
+		for _, item := range g.items[1:] {
+			if p := langPriority(item.language); p < chosenPriority {
 				chosen = item
-				break
+				chosenPriority = p
 			}
 		}
 
@@ -270,6 +270,19 @@ func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.Ra
 	}
 
 	return translated, nil
+}
+
+// langPriority returns a priority for the given language string (lower = preferred).
+// Swedish = 0, English = 1, anything else (e.g. Greek) = 2.
+func langPriority(lang string) int {
+	switch strings.ToLower(lang) {
+	case "swedish", "svenska":
+		return 0
+	case "english", "engelska":
+		return 1
+	default:
+		return 2
+	}
 }
 
 // rawEntriesToSwedish converts RawScheduleEntry to ScheduleEntry directly (no API call needed).
