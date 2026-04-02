@@ -498,10 +498,14 @@
             const base = window.location.origin + '/calendar.ics';
             const params = new URLSearchParams();
             if (excludedSources.size > 0) {
-                params.set('exclude', [...excludedSources].join(','));
+                const allParishNames = [...new Set(allServices.map(s => getParishGroup(s)))];
+                const includedSources = allParishNames.filter(p => !excludedSources.has(p));
+                params.set('include', includedSources.join(','));
             }
             if (excludedLanguages.size > 0) {
-                params.set('excludeLang', [...excludedLanguages].join(','));
+                const langChoices = ['Svenska', 'Engelska', 'Övrigt'];
+                const includedLangs = langChoices.filter(l => !excludedLanguages.has(l));
+                params.set('includeLang', includedLangs.join(','));
             }
             params.set('v', Math.random().toString(36).slice(2, 8));
             return base + '?' + params.toString();
