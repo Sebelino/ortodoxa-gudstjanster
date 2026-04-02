@@ -642,10 +642,6 @@
             if (service.start_time) {
                 const startDate = new Date(service.start_time);
                 const endDate = service.end_time ? new Date(service.end_time) : null;
-                const isMultiDay = endDate && startDate.toDateString() !== endDate.toDateString();
-                if (isMultiDay) {
-                    return '';
-                }
                 return startDate.toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm'});
             }
             return service.time ? escapeHtml(service.time) : '';
@@ -679,20 +675,13 @@
             if (service.start_time) {
                 const startDate = new Date(service.start_time);
                 const endDate = service.end_time ? new Date(service.end_time) : null;
-                const isMultiDay = endDate && startDate.toDateString() !== endDate.toDateString();
-                let tid;
-                if (isMultiDay) {
-                    const fmtDate = d => d.toLocaleDateString('sv-SE', {day: 'numeric', month: 'long', timeZone: 'Europe/Stockholm'});
-                    tid = fmtDate(startDate) + ' – ' + fmtDate(endDate);
-                } else {
-                    const opts = {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm'};
-                    const fmtTime = t => new Date(t).toLocaleTimeString('sv-SE', opts);
-                    const timeStr = endDate ? fmtTime(service.start_time) + ' - ' + fmtTime(service.end_time) : fmtTime(service.start_time);
-                    const dayName = startDate.toLocaleDateString('sv-SE', {weekday: 'long', timeZone: 'Europe/Stockholm'});
-                    const dayCapitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-                    const tz = service.start_time.includes('+02:00') ? 'CEST' : 'CET';
-                    tid = dayCapitalized + ' ' + timeStr + ', ' + service.date + ' ' + tz;
-                }
+                const opts = {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm'};
+                const fmtTime = t => new Date(t).toLocaleTimeString('sv-SE', opts);
+                const timeStr = endDate ? fmtTime(service.start_time) + ' - ' + fmtTime(service.end_time) : fmtTime(service.start_time);
+                const dayName = startDate.toLocaleDateString('sv-SE', {weekday: 'long', timeZone: 'Europe/Stockholm'});
+                const dayCapitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                const tz = service.start_time.includes('+02:00') ? 'CEST' : 'CET';
+                const tid = dayCapitalized + ' ' + timeStr + ', ' + service.date + ' ' + tz;
                 details += `<div class="detail-item"><span class="detail-label">Tid:</span> ${escapeHtml(tid)}</div>`;
             }
             if (service.title) {
