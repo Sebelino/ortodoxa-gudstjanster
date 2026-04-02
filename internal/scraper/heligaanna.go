@@ -16,7 +16,7 @@ import (
 const (
 	heligaAnnaSourceName = "Heliga Anna av Novgorod"
 	heligaAnnaURL        = "https://heligaanna.nu/gudstjanster/"
-	heligaAnnaLocation   = "Stockholm, Kyrkvägen 27, Stocksund"
+	heligaAnnaLocation   = "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden"
 	heligaAnnaLanguage   = "Svenska"
 )
 

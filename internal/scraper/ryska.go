@@ -77,7 +77,7 @@ func ExtractRyskaScheduleTextFromHTML(htmlContent string) string {
 const (
 	ryskaSourceName = "Kristi Förklarings Ortodoxa Församling"
 	ryskaURL        = "https://www.ryskaortodoxakyrkan.se/gudstjänst"
-	ryskaLocation   = "Stockholm, Birger Jarlsgatan 98"
+	ryskaLocation   = "Kristi Förklarings Ortodoxa Församling, Birger Jarlsgatan 98, 114 20 Stockholm"
 	ryskaLanguage   = "Kyrkoslaviska, svenska"
 )
 

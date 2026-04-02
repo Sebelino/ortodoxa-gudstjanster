@@ -9,7 +9,7 @@ import (
 
 const (
 	srpskaSourceName = "Sankt Sava"
-	srpskaLocation   = "Stockholm, Bägerstavägen 68"
+	srpskaLocation   = "Sankt Sava, Bägerstavägen 68, 120 47 Enskede Gård"
 	srpskaLanguage   = "Kyrkoslaviska"
 	srpskaWeeks      = 26
 )

@@ -26,12 +26,12 @@ var locationMapping = []struct {
 	location       string
 	parishLanguage string
 }{
-	{"Petruskyrkan", parishHeligaAnna, "Petruskyrkan, Kyrkvägen 27, Stocksund", "Svenska"},
-	{"Heliga Annas Ortodoxa", parishHeligaAnna, "Heliga Annas Ortodoxa kyrkoförsamling, Kyrkvägen 27, Stocksund", "Svenska"},
-	{"Sankt Ignatios Folkhögskola", parishStIgnatios, "Sankt Ignatios Folkhögskola, Nygatan 2, Södertälje", "Svenska, grekiska, serbiska"},
-	{"Sankt Ignatios andliga akademi", parishStIgnatios, "Sankt Ignatios andliga akademi, Nygatan 2, Södertälje", "Svenska, grekiska, serbiska"},
+	{"Petruskyrkan", parishHeligaAnna, "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden", "Svenska"},
+	{"Heliga Annas Ortodoxa", parishHeligaAnna, "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden", "Svenska"},
+	{"Sankt Ignatios Folkhögskola", parishStIgnatios, "Sankt Ignatios Folkhögskola, Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
+	{"Sankt Ignatios andliga akademi", parishStIgnatios, "Sankt Ignatios andliga akademi, Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
 	// Catch-all for Södertälje addresses not matching above
-	{"Södertälje", parishStIgnatios, "Nygatan 2, Södertälje", "Svenska, grekiska, serbiska"},
+	{"Södertälje", parishStIgnatios, "Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
 }
 
 // GCalendarScraper fetches events from a public Google Calendar ICS feed.

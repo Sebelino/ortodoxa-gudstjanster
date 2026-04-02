@@ -19,7 +19,7 @@ import (
 const (
 	gomosSourceName  = "St. Georgios Cathedral"
 	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
-	gomosLocation    = "Stockholm, St. Georgios Cathedral, Birger Jarlsgatan 92"
+	gomosLocation    = "St. Georgios Cathedral, Birger Jarlsgatan 92, 114 20 Stockholm"
 	gomosLanguage    = "Grekiska, svenska, engelska"
 )
 
