@@ -267,9 +267,22 @@ func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
 	}
 	services = filterAndSort(services)
 
-	// Parse excluded sources from query parameter
-	excludeParam := r.URL.Query().Get("exclude")
-	if excludeParam != "" {
+	// Parish filter: include= (whitelist) takes precedence over exclude= (blacklist, legacy)
+	if includeParam := r.URL.Query().Get("include"); includeParam != "" {
+		included := make(map[string]bool)
+		for _, source := range strings.Split(includeParam, ",") {
+			if s := strings.TrimSpace(source); s != "" {
+				included[s] = true
+			}
+		}
+		var filtered []model.ChurchService
+		for _, s := range services {
+			if included[parishGroup(s)] {
+				filtered = append(filtered, s)
+			}
+		}
+		services = filtered
+	} else if excludeParam := r.URL.Query().Get("exclude"); excludeParam != "" {
 		excluded := make(map[string]bool)
 		for _, source := range strings.Split(excludeParam, ",") {
 			excluded[strings.TrimSpace(source)] = true
@@ -283,9 +296,22 @@ func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
 		services = filtered
 	}
 
-	// Parse excluded languages from query parameter
-	excludeLangParam := r.URL.Query().Get("excludeLang")
-	if excludeLangParam != "" {
+	// Language filter: includeLang= (whitelist) takes precedence over excludeLang= (blacklist, legacy)
+	if includeLangParam := r.URL.Query().Get("includeLang"); includeLangParam != "" {
+		includedLangs := make(map[string]bool)
+		for _, lang := range strings.Split(includeLangParam, ",") {
+			if l := strings.TrimSpace(lang); l != "" {
+				includedLangs[l] = true
+			}
+		}
+		var filtered []model.ChurchService
+		for _, s := range services {
+			if includedLangs[langCategory(s)] {
+				filtered = append(filtered, s)
+			}
+		}
+		services = filtered
+	} else if excludeLangParam := r.URL.Query().Get("excludeLang"); excludeLangParam != "" {
 		excludedLangs := make(map[string]bool)
 		for _, lang := range strings.Split(excludeLangParam, ",") {
 			excludedLangs[strings.TrimSpace(lang)] = true
