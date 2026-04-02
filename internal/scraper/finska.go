@@ -67,7 +67,7 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 		// Extract location
 		locRegex := regexp.MustCompile(`<strong>\s*Plats:\s*</strong>\s*([^<]+)`)
 		if locMatch := locRegex.FindStringSubmatch(detailsHTML); len(locMatch) > 1 {
-			loc := strings.TrimSpace(locMatch[1])
+			loc := normalizeFinskaLocation(strings.TrimSpace(locMatch[1]))
 			location = &loc
 		}
 
@@ -120,4 +120,12 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 	})
 
 	return services, nil
+}
+
+// normalizeFinskaLocation maps known location variants to a canonical address format.
+func normalizeFinskaLocation(loc string) string {
+	if strings.Contains(loc, "Nikolai") || strings.Contains(loc, "Bellmansgatan") {
+		return "Helige Nikolai, Bellmansgatan 13, 118 47 Stockholm"
+	}
+	return loc
 }
