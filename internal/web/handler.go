@@ -130,6 +130,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/about", h.handleAbout)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
 	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
+	mux.HandleFunc("/.well-known/assetlinks.json", h.handleAssetLinks)
 }
 
 func (h *Handler) noCache(next http.HandlerFunc) http.HandlerFunc {
@@ -687,6 +688,17 @@ func (h *Handler) handleServiceWorker(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
+	w.Write(data)
+}
+
+func (h *Handler) handleAssetLinks(w http.ResponseWriter, r *http.Request) {
+	data, err := templates.ReadFile("templates/assetlinks.json")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(data)
 }
 
