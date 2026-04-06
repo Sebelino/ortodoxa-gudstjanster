@@ -126,6 +126,9 @@ func buildManualService(event RecurringEvent, date time.Time) model.ChurchServic
 	}
 	if event.StartTimeStr != "" {
 		timeStr := event.StartTimeStr
+		if event.EndTimeStr != "" {
+			timeStr = event.StartTimeStr + " - " + event.EndTimeStr
+		}
 		svc.Time = &timeStr
 		if t, err := parseHHMM(date, event.StartTimeStr); err == nil {
 			svc.StartTime = &t
