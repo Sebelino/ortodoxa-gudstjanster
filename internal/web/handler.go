@@ -128,6 +128,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/manifest.json", h.handleManifest)
 	mux.HandleFunc("/sw.js", h.handleServiceWorker)
 	mux.HandleFunc("/about", h.handleAbout)
+	mux.HandleFunc("/privacy", h.handlePrivacy)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
 	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
 	mux.HandleFunc("/.well-known/assetlinks.json", h.handleAssetLinks)
@@ -996,6 +997,16 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleAbout(w http.ResponseWriter, r *http.Request) {
 	data, err := templates.ReadFile("templates/about.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
+
+func (h *Handler) handlePrivacy(w http.ResponseWriter, r *http.Request) {
+	data, err := templates.ReadFile("templates/privacy.html")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
