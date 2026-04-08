@@ -282,8 +282,40 @@ func (c *Client) TranslateScheduleEntries(ctx context.Context, entries []RawSche
 	}
 
 	today := time.Now().Format("January 2, 2006")
-	prompt := fmt.Sprintf(`Translate these church service schedule entries to Swedish.
+	prompt := fmt.Sprintf(`Translate these Orthodox church service schedule entries to Swedish.
 Today is %s.
+
+TRANSLATION RULES:
+
+Clergy titles — use these official Swedish forms:
+- Archbishop / Αρχιεπίσκοπος / Ärkebishop → "Hans Eminens Ärkebiskop [Name]"
+- Metropolitan / Μητροπολίτης → "Hans Eminens [Name]"
+- Bishop / Επίσκοπος → "Hans Högvördighet [Name]"
+- Archimandrite / Αρχιμανδρίτης → "Arkimandrit [Name]" (no honorific prefix needed)
+- NEVER use "hans nåd", "ledd av", or "metropolitiska" — these are wrong
+- Always use "med" (not "ledd av") when a clergyman presides: "med Hans Eminens Ärkebiskop X"
+
+Name transliteration:
+- Preserve Greek name forms: Bartholomaios (not Bartholomeus/Bartholomew), Cleopas, Makarios, etc.
+- Do not Latinize or Anglicize Greek names
+
+Capitalization:
+- Service names: capitalize only the first word and proper nouns
+  Correct: "Gudomlig Liturgi", "Stora kompletoriet", "Akathist till Guds moder", "Stora sena kvällsgudstjänsten"
+  Wrong:   "gudomlig liturgi", "Stora Kompletoriet"
+- Honorifics: capitalize "Hans Eminens", "Hans Högvördighet", "Ärkebiskop" when used as a title
+- "Guds moder" — both words capitalized (it is a proper title)
+
+Service name examples:
+- "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Högvördighet Bartholomaios av Elaia")
+- "Divine Liturgy" / "Θεία Λειτουργία" → "Gudomlig Liturgi"
+- "Great Vespers" / "Μέγας Εσπερινός" → "Stora aftongudstjänsten"
+- "Great Compline" / "Μέγα Απόδειπνο" → "Stora kompletoriet"
+- "Great Compline with the Canon of St. Andrew" → "Stora kompletoriet med den heliga Andreasakanonen"
+- "Akathist to the Theotokos - Fourth Salutation" → "Akathist till Guds moder - Fjärde hälsningen"
+- "Orthros" / "Όρθρος" → "Orthros"
+- "Vespers" / "Εσπερινός" → "Vesper"
+- "Hours" / "Ώρες" → "Bönetimmarna"
 
 Input JSON:
 %s
@@ -292,7 +324,7 @@ Return a JSON array of services with these fields:
 - date: in YYYY-MM-DD format (keep the same dates)
 - day_of_week: the day name in Swedish (e.g., "Måndag", "Söndag")
 - time: in HH:MM format (24-hour, keep the same times)
-- service_name: the name of the service translated to Swedish (e.g., "Θεία Λειτουργία" → "Gudomlig liturgi")
+- service_name: the name of the service translated to Swedish following all rules above
 - occasion: optional, any special occasion or holiday, translated to Swedish
 
 Return ONLY the JSON array, no other text.`, today, string(entriesJSON))
@@ -379,7 +411,7 @@ func (c *Client) GenerateTitles(ctx context.Context, serviceNames []string) (map
 		return nil, fmt.Errorf("marshaling service names: %w", err)
 	}
 
-	prompt := fmt.Sprintf(`You are given a JSON array of Orthodox church service names (in Swedish). For each service name, generate a short title of 1-2 words that captures the essence of the service. The title should be in Swedish.
+	prompt := fmt.Sprintf(`You are given a JSON array of Orthodox church service names. Names may be in Swedish or English. For each service name, generate a short title of 1-2 words that captures the essence of the service in its Orthodox liturgical context. The title must always be in Swedish.
 
 Examples:
 - "Gudomlig liturgi" → "Gudomlig Liturgi"
@@ -394,9 +426,12 @@ Examples:
 - "Trefaldighetsafton" → "Trefaldighetsafton"
 - "Föreläsning för katekumener, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Katekesundervisning"
 - "Katekes" → "Katekesundervisning"
+- "Reading of the Book of Acts" → "Apostelläsning"
+- "Reading of the Holy Gospel" → "Evangelieläsning"
 
-IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, etc.) must get the title "Gudomlig Liturgi".
+IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, Divine Liturgy, etc.) must get the title "Gudomlig Liturgi".
 IMPORTANT: Any service related to catechism or catechumens (katekumener, katekes, katekisundervisning, etc.) must get the title "Katekesundervisning".
+IMPORTANT: A "Reading of the Book of Acts" or similar scriptural reading is an Orthodox liturgical service, not a book club — title it appropriately (e.g. "Apostelläsning").
 
 Return a JSON object mapping each input service name (exactly as given) to its short title.
 
