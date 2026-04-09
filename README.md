@@ -50,10 +50,10 @@ Prenumerera på ICS-flödet för att få gudstjänsterna i din kalenderapp:
 https://ortodoxagudstjanster.se/calendar.ics
 ```
 
-Du kan exkludera specifika församlingar med parametern `exclude`:
+Du kan välja specifika församlingar med parametern `include`:
 
 ```
-https://ortodoxagudstjanster.se/calendar.ics?exclude=St.%20Georgios%20Cathedral
+https://ortodoxagudstjanster.se/calendar.ics?include=St.%20Georgios%20Cathedral
 ```
 
 #### Lägga till i Google Kalender
