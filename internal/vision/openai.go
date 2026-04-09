@@ -299,6 +299,10 @@ Name transliteration:
 - Preserve Greek name forms: Bartholomaios (not Bartholomeus/Bartholomew), Cleopas, Makarios, etc.
 - Do not Latinize or Anglicize Greek names
 
+Swedish compound words:
+- NEVER split Swedish compound words with a space: "gudstjänst" not "guds tjänst", "klagogudstjänst" not "klago gudstjänst"
+- Church services are always "gudstjänst", NEVER just "tjänst": "aftongudstjänst" not "afton tjänst"
+
 Capitalization:
 - Service names: capitalize only the first word and proper nouns
   Correct: "Gudomlig Liturgi", "Stora kompletoriet", "Akathist till Guds moder", "Stora sena kvällsgudstjänsten"
@@ -313,9 +317,13 @@ Service name examples:
 - "Great Compline" / "Μέγα Απόδειπνο" → "Stora kompletoriet"
 - "Great Compline with the Canon of St. Andrew" → "Stora kompletoriet med den heliga Andreasakanonen"
 - "Akathist to the Theotokos - Fourth Salutation" → "Akathist till Guds moder - Fjärde hälsningen"
+- "Lamentations Service (Epitaphios)" / "Ακολουθία Επιταφίου" → "Sorgeropens gudstjänst (Epitaphios)"
+- "Service of the Holy Passion" → "De tolv evangelieläsningarna"
+- "Royal Hours" → "Kungliga tidebönerna"
+- "Royal Hours and Vespers of the Apokathelosis (Descent from the Cross)" → "Kungliga tidebönerna och vesper för avtagandet från korset"
 - "Orthros" / "Όρθρος" → "Orthros"
 - "Vespers" / "Εσπερινός" → "Vesper"
-- "Hours" / "Ώρες" → "Bönetimmarna"
+- "Hours" / "Ώρες" → "Tidebönerna"
 
 Input JSON:
 %s
@@ -418,8 +426,10 @@ Examples:
 - "Helig Liturgi" → "Gudomlig Liturgi"
 - "Liturgi" → "Gudomlig Liturgi"
 - "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Gudomlig Liturgi"
+- "Hierarkisk gemensam gudstjänst, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Gemensam Liturgi"
 - "Akathist till Guds moder - Andra hälsningen, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Akathist"
 - "Stora bönetimmarna och vesper med basiliusliturgi" → "Bönetimmar"
+- "Kungliga tidebönerna och vesper för avtagandet från korset" → "Kungliga tidebönerna"
 - "Morgongudstjänst (Orthros/Matins)" → "Orthros"
 - "Stora kompletoriet med den heliga Andreasakanonen" → "Kompletoriet"
 - "Vesper" → "Vesper"
@@ -428,10 +438,14 @@ Examples:
 - "Katekes" → "Katekesundervisning"
 - "Reading of the Book of Acts" → "Apostelläsning"
 - "Reading of the Holy Gospel" → "Evangelieläsning"
+- "Sorgeropens gudstjänst (Epitaphios)" → "Sorgeropen"
+- "De tolv evangelieläsningarna" → "Evangelieläsningarna"
+- "De heliga lidandenas gudstjänst" → "Evangelieläsningarna"
 
-IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, Divine Liturgy, etc.) must get the title "Gudomlig Liturgi".
+IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, Divine Liturgy, etc.) must get the title "Gudomlig Liturgi". Exception: joint services ("gemensam") get "Gemensam Liturgi".
 IMPORTANT: Any service related to catechism or catechumens (katekumener, katekes, katekisundervisning, etc.) must get the title "Katekesundervisning".
 IMPORTANT: A "Reading of the Book of Acts" or similar scriptural reading is an Orthodox liturgical service, not a book club — title it appropriately (e.g. "Apostelläsning").
+IMPORTANT: Special Holy Week services (Epitaphios/Sorgeropen, De tolv evangelieläsningarna, etc.) must keep their specific title — do NOT collapse them into "Vesper" or "Gudomlig Liturgi".
 
 Return a JSON object mapping each input service name (exactly as given) to its short title.
 
