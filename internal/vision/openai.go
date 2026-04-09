@@ -441,6 +441,8 @@ Examples:
 - "Sorgeropens gudstjänst (Epitaphios)" → "Sorgeropen"
 - "De tolv evangelieläsningarna" → "Evangelieläsningarna"
 - "De heliga lidandenas gudstjänst" → "Evangelieläsningarna"
+- "Holy Unction - Rumänska" → "Oljesmörjelsen"
+- "Oljesmörjelsens sakrament" → "Oljesmörjelsen"
 
 IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, Divine Liturgy, etc.) must get the title "Gudomlig Liturgi". Exception: joint services ("gemensam") get "Gemensam Liturgi".
 IMPORTANT: Any service related to catechism or catechumens (katekumener, katekes, katekisundervisning, etc.) must get the title "Katekesundervisning".
