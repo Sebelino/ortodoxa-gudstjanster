@@ -94,6 +94,19 @@ var parishes = []ParishInfo{
 		Lat:       59.289587434290844,
 		Lng:       18.061649082707426,
 	},
+	{
+		Slug:      "sankt-goran",
+		Name:      "Sankt Göran",
+		ShortName: "Sankt Göran",
+		Address:   "Vanadisvägen 35, Stockholm",
+		City:      "Stockholm",
+		Website:   "https://borss.se",
+		Languages: []string{"Rumänska"},
+		Tradition: "Rumänsk-ortodox (Rumänska patriarkatet)",
+		MapQuery:  "Matteus+Lillkyrkan+Vanadisvägen+35+Stockholm",
+		Lat:       59.3454446,
+		Lng:       18.0424408,
+	},
 }
 
 var parishBySlug = func() map[string]ParishInfo {

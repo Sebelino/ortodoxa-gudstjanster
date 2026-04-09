@@ -35,6 +35,7 @@ Data samlas in av ett schemalagt jobb som kör alla scrapers och sparar resultat
 - Heliga Anna av Novgorod
 - Kristi Förklarings Ortodoxa Församling (Rysk-ortodoxa)
 - Sankt Sava (Serbisk-ortodoxa)
+- Sankt Göran (Rumänsk-ortodoxa)
 
 ## Användning
 
