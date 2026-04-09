@@ -197,8 +197,11 @@ func main() {
 	totalServices := 0
 	for _, result := range accepted {
 		for i := range result.services {
-			if title, ok := titleMap[result.services[i].ServiceName]; ok {
-				result.services[i].Title = title
+			// Only apply generated title if the scraper didn't set one explicitly
+			if result.services[i].Title == "" {
+				if title, ok := titleMap[result.services[i].ServiceName]; ok {
+					result.services[i].Title = title
+				}
 			}
 			if result.services[i].Time != nil {
 				key := result.services[i].Date + "|" + *result.services[i].Time
