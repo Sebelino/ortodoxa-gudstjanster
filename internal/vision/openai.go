@@ -526,6 +526,138 @@ Return ONLY the JSON object, no other text.`, string(namesJSON))
 	return titles, nil
 }
 
+// ScheduleException represents a date where the recurring schedule is overridden.
+type ScheduleException struct {
+	Date     string             `json:"date"`     // YYYY-MM-DD
+	Services []ExceptionService `json:"services"` // replacement services (empty = no services)
+}
+
+// ExceptionService is a single service on an exception date.
+type ExceptionService struct {
+	Name string `json:"name"` // Swedish service name
+	Time string `json:"time"` // HH:MM
+}
+
+// InterpretScheduleNotice uses AI to interpret a notice/announcement from a
+// church website and determine which dates deviate from the recurring schedule.
+// The noticeText is the full page body text (in Serbian/Cyrillic), and
+// recurringDesc describes the normal weekly schedule for context.
+// Returns a list of date-level exceptions, or nil if no changes are described.
+func (c *Client) InterpretScheduleNotice(ctx context.Context, noticeText string, recurringDesc string) ([]ScheduleException, error) {
+	today := time.Now().Format("2006-01-02")
+	prompt := fmt.Sprintf(`You are given text from a Serbian Orthodox church website. The page has two sections:
+1. A notice/announcement section ("Обавештење") that may describe temporary schedule changes
+2. A recurring weekly schedule section ("Редовни распоред")
+
+The RECURRING WEEKLY SCHEDULE (already parsed) is:
+%s
+
+The FULL PAGE TEXT (in Serbian, may include both sections) is:
+%s
+
+Today is %s. Analyze the notice/announcement section and determine if it describes any temporary changes to the recurring schedule for specific dates within the next 26 weeks.
+
+Examples of what a notice might say:
+- "During Bright Week (Светла седмица), services will only be held on Sunday, Monday and Tuesday at 9:00" → override those specific dates AND override all other days that week with empty services
+- "On [date], the evening service is cancelled" → that date has no evening service
+- "On [date], Liturgy will be at 8:00 instead of 9:30" → override that date's services
+
+For each date where the schedule DIFFERS from the recurring one, output:
+- date: YYYY-MM-DD
+- services: array of services that SHOULD be held on that date (empty array if NO services that day)
+  Each service has:
+  - name: service name in Swedish. Use these translations:
+    - Јутрење/Jutrenje → "Morgongudstjänst"
+    - Литургија/Liturgija → "Helig Liturgi"
+    - Вечерње/Večernje → "Aftongudstjänst"
+    - Васкршња Литургија → "Påskliturgi"
+    - Света Литургија → "Helig Liturgi"
+    For other service names, translate to Swedish.
+  - time: HH:MM format (24-hour)
+
+CRITICAL RULES:
+- When the notice describes a special liturgical period (e.g., Pascha/Easter, Bright Week, Holy Week, Christmas), the listed dates and services represent the COMPLETE schedule for that entire period. You MUST:
+  1. Override listed dates with the services shown in the notice.
+  2. Override ALL other days within that period that would normally have recurring services with an EMPTY services array (no services). This includes weekdays not mentioned in the notice.
+  3. The period spans from the earliest date in the notice through the end of that calendar week (Saturday). For example, if the notice lists Easter services from Saturday April 11 through Tuesday April 14, then Wednesday April 15 through Friday April 17 must also be overridden with empty services arrays, because those days are part of Bright Week and the notice does not list any services for them.
+- If the notice mentions a date range (e.g., "from April 13 to April 20"), list EACH affected date individually.
+- If a date normally has services but the notice says no services that day, include it with an empty services array.
+- If a date normally has no services but the notice adds one, include it with the added services.
+- Skip dates before today.
+- If the notice doesn't describe any schedule changes, return an empty array.
+
+Return ONLY a JSON array, no other text.`, recurringDesc, noticeText, today)
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 16384,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.doRequest(req, "InterpretScheduleNotice", "gpt-4o")
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var exceptions []ScheduleException
+	if err := json.Unmarshal([]byte(content), &exceptions); err != nil {
+		return nil, fmt.Errorf("parsing schedule exceptions: %w (content: %s)", err, content)
+	}
+
+	return exceptions, nil
+}
+
 // EventInfo holds the relevant fields for determining an event's language.
 type EventInfo struct {
 	ServiceName string  `json:"service_name"`

@@ -27,8 +27,27 @@ type RecurringService struct {
 	Time string   `json:"time"`
 }
 
-// Part 1: Fetch raw table text from the website using chromedp
-func FetchScheduleTable(ctx context.Context) (string, error) {
+// PageContent holds the extracted text from the calendar page.
+type PageContent struct {
+	TableText string // The recurring schedule table text
+	BodyText  string // The full page body text (includes notices)
+}
+
+// ScheduleException represents a date where the recurring schedule is overridden.
+type ScheduleException struct {
+	Date     string             `json:"date"`     // YYYY-MM-DD
+	Services []ExceptionService `json:"services"` // replacement services (empty = no services that day)
+}
+
+// ExceptionService is a single service on an exception date.
+type ExceptionService struct {
+	Name string `json:"name"` // Swedish service name
+	Time string `json:"time"` // HH:MM
+}
+
+// FetchPageContent fetches the calendar page and extracts both the recurring
+// schedule table text and the full page body text (which may contain notices).
+func FetchPageContent(ctx context.Context) (*PageContent, error) {
 	// Create headless Chrome context
 	opts := chromedp.DefaultExecAllocatorOptions[:]
 	if chromePath := os.Getenv("CHROME_PATH"); chromePath != "" {
@@ -47,6 +66,7 @@ func FetchScheduleTable(ctx context.Context) (string, error) {
 	defer chromeCancel()
 
 	var tableText string
+	var bodyText string
 
 	// Navigate to the calendar page and extract the schedule table
 	err := chromedp.Run(chromeCtx,
@@ -57,12 +77,17 @@ func FetchScheduleTable(ctx context.Context) (string, error) {
 		chromedp.Sleep(1*time.Second),
 		// Extract the table text content
 		chromedp.Text(`table`, &tableText, chromedp.ByQuery),
+		// Extract the full page body text (includes notices)
+		chromedp.Text(`body`, &bodyText, chromedp.ByQuery),
 	)
 	if err != nil {
-		return "", fmt.Errorf("extracting schedule table: %w", err)
+		return nil, fmt.Errorf("extracting schedule table: %w", err)
 	}
 
-	return tableText, nil
+	return &PageContent{
+		TableText: tableText,
+		BodyText:  bodyText,
+	}, nil
 }
 
 // Part 2: Parse raw table text into structured schedule
@@ -149,9 +174,17 @@ type CalendarEvent struct {
 	Time        string `json:"time"`
 }
 
-// Part 3: Generate calendar events from structured schedule
-func GenerateEvents(schedule *RecurringSchedule, weeks int) []CalendarEvent {
+// Part 3: Generate calendar events from structured schedule.
+// If exceptions is non-nil, dates listed there replace the recurring schedule
+// for that date entirely (the exception's Services list is used instead).
+func GenerateEvents(schedule *RecurringSchedule, weeks int, exceptions []ScheduleException) []CalendarEvent {
 	var events []CalendarEvent
+
+	// Build exception lookup: date → []ExceptionService
+	exceptionMap := make(map[string][]ExceptionService)
+	for _, exc := range exceptions {
+		exceptionMap[exc.Date] = exc.Services
+	}
 
 	stockholm, err := time.LoadLocation("Europe/Stockholm")
 	if err != nil {
@@ -175,7 +208,23 @@ func GenerateEvents(schedule *RecurringSchedule, weeks int) []CalendarEvent {
 	}
 
 	for current.Before(end) {
+		dateStr := current.Format("2006-01-02")
 		currentWeekday := current.Weekday()
+
+		// Check if this date has an exception override
+		if excServices, hasException := exceptionMap[dateStr]; hasException {
+			// Use exception services instead of recurring schedule
+			for _, excSvc := range excServices {
+				events = append(events, CalendarEvent{
+					Date:        dateStr,
+					DayOfWeek:   WeekdayToSwedish(currentWeekday),
+					ServiceName: excSvc.Name,
+					Time:        excSvc.Time,
+				})
+			}
+			current = current.AddDate(0, 0, 1)
+			continue
+		}
 
 		for _, svc := range schedule.Services {
 			// Check if this service runs on the current weekday
@@ -193,7 +242,7 @@ func GenerateEvents(schedule *RecurringSchedule, weeks int) []CalendarEvent {
 
 			if shouldInclude {
 				events = append(events, CalendarEvent{
-					Date:        current.Format("2006-01-02"),
+					Date:        dateStr,
 					DayOfWeek:   WeekdayToSwedish(currentWeekday),
 					ServiceName: svc.Name,
 					Time:        svc.Time,

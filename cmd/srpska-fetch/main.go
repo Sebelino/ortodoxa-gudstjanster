@@ -17,11 +17,11 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	tableText, err := srpska.FetchScheduleTable(ctx)
+	page, err := srpska.FetchPageContent(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Print(tableText)
+	fmt.Print(page.TableText)
 }

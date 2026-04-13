@@ -21,14 +21,14 @@ func main() {
 	defer cancel()
 
 	// Part 1: Fetch raw table text
-	tableText, err := srpska.FetchScheduleTable(ctx)
+	page, err := srpska.FetchPageContent(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error fetching: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Part 2: Parse into structured schedule
-	schedule, err := srpska.ParseScheduleTable(tableText)
+	schedule, err := srpska.ParseScheduleTable(page.TableText)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing: %v\n", err)
 		os.Exit(1)

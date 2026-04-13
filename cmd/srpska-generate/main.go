@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// Generate events for 8 weeks
-	events := srpska.GenerateEvents(&schedule, defaultWeeks)
+	events := srpska.GenerateEvents(&schedule, defaultWeeks, nil)
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

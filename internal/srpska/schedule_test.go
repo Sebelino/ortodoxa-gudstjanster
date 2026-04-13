@@ -194,7 +194,7 @@ func TestGenerateEvents(t *testing.T) {
 		},
 	}
 
-	events := GenerateEvents(schedule, 2)
+	events := GenerateEvents(schedule, 2, nil)
 
 	// 2 weeks should have exactly 2 Sundays
 	if len(events) < 1 || len(events) > 3 {
@@ -223,7 +223,7 @@ func TestGenerateEventsMultipleServices(t *testing.T) {
 		},
 	}
 
-	events := GenerateEvents(schedule, 1)
+	events := GenerateEvents(schedule, 1, nil)
 
 	// In 1 week we should have at least 1 Saturday + 1 Sunday worth of events
 	if len(events) < 2 {
@@ -247,11 +247,95 @@ func TestGenerateEventsDateFormat(t *testing.T) {
 		},
 	}
 
-	events := GenerateEvents(schedule, 1)
+	events := GenerateEvents(schedule, 1, nil)
 
 	for _, e := range events {
 		if len(e.Date) != 10 || e.Date[4] != '-' || e.Date[7] != '-' {
 			t.Errorf("event.Date = %q, want YYYY-MM-DD format", e.Date)
+		}
+	}
+}
+
+func TestGenerateEventsWithExceptions(t *testing.T) {
+	schedule := &RecurringSchedule{
+		Services: []RecurringService{
+			{Name: "Morgongudstjänst", Days: []string{"måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag"}, Time: "08:00"},
+			{Name: "Helig Liturgi", Days: []string{"söndag"}, Time: "09:30"},
+		},
+	}
+
+	// Find the next Monday from today
+	now := time.Now()
+	daysUntilMonday := (int(time.Monday) - int(now.Weekday()) + 7) % 7
+	if daysUntilMonday == 0 {
+		daysUntilMonday = 7
+	}
+	nextMonday := now.AddDate(0, 0, daysUntilMonday)
+	mondayStr := nextMonday.Format("2006-01-02")
+
+	exceptions := []ScheduleException{
+		{
+			// Override Monday: replace with a single service at different time
+			Date: mondayStr,
+			Services: []ExceptionService{
+				{Name: "Helig Liturgi", Time: "10:00"},
+			},
+		},
+	}
+
+	events := GenerateEvents(schedule, 4, exceptions)
+
+	// Check that the exception date has the override service, not the recurring one
+	for _, e := range events {
+		if e.Date == mondayStr {
+			if e.ServiceName != "Helig Liturgi" || e.Time != "10:00" {
+				t.Errorf("exception date %s: got %s at %s, want Helig Liturgi at 10:00", mondayStr, e.ServiceName, e.Time)
+			}
+		}
+	}
+
+	// Count events on the exception date — should be exactly 1
+	count := 0
+	for _, e := range events {
+		if e.Date == mondayStr {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected 1 event on exception date %s, got %d", mondayStr, count)
+	}
+}
+
+func TestGenerateEventsWithEmptyException(t *testing.T) {
+	schedule := &RecurringSchedule{
+		Services: []RecurringService{
+			{Name: "Morgongudstjänst", Days: []string{"måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag"}, Time: "08:00"},
+		},
+	}
+
+	// Find the next Tuesday from today
+	now := time.Now()
+	daysUntilTuesday := (int(time.Tuesday) - int(now.Weekday()) + 7) % 7
+	if daysUntilTuesday == 0 {
+		daysUntilTuesday = 7
+	}
+	nextTuesday := now.AddDate(0, 0, daysUntilTuesday)
+	tuesdayStr := nextTuesday.Format("2006-01-02")
+
+	exceptions := []ScheduleException{
+		{
+			// No services on Tuesday (empty services list)
+			Date:     tuesdayStr,
+			Services: []ExceptionService{},
+		},
+	}
+
+	events := GenerateEvents(schedule, 4, exceptions)
+
+	// No events should exist on the exception date
+	for _, e := range events {
+		if e.Date == tuesdayStr {
+			t.Errorf("expected no events on exception date %s, but got %s at %s", tuesdayStr, e.ServiceName, e.Time)
 		}
 	}
 }
