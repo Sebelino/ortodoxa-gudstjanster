@@ -16,7 +16,7 @@ const (
 	romanianCalendarPage = "https://calendar.google.com/calendar/embed?src=e55ade1dbe3651b62babb5e6012c4bde4765646a8932498de709d7816ee026e4%40group.calendar.google.com&ctz=Europe%2FStockholm"
 	romanianCalendarName = "Google Calendar (Rumänska Ortodoxa Kyrkan)"
 	romanianLocation     = "Matteus Lillkyrkan, Vanadisvägen 35, 113 23 Stockholm"
-	romanianLanguage     = "Rumänska"
+	romanianLanguage     = "Rumänska, svenska, engelska"
 )
 
 // RomanianScraper fetches events from the Romanian Orthodox church Sankt Göran's Google Calendar.

@@ -101,7 +101,7 @@ var parishes = []ParishInfo{
 		Address:   "Vanadisvägen 35, Stockholm",
 		City:      "Stockholm",
 		Website:   "https://borss.se",
-		Languages: []string{"Rumänska"},
+		Languages: []string{"Rumänska", "Svenska", "Engelska"},
 		Tradition: "Rumänsk-ortodox (Rumänska patriarkatet)",
 		MapQuery:  "Matteus+Lillkyrkan+Vanadisvägen+35+Stockholm",
 		Lat:       59.3454446,
