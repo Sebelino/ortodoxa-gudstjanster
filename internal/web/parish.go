@@ -102,7 +102,7 @@ var parishes = []ParishInfo{
 		City:      "Stockholm",
 		Website:   "https://borss.se",
 		Languages: []string{"Rumänska", "Svenska", "Engelska"},
-		Tradition: "Rumänsk-ortodox (Rumänska patriarkatet)",
+		Tradition: "Rumänsk-ortodox",
 		MapQuery:  "Matteus+Lillkyrkan+Vanadisvägen+35+Stockholm",
 		Lat:       59.3454446,
 		Lng:       18.0424408,
