@@ -114,6 +114,7 @@ func main() {
 	registry.Register(scraper.NewRyskaScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewSrpskaScraper(visionClient))
 	registry.Register(scraper.NewGCalendarScraper())
+	registry.Register(scraper.NewGCalendarManualScraper())
 	registry.Register(scraper.NewRomanianScraper())
 	registry.Register(scraper.NewSommarlagerScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewManualScraper(manualEventsReader))
