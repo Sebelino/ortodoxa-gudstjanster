@@ -194,6 +194,7 @@ Return a JSON array of services with these fields:
 - occasion: optional, any special occasion or holiday mentioned
 
 Only include entries that have both a date/day and a time specified.
+Include entries where the time is given in prose form rather than tabular form. For example, "21 Tisdag Rádonitsa — minnesdag för de avsomnade Kl. 14.00 förrättas panichida på Skogskyrkogården" is a valid entry (date=21, time=14:00, service_name="Panichida på Skogskyrkogården", occasion="Rádonitsa — minnesdag för de avsomnade"). Times written as "Kl. HH.MM" or "HH.MM" should be normalized to "HH:MM".
 Return ONLY the JSON array, no other text.
 
 Text to parse:
