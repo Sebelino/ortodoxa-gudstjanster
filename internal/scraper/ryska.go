@@ -61,14 +61,17 @@ func ExtractRyskaScheduleTextFromHTML(htmlContent string) string {
 	content = regexp.MustCompile(`[\x{200B}\x{200C}\x{200D}\x{FEFF}\x{00A0}\x{2060}\x{200E}\x{200F}]`).ReplaceAllString(content, " ")
 	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
 
-	// Extract just the schedule section (from "Januari" to "bottom of page" or similar)
-	schedulePattern := regexp.MustCompile(`(?i)(Januari\s.+?)(?:bottom of page|KRISTI FÖRKLARINGS|$)`)
+	// Extract just the schedule section. The page header is
+	// "GUDSTJÄNSTKUNGÖRELSE ..." and it ends at "bottom of page". Historically
+	// it spanned the whole year starting from "Januari"; it now shows only the
+	// current and next month, so anchor on the header instead of a month name.
+	schedulePattern := regexp.MustCompile(`(?is)(GUDSTJÄNSTKUNGÖRELSE.+?)(?:bottom of page|$)`)
 	if match := schedulePattern.FindStringSubmatch(content); len(match) > 1 {
 		content = match[1]
 	}
 
 	// Add newlines for better structure
-	content = regexp.MustCompile(`\s+(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)\s`).ReplaceAllString(content, "\n\n$1\n")
+	content = regexp.MustCompile(`(?i)\s+(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)\s`).ReplaceAllString(content, "\n\n$1\n")
 	content = regexp.MustCompile(`\s+(\d{1,2}\s+(?:Söndag|Måndag|Tisdag|Onsdag|Torsdag|Fredag|Lördag))`).ReplaceAllString(content, "\n$1")
 
 	return strings.TrimSpace(content)
