@@ -576,13 +576,9 @@ For each date where the schedule DIFFERS from the recurring one, output:
   - time: HH:MM format (24-hour)
 
 CRITICAL RULES:
-- When the notice describes a special liturgical period (e.g., Pascha/Easter, Bright Week, Holy Week, Christmas), the listed dates and services represent the COMPLETE schedule for that entire period. You MUST:
-  1. Override listed dates with the services shown in the notice.
-  2. Override ALL other days within that period that would normally have recurring services with an EMPTY services array (no services). This includes weekdays not mentioned in the notice.
-  3. The period spans from the earliest date in the notice through the end of that calendar week (Saturday). For example, if the notice lists Easter services from Saturday April 11 through Tuesday April 14, then Wednesday April 15 through Friday April 17 must also be overridden with empty services arrays, because those days are part of Bright Week and the notice does not list any services for them.
+- The exception period spans from the earliest date in the notice through the LAST date in the notice. The recurring schedule resumes the day AFTER the last listed date. For example, if the notice lists Easter services from Saturday April 11 through Tuesday April 14, the exception period is April 11-14; the recurring schedule resumes on Wednesday April 15.
+- Within the exception period, you MUST output an override for EVERY date that would normally have recurring services, even dates not explicitly mentioned in the notice. For dates the notice lists, use the notice's services. For dates within the period that the notice does NOT list, output an empty services array (no services that day).
 - If the notice mentions a date range (e.g., "from April 13 to April 20"), list EACH affected date individually.
-- If a date normally has services but the notice says no services that day, include it with an empty services array.
-- If a date normally has no services but the notice adds one, include it with the added services.
 - Skip dates before today.
 - If the notice doesn't describe any schedule changes, return an empty array.
 
