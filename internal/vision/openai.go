@@ -195,6 +195,8 @@ Return a JSON array of services with these fields:
 
 Only include entries that have both a date/day and a time specified.
 Include entries where the time is given in prose form rather than tabular form. For example, "21 Tisdag Rádonitsa — minnesdag för de avsomnade Kl. 14.00 förrättas panichida på Skogskyrkogården" is a valid entry (date=21, time=14:00, service_name="Panichida på Skogskyrkogården", occasion="Rádonitsa — minnesdag för de avsomnade"). Times written as "Kl. HH.MM" or "HH.MM" should be normalized to "HH:MM".
+
+Correct typos where the day-of-week and the day-of-month disagree. ALWAYS trust the day-of-week label over the day number, even when the day number coincides with a traditional feast date (e.g., St. George is traditionally May 6, but if the entry reads "6 Lördag SM Georgios" in May 2026 and May 6 is a Wednesday, the parish has moved the observance to a Saturday — correct the date to the nearest Saturday in May 2026, e.g., May 2). Replace the day number with the nearest date in the same month that matches that weekday and is not already assigned to another entry. Another example: "7 Söndag Den lame mannens söndag" in May 2026 where May 7 is a Thursday → use May 3 (Sunday). If two surrounding entries bracket the ambiguous date, pick the option that keeps the schedule in chronological order where possible, but never assign the same date as another entry.
 Return ONLY the JSON array, no other text.
 
 Text to parse:
