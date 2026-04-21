@@ -217,6 +217,21 @@
             font-size: 0.85rem;
         }
 
+        .show-more-btn {
+            background: #2c5282;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin: 0.25rem 0 0.75rem;
+        }
+
+        .show-more-btn:hover {
+            background: #1a365d;
+        }
+
         .filter-panel {
             background: white;
             border-radius: 6px;
@@ -399,6 +414,7 @@
         let parishByName = {};
         let excludedSources = new Set();
         let excludedLanguages = new Set();
+        let visibleWeeks = 4;
 
         async function loadServices() {
             const content = document.getElementById('content');
@@ -571,6 +587,10 @@
         function renderServices() {
             const content = document.getElementById('content');
             const today = new Date().toISOString().slice(0, 10);
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() + visibleWeeks * 7);
+            const cutoff = cutoffDate.toISOString().slice(0, 10);
+
             const filteredServices = allServices.filter(s => {
                 if (s.date < today) return false;
                 if (excludedSources.has(getParishGroup(s))) return false;
@@ -583,9 +603,12 @@
                 return;
             }
 
+            const visibleServices = filteredServices.filter(s => s.date <= cutoff);
+            const hasMore = filteredServices.length > visibleServices.length;
+
             // Group services by date
             const grouped = {};
-            filteredServices.forEach(service => {
+            visibleServices.forEach(service => {
                 if (!grouped[service.date]) {
                     grouped[service.date] = {
                         dayOfWeek: service.day_of_week,
@@ -629,8 +652,16 @@
             });
 
             const totalCurrent = allServices.filter(s => s.date >= today).length;
-            html += `<p class="service-count">Visar ${filteredServices.length} av ${totalCurrent} gudstjänster</p>`;
+            html += `<p class="service-count">Visar ${visibleServices.length} av ${totalCurrent} gudstjänster</p>`;
+            if (hasMore) {
+                html += `<div style="text-align:center;"><button class="show-more-btn" onclick="showMore()">Visa fler</button></div>`;
+            }
             content.innerHTML = html;
+        }
+
+        function showMore() {
+            visibleWeeks += 4;
+            renderServices();
         }
 
         function formatDate(dateStr) {
