@@ -1,10 +1,16 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "se.ortodoxagudstjanster.twa",
-    "sha256_cert_fingerprints": [
-      "1C:13:7F:8C:2D:22:85:72:7A:8D:E2:F6:D2:10:8B:28:F8:DF:C3:6C:E0:5E:AF:A8:3D:9B:67:72:9F:8D:35:66"
-    ]
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "se.ortodoxagudstjanster.twa",
+      "sha256_cert_fingerprints": [
+        "1C:13:7F:8C:2D:22:85:72:7A:8D:E2:F6:D2:10:8B:28:F8:DF:C3:6C:E0:5E:AF:A8:3D:9B:67:72:9F:8D:35:66",
+        "9A:66:F2:B1:86:4E:28:17:09:4E:8E:C4:C3:75:83:BF:25:A6:50:E8:B0:6E:44:37:06:8A:8F:18:A9:17:87:8A"
+      ]
+    }
   }
-}]
+]
