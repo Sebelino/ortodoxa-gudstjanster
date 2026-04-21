@@ -1,6 +1,8 @@
 calendar.json
 /server
+/ingest
 /scrape
+.claude/
 disk/
 test-disk/
 /cache/
