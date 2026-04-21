@@ -24,6 +24,8 @@
     <meta property="og:description" content="Lista över ortodoxa församlingar i Sverige.">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <style>
+        {{template "theme-css" .}}
+
         * {
             margin: 0;
             padding: 0;
@@ -32,14 +34,14 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: var(--bg);
+            color: var(--text);
             line-height: 1.5;
             font-size: 14px;
         }
 
         header {
-            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
             color: white;
             padding: 1rem;
             text-align: center;
@@ -56,25 +58,10 @@
             padding: 1rem;
         }
 
-        .breadcrumb {
-            font-size: 0.85rem;
-            margin-bottom: 1rem;
-            color: #666;
-        }
-
-        .breadcrumb a {
-            color: #2c5282;
-            text-decoration: none;
-        }
-
-        .breadcrumb a:hover {
-            text-decoration: underline;
-        }
-
         #map {
             height: 350px;
             border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px var(--shadow);
             margin-bottom: 1rem;
         }
 
@@ -85,9 +72,9 @@
         }
 
         .parish-card {
-            background: white;
+            background: var(--surface);
             border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px var(--shadow);
             overflow: hidden;
             text-decoration: none;
             color: inherit;
@@ -95,7 +82,7 @@
         }
 
         .parish-card:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px var(--shadow-hover);
         }
 
         .parish-card-body {
@@ -105,21 +92,23 @@
         .parish-name {
             font-weight: 600;
             font-size: 1rem;
-            color: #1a365d;
+            color: var(--parish-name);
             margin-bottom: 0.2rem;
         }
 
         .parish-tradition {
             font-size: 0.85rem;
-            color: #666;
+            color: var(--text-muted);
             margin-bottom: 0.3rem;
         }
 
         .parish-address {
             font-size: 0.85rem;
-            color: #888;
+            color: var(--text-label);
         }
+
     </style>
+    {{template "theme-flash" .}}
 </head>
 <body>
     <header>
@@ -128,7 +117,8 @@
 
     <main>
         <div class="breadcrumb">
-            <a href="/">Alla gudstj&auml;nster</a> &rsaquo; F&ouml;rsamlingar
+            <span><a href="/">Alla gudstj&auml;nster</a> &rsaquo; F&ouml;rsamlingar</span>
+            <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
         </div>
 
         <div id="map"></div>
@@ -169,5 +159,6 @@
 
         map.fitBounds(bounds, {padding: [30, 30]});
     </script>
+    {{template "theme-js" .}}
 </body>
 </html>

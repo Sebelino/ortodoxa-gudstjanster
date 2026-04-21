@@ -13,6 +13,8 @@
     </script>
     <title>Feedback - Ortodoxa Gudstjänster</title>
     <style>
+        {{template "theme-css" .}}
+
         * {
             margin: 0;
             padding: 0;
@@ -21,14 +23,14 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: var(--bg);
+            color: var(--text);
             line-height: 1.5;
             font-size: 14px;
         }
 
         header {
-            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
             color: white;
             padding: 1rem;
             text-align: center;
@@ -39,16 +41,6 @@
             font-weight: 600;
         }
 
-        header a {
-            color: rgba(255,255,255,0.8);
-            text-decoration: none;
-            font-size: 0.85rem;
-        }
-
-        header a:hover {
-            color: white;
-        }
-
         main {
             max-width: 600px;
             margin: 0 auto;
@@ -56,20 +48,20 @@
         }
 
         .form-container {
-            background: white;
+            background: var(--surface);
             border-radius: 6px;
             padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px var(--shadow);
         }
 
         .form-container h2 {
             font-size: 1.1rem;
             margin-bottom: 0.5rem;
-            color: #1a365d;
+            color: var(--parish-name);
         }
 
         .form-container p {
-            color: #666;
+            color: var(--text-muted);
             margin-bottom: 1.5rem;
             font-size: 0.9rem;
         }
@@ -82,21 +74,23 @@
             display: block;
             font-weight: 500;
             margin-bottom: 0.35rem;
-            color: #4a5568;
+            color: var(--label);
         }
 
         select, input, textarea {
             width: 100%;
             padding: 0.6rem 0.75rem;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--form-border);
             border-radius: 4px;
             font-size: 0.9rem;
             font-family: inherit;
+            background: var(--surface);
+            color: var(--text);
         }
 
         select:focus, input:focus, textarea:focus {
             outline: none;
-            border-color: #2c5282;
+            border-color: var(--link);
             box-shadow: 0 0 0 2px rgba(44, 82, 130, 0.1);
         }
 
@@ -106,7 +100,7 @@
         }
 
         .submit-btn {
-            background: #2c5282;
+            background: var(--btn);
             color: white;
             border: none;
             padding: 0.7rem 1.5rem;
@@ -118,11 +112,11 @@
         }
 
         .submit-btn:hover {
-            background: #1a365d;
+            background: var(--btn-hover);
         }
 
         .submit-btn:disabled {
-            background: #a0aec0;
+            background: var(--btn-disabled);
             cursor: not-allowed;
         }
 
@@ -134,13 +128,13 @@
         }
 
         .message.success {
-            background: #c6f6d5;
-            color: #22543d;
+            background: var(--msg-success-bg);
+            color: var(--msg-success-text);
         }
 
         .message.error {
-            background: #fed7d7;
-            color: #c53030;
+            background: var(--error-bg);
+            color: var(--error-text);
         }
 
         .hidden {
@@ -158,14 +152,19 @@
             z-index: -1;
         }
     </style>
+    {{template "theme-flash" .}}
 </head>
 <body>
     <header>
         <h1>Feedback</h1>
-        <a href="/">&larr; Tillbaka till kalendern</a>
     </header>
 
     <main>
+        <div class="breadcrumb">
+            <span><a href="/">&larr; Tillbaka till kalendern</a></span>
+            <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
+        </div>
+
         <div class="form-container">
             <h2>Skicka feedback</h2>
             <p>Rapportera fel i schemat, be om att en ny församling läggs till, eller skicka andra synpunkter.</p>
@@ -251,5 +250,6 @@
             submitBtn.textContent = 'Skicka';
         });
     </script>
+    {{template "theme-js" .}}
 </body>
 </html>
