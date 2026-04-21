@@ -628,7 +628,8 @@
                 `;
             });
 
-            html += `<p class="service-count">Visar ${filteredServices.length} av ${allServices.length} gudstjänster</p>`;
+            const totalCurrent = allServices.filter(s => s.date >= today).length;
+            html += `<p class="service-count">Visar ${filteredServices.length} av ${totalCurrent} gudstjänster</p>`;
             content.innerHTML = html;
         }
 
