@@ -143,31 +143,37 @@ func (h *Handler) noCache(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// parseWithTheme parses a named template file together with the shared _theme.html
+// partial, making the theme-css, theme-flash, and theme-js blocks available.
+func parseWithTheme(name string) (*template.Template, error) {
+	return template.ParseFS(templates, "templates/"+name, "templates/_theme.html")
+}
+
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	data, err := templates.ReadFile("templates/index.html")
+
+	tmpl, err := parseWithTheme("index.html")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	html := string(data)
-
 	// Inject Event JSON-LD for SEO (search engines don't execute JS)
+	var jsonLD template.HTML
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	if services, err := h.fetcher.GetAllServices(ctx); err == nil {
 		services = filterAndSort(services)
-		if jsonLD := buildEventJSONLD(services); jsonLD != "" {
-			html = strings.Replace(html, "</head>", jsonLD+"\n</head>", 1)
+		if jld := buildEventJSONLD(services); jld != "" {
+			jsonLD = template.HTML(jld)
 		}
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(html))
+	tmpl.Execute(w, struct{ JSONLD template.HTML }{JSONLD: jsonLD})
 }
 
 func buildEventJSONLD(services []model.ChurchService) string {
@@ -767,13 +773,7 @@ func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleParishesPage(w http.ResponseWriter, r *http.Request) {
-	tmplData, err := templates.ReadFile("templates/parishes.html")
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	tmpl, err := template.New("parishes").Parse(string(tmplData))
+	tmpl, err := parseWithTheme("parishes.html")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -791,13 +791,7 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmplData, err := templates.ReadFile("templates/parish.html")
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	tmpl, err := template.New("parish").Parse(string(tmplData))
+	tmpl, err := parseWithTheme("parish.html")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -836,13 +830,7 @@ func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmplData, err := templates.ReadFile("templates/event.html")
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	tmpl, err := template.New("event").Parse(string(tmplData))
+	tmpl, err := parseWithTheme("event.html")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -926,13 +914,13 @@ func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		data, err := templates.ReadFile("templates/feedback.html")
+		tmpl, err := parseWithTheme("feedback.html")
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(data)
+		tmpl.Execute(w, nil)
 		return
 	}
 
@@ -996,23 +984,23 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleAbout(w http.ResponseWriter, r *http.Request) {
-	data, err := templates.ReadFile("templates/about.html")
+	tmpl, err := parseWithTheme("about.html")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(data)
+	tmpl.Execute(w, nil)
 }
 
 func (h *Handler) handlePrivacy(w http.ResponseWriter, r *http.Request) {
-	data, err := templates.ReadFile("templates/privacy.html")
+	tmpl, err := parseWithTheme("privacy.html")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(data)
+	tmpl.Execute(w, nil)
 }
 
 func getClientIP(r *http.Request) string {

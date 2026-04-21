@@ -31,6 +31,8 @@
     <meta name="twitter:title" content="Ortodoxa Gudstjänster">
     <meta name="twitter:description" content="Samlade gudstjänsttider för ortodoxa kyrkor i Sverige.">
     <style>
+        {{template "theme-css" .}}
+
         * {
             margin: 0;
             padding: 0;
@@ -39,14 +41,14 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: var(--bg);
+            color: var(--text);
             line-height: 1.4;
             font-size: 14px;
         }
 
         header {
-            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
             color: white;
             padding: 1rem;
             text-align: center;
@@ -70,13 +72,20 @@
         }
 
         .top-bar a {
-            color: #2c5282;
+            color: var(--link);
             text-decoration: none;
         }
 
         .top-bar a:hover {
             text-decoration: underline;
         }
+
+        .top-bar .sep {
+            margin: 0 0.5rem;
+            color: var(--sep);
+        }
+
+
 
         main {
             max-width: 1000px;
@@ -87,25 +96,25 @@
         .loading, .error {
             text-align: center;
             padding: 2rem;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .error {
-            background: #fed7d7;
-            color: #c53030;
+            background: var(--error-bg);
+            color: var(--error-text);
             border-radius: 4px;
         }
 
         .date-group {
-            background: white;
+            background: var(--surface);
             border-radius: 6px;
             margin-bottom: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px var(--shadow);
             overflow: hidden;
         }
 
         .date-header {
-            background: #2c5282;
+            background: var(--date-header);
             color: white;
             padding: 0.5rem 0.75rem;
             font-weight: 600;
@@ -125,7 +134,7 @@
         }
 
         .service-row {
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border);
             cursor: pointer;
         }
 
@@ -134,7 +143,7 @@
         }
 
         .service-row:hover {
-            background: #f8fafc;
+            background: var(--surface-alt);
         }
 
         .service-row td {
@@ -146,7 +155,7 @@
             content: '▸';
             display: inline-block;
             margin-right: 0.4rem;
-            color: #999;
+            color: var(--arrow);
             font-size: 0.7rem;
             transition: transform 0.2s;
         }
@@ -157,8 +166,8 @@
 
         .service-details {
             display: none;
-            background: #f8fafc;
-            border-bottom: 1px solid #eee;
+            background: var(--surface-alt);
+            border-bottom: 1px solid var(--border);
         }
 
         .service-details.visible {
@@ -167,7 +176,7 @@
 
         .service-details td {
             padding: 0.5rem 0.75rem 0.75rem 1.5rem;
-            color: #555;
+            color: var(--text-detail);
             font-size: 0.85rem;
         }
 
@@ -180,12 +189,16 @@
         }
 
         .detail-label {
-            color: #888;
+            color: var(--text-label);
             margin-right: 0.25rem;
         }
 
+        .detail-none {
+            color: var(--text-label);
+        }
+
         .service-details a {
-            color: #2c5282;
+            color: var(--link);
             text-decoration: none;
         }
 
@@ -196,7 +209,7 @@
         .col-time {
             width: 70px;
             font-weight: 500;
-            color: #1a365d;
+            color: var(--text-time);
             white-space: nowrap;
         }
 
@@ -206,19 +219,19 @@
 
         .col-source {
             width: 140px;
-            color: #666;
+            color: var(--text-muted);
             font-size: 0.85rem;
         }
 
         .service-count {
             text-align: center;
-            color: #666;
+            color: var(--text-muted);
             padding: 0.75rem;
             font-size: 0.85rem;
         }
 
         .show-more-btn {
-            background: #2c5282;
+            background: var(--btn);
             color: white;
             border: none;
             padding: 0.5rem 1.5rem;
@@ -229,23 +242,23 @@
         }
 
         .show-more-btn:hover {
-            background: #1a365d;
+            background: var(--btn-hover);
         }
 
         .filter-panel {
-            background: white;
+            background: var(--surface);
             border-radius: 6px;
             margin-bottom: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px var(--shadow);
             overflow: hidden;
         }
 
         .filter-header {
-            background: #e2e8f0;
+            background: var(--filter-bg);
             padding: 0.5rem 0.75rem;
             font-weight: 500;
             font-size: 0.85rem;
-            color: #4a5568;
+            color: var(--filter-text);
             cursor: pointer;
             display: flex;
             justify-content: space-between;
@@ -253,7 +266,7 @@
         }
 
         .filter-header:hover {
-            background: #cbd5e0;
+            background: var(--filter-hover);
         }
 
         .filter-header::after {
@@ -290,7 +303,7 @@
         }
 
         .subscribe-section {
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid var(--border);
             padding: 0.75rem;
             display: flex;
             flex-wrap: wrap;
@@ -304,11 +317,11 @@
 
         .subscribe-label {
             font-size: 0.85rem;
-            color: #4a5568;
+            color: var(--filter-text);
         }
 
         .subscribe-btn {
-            background: #2c5282;
+            background: var(--btn);
             color: white;
             border: none;
             padding: 0.4rem 0.75rem;
@@ -322,12 +335,12 @@
         }
 
         .subscribe-btn:hover {
-            background: #1a365d;
+            background: var(--btn-hover);
         }
 
         .copy-feedback {
             font-size: 0.8rem;
-            color: #38a169;
+            color: var(--success);
             opacity: 0;
             transition: opacity 0.2s;
         }
@@ -338,8 +351,8 @@
 
         .offline-banner {
             display: none;
-            background: #f6ad55;
-            color: #744210;
+            background: var(--offline-bg);
+            color: var(--offline-text);
             text-align: center;
             padding: 0.4rem;
             font-size: 0.8rem;
@@ -360,6 +373,7 @@
             }
         }
     </style>
+    {{template "theme-flash" .}}
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -370,6 +384,7 @@
       "inLanguage": "sv"
     }
     </script>
+    {{.JSONLD}}
 </head>
 <body>
     <div id="offline-banner" class="offline-banner">Du är offline – visar sparade data</div>
@@ -381,12 +396,14 @@
     <main>
         <div class="top-bar">
             <a href="https://github.com/Sebelino/ortodoxa-gudstjanster" target="_blank" rel="noopener" title="GitHub"><svg height="16" width="16" viewBox="0 0 16 16" style="vertical-align: middle; fill: currentColor;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg></a>
-            <span style="margin: 0 0.5rem; color: #ccc;">|</span>
+            <span class="sep">|</span>
             <a href="/parishes">Församlingar</a>
-            <span style="margin: 0 0.5rem; color: #ccc;">|</span>
+            <span class="sep">|</span>
             <a href="/feedback">Rapportera fel/önskemål</a>
-            <span style="margin: 0 0.5rem; color: #ccc;">|</span>
+            <span class="sep">|</span>
             <a href="/privacy">Integritetspolicy</a>
+            <span class="sep">|</span>
+            <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
         </div>
         <div id="filter-panel" class="filter-panel" style="display: none;">
             <div class="filter-header" onclick="toggleFilter()">
@@ -741,10 +758,10 @@
                 details += `<div class="detail-item"><span class="detail-label">Källa:</span> ${escapeHtml(service.source)}</div>`;
             }
             if (!details) {
-                details = '<div class="detail-item" style="color:#999;">Ingen ytterligare information</div>';
+                details = '<div class="detail-item detail-none">Ingen ytterligare information</div>';
             }
             if (service.id) {
-                details += `<div class="detail-item" style="margin-top:0.5rem;"><a href="/event/${encodeURIComponent(service.id)}" style="color:#2c5282;">Mer detaljer</a></div>`;
+                details += `<div class="detail-item" style="margin-top:0.5rem;"><a href="/event/${encodeURIComponent(service.id)}">Mer detaljer</a></div>`;
             }
             return details;
         }
@@ -806,5 +823,6 @@
         window.addEventListener('offline', updateOnlineStatus);
         updateOnlineStatus();
     </script>
+    {{template "theme-js" .}}
 </body>
 </html>
