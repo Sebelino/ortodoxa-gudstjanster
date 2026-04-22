@@ -236,18 +236,6 @@ func (c *Client) GetLatestBatchID(ctx context.Context) (string, error) {
 	return batchID, nil
 }
 
-// PatchService applies partial field updates to a service document identified by
-// the service's natural key (source, date, service_name, time). Fields in the
-// update map are merged into the existing document without overwriting other fields.
-func (c *Client) PatchService(ctx context.Context, svc model.ChurchService, fields map[string]interface{}) error {
-	docID := generateDocID(svc)
-	_, err := c.client.Collection(c.collection).Doc(docID).Set(ctx, fields, firestore.MergeAll)
-	if err != nil {
-		return fmt.Errorf("patching document %s: %w", docID, err)
-	}
-	return nil
-}
-
 // generateDocID creates a unique document ID based on service fields.
 func generateDocID(svc model.ChurchService) string {
 	timeStr := ""

@@ -72,7 +72,6 @@ go run ./cmd/ingest
 - `FIRESTORE_COLLECTION` - Firestore collection name (default: `services`)
 - `GCS_BUCKET` - GCS bucket for Vision API results cache (required)
 - `GCS_UPLOAD_BUCKET` - GCS bucket for manually uploaded schedule images (optional, enables fallback)
-- `GCS_MANUAL_EVENTS_BUCKET` - GCS bucket for manually configured recurring events (optional, enables manual scraper)
 - `OPENAI_API_KEY` - Required for scrapers that use OpenAI Vision API
 - `SMTP_HOST` - SMTP server hostname for alerting (optional, enables email alerts)
 - `SMTP_PORT` - SMTP server port for alerting
@@ -217,7 +216,7 @@ This prevents broken scrapers or flaky networks from silently replacing good dat
 Services are stored in the `services` collection with:
 - Document ID: SHA256 hash of `(source, date, service_name, time)`
 - Fields: `parish`, `source`, `source_url`, `date`, `day_of_week`, `service_name`, `title`, `location`, `time`, `occasion`, `notes`, `language`, `batch_id`
-- `parish` identifies the church (used for UI filtering/grouping); `source` describes where the data came from (displayed as "Källa"). For most scrapers these are identical; the manual scraper can set them differently. Legacy docs without `parish` fall back to `source`.
+- `parish` identifies the church (used for UI filtering/grouping); `source` describes where the data came from (displayed as "Källa"). For most scrapers these are identical; the Google Calendar manual scraper can set them differently. Legacy docs without `parish` fall back to `source`.
 - Composite index on `source` + `date` for efficient queries
 
 ### Vision API Cache (GCS)
@@ -320,7 +319,6 @@ Secrets must be populated manually in Google Secret Manager:
 | Firestore | `(default)` | Service data storage |
 | GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-store` | Vision API cache, title cache |
 | GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-uploads` | Manual schedule image uploads |
-| GCS Bucket | `ortodoxa-gudstjanster-ortodoxa-manual-events` | Manual recurring event definitions |
 | Artifact Registry | `ortodoxa-gudstjanster` | Docker images |
 
 ### Service Accounts

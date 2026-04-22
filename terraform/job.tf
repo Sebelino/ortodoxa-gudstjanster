@@ -25,13 +25,6 @@ resource "google_storage_bucket_iam_member" "ingest_uploads_access" {
   member = "serviceAccount:${google_service_account.ingest.email}"
 }
 
-# Grant ingestion service account read access to manual events bucket
-resource "google_storage_bucket_iam_member" "ingest_manual_events_access" {
-  bucket = google_storage_bucket.manual_events.name
-  role   = "roles/storage.objectViewer"
-  member = "serviceAccount:${google_service_account.ingest.email}"
-}
-
 # Grant ingestion service account access to read OpenAI API key secret
 resource "google_secret_manager_secret_iam_member" "ingest_openai_api_key_access" {
   secret_id = google_secret_manager_secret.openai_api_key.id
@@ -112,11 +105,6 @@ resource "google_cloud_run_v2_job" "ingest" {
         }
 
         env {
-          name  = "GCS_MANUAL_EVENTS_BUCKET"
-          value = google_storage_bucket.manual_events.name
-        }
-
-        env {
           name = "OPENAI_API_KEY"
           value_source {
             secret_key_ref {
@@ -189,7 +177,6 @@ resource "google_cloud_run_v2_job" "ingest" {
     google_secret_manager_secret_iam_member.ingest_smtp_to_access,
     google_storage_bucket_iam_member.ingest_store_access,
     google_storage_bucket_iam_member.ingest_uploads_access,
-    google_storage_bucket_iam_member.ingest_manual_events_access,
     google_project_iam_member.ingest_firestore_access,
     google_firestore_database.main,
   ]

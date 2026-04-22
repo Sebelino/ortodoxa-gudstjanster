@@ -14,6 +14,17 @@ import (
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
+// stockholm is the Europe/Stockholm timezone, loaded once at init.
+var stockholm *time.Location
+
+func init() {
+	var err error
+	stockholm, err = time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		panic(fmt.Sprintf("failed to load Europe/Stockholm timezone: %v", err))
+	}
+}
+
 // fetchURL fetches the content of a URL and returns the response body as bytes.
 func fetchURL(ctx context.Context, url string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)

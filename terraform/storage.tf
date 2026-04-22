@@ -26,19 +26,6 @@ resource "google_storage_bucket" "uploads" {
   }
 }
 
-# Cloud Storage bucket for manually configured recurring events
-resource "google_storage_bucket" "manual_events" {
-  name          = "${var.project_id}-ortodoxa-manual-events"
-  location      = var.region
-  force_destroy = false
-
-  uniform_bucket_level_access = true
-
-  versioning {
-    enabled = false
-  }
-}
-
 # Artifact Registry for Docker images
 resource "google_artifact_registry_repository" "repo" {
   location      = var.region

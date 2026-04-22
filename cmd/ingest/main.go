@@ -74,19 +74,6 @@ func main() {
 		log.Printf("Upload bucket: %s", gcsUploadBucket)
 	}
 
-	// Initialize manual events bucket reader (optional)
-	gcsManualEventsBucket := os.Getenv("GCS_MANUAL_EVENTS_BUCKET")
-	var manualEventsReader *store.BucketReader
-	if gcsManualEventsBucket != "" {
-		var err2 error
-		manualEventsReader, err2 = store.NewBucketReader(ctx, gcsManualEventsBucket)
-		if err2 != nil {
-			log.Fatalf("Failed to initialize manual events bucket reader: %v", err2)
-		}
-		defer manualEventsReader.Close()
-		log.Printf("Manual events bucket: %s", gcsManualEventsBucket)
-	}
-
 	// Initialize SMTP for alerting (optional)
 	var smtpConfig *email.SMTPConfig
 	if smtpHost := strings.TrimSpace(os.Getenv("SMTP_HOST")); smtpHost != "" {
@@ -117,7 +104,6 @@ func main() {
 	registry.Register(scraper.NewGCalendarManualScraper())
 	registry.Register(scraper.NewRomanianScraper())
 	registry.Register(scraper.NewSommarlagerScraper(gcsStore, visionClient))
-	registry.Register(scraper.NewManualScraper(manualEventsReader))
 	if uploadReader != nil {
 		registry.Register(scraper.NewUploadsScraper(gcsStore, visionClient, uploadReader, gcsUploadBucket))
 	}
@@ -233,9 +219,6 @@ func main() {
 		log.Printf("Stored %d services for %s", len(result.services), result.scraperName)
 		totalServices += len(result.services)
 	}
-
-	// Pass 3: Apply persistent field overrides from overrides.json in the manual events bucket
-	applyOverrides(ctx, manualEventsReader, accepted, fsClient)
 
 	log.Printf("Ingestion complete. Total services: %d, Failed scrapers: %d/%d",
 		totalServices, failedScrapers, len(scrapers))
@@ -478,62 +461,6 @@ func parseEventLanguages(accepted []acceptedResult) map[string]*string {
 	}
 	log.Printf("Event languages: %d detected out of %d unique events", detected, len(langMap))
 	return langMap
-}
-
-// serviceOverride defines a match criterion and the fields to patch.
-type serviceOverride struct {
-	Match  overrideMatch          `json:"match"`
-	Fields map[string]interface{} `json:"fields"`
-}
-
-// overrideMatch identifies a service by parish, date, and time prefix.
-// Time is matched as a prefix so "23:00" matches "23:00 - 02:00".
-type overrideMatch struct {
-	Parish string `json:"parish"`
-	Date   string `json:"date"`
-	Time   string `json:"time"`
-}
-
-// applyOverrides reads overrides.json from the manual events bucket and patches
-// matching Firestore documents with the specified field values.
-func applyOverrides(ctx context.Context, reader *store.BucketReader, accepted []acceptedResult, fsClient *firestore.Client) {
-	if reader == nil {
-		return
-	}
-
-	data, err := reader.ReadObject(ctx, "overrides.json")
-	if err != nil {
-		// File not present is fine — no overrides configured
-		return
-	}
-
-	var overrides []serviceOverride
-	if err := json.Unmarshal(data, &overrides); err != nil {
-		log.Printf("WARNING: Failed to parse overrides.json: %v", err)
-		return
-	}
-
-	applied := 0
-	for _, ov := range overrides {
-		for _, result := range accepted {
-			for _, svc := range result.services {
-				if svc.Parish != ov.Match.Parish || svc.Date != ov.Match.Date {
-					continue
-				}
-				if svc.Time == nil || !strings.HasPrefix(*svc.Time, ov.Match.Time) {
-					continue
-				}
-				if err := fsClient.PatchService(ctx, svc, ov.Fields); err != nil {
-					log.Printf("WARNING: Override failed for %s %s %s: %v", svc.Parish, svc.Date, *svc.Time, err)
-				} else {
-					log.Printf("Override applied: %s %s %s → %v", svc.Parish, svc.Date, *svc.Time, ov.Fields)
-					applied++
-				}
-			}
-		}
-	}
-
-	log.Printf("Overrides: %d applied out of %d defined", applied, len(overrides))
 }
 
 // saveDiagnostics serializes rejected services to GCS and returns the object path.
