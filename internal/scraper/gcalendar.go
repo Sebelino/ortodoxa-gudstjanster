@@ -144,6 +144,8 @@ type icsEvent struct {
 	location    string
 	description string
 	cancelled   bool
+	rrule       string   // raw RRULE value, e.g. "FREQ=WEEKLY;BYDAY=TH"
+	exdates     []string // raw EXDATE values for exclusions
 }
 
 // parseICS parses an ICS feed into a slice of events.
@@ -205,6 +207,10 @@ func parseICS(data string) ([]icsEvent, error) {
 			current.location = value
 		case "DESCRIPTION":
 			current.description = value
+		case "RRULE":
+			current.rrule = value
+		case "EXDATE":
+			current.exdates = append(current.exdates, line[colonIdx+1:])
 		case "STATUS":
 			if strings.EqualFold(value, "CANCELLED") {
 				current.cancelled = true
@@ -213,6 +219,127 @@ func parseICS(data string) ([]icsEvent, error) {
 	}
 
 	return events, nil
+}
+
+// defaultRecurringHorizon is how far into the future recurring events are expanded.
+const defaultRecurringHorizon = 26 * 7 * 24 * time.Hour // 26 weeks
+
+// expandRecurringEvents expands any events with an RRULE into individual
+// occurrences up to the given horizon from now. Non-recurring events pass
+// through unchanged.
+func expandRecurringEvents(events []icsEvent, loc *time.Location) []icsEvent {
+	now := time.Now()
+	horizon := now.Add(defaultRecurringHorizon)
+
+	var out []icsEvent
+	for _, ev := range events {
+		if ev.rrule == "" {
+			out = append(out, ev)
+			continue
+		}
+
+		start, allDay, err := parseICSTimestamp(ev.dtstart, loc)
+		if err != nil {
+			out = append(out, ev) // can't parse, keep as-is
+			continue
+		}
+
+		// Compute event duration from DTSTART/DTEND
+		var duration time.Duration
+		if ev.dtend != "" {
+			end, _, err := parseICSTimestamp(ev.dtend, loc)
+			if err == nil {
+				duration = end.Sub(start)
+			}
+		}
+
+		// Parse RRULE parameters
+		params := parseRRuleParams(ev.rrule)
+		freq := params["FREQ"]
+		if freq != "DAILY" && freq != "WEEKLY" {
+			out = append(out, ev) // unsupported frequency, keep original
+			continue
+		}
+
+		interval := 1
+		if v, ok := params["INTERVAL"]; ok {
+			if n, err := fmt.Sscanf(v, "%d", &interval); n != 1 || err != nil {
+				interval = 1
+			}
+		}
+
+		maxCount := -1
+		if v, ok := params["COUNT"]; ok {
+			fmt.Sscanf(v, "%d", &maxCount)
+		}
+
+		var until time.Time
+		if v, ok := params["UNTIL"]; ok {
+			if t, _, err := parseICSTimestamp(v, loc); err == nil {
+				until = t
+			}
+		}
+
+		// Build EXDATE set
+		exdateSet := make(map[string]bool)
+		for _, exd := range ev.exdates {
+			if t, _, err := parseICSTimestamp(exd, loc); err == nil {
+				exdateSet[t.Format("2006-01-02")] = true
+			}
+		}
+
+		// Generate occurrences
+		count := 0
+		for current := start; !current.After(horizon); {
+			if !until.IsZero() && current.After(until) {
+				break
+			}
+			if maxCount >= 0 && count >= maxCount {
+				break
+			}
+
+			dateStr := current.Format("2006-01-02")
+			if !exdateSet[dateStr] {
+				inst := ev
+				inst.rrule = "" // mark as expanded
+				inst.exdates = nil
+				if allDay {
+					inst.dtstart = current.Format("20060102")
+					if duration > 0 {
+						inst.dtend = current.Add(duration).Format("20060102")
+					}
+				} else {
+					inst.dtstart = current.Format("20060102T150405")
+					if duration > 0 {
+						inst.dtend = current.Add(duration).Format("20060102T150405")
+					}
+				}
+				out = append(out, inst)
+			}
+
+			count++
+			switch freq {
+			case "DAILY":
+				current = current.AddDate(0, 0, interval)
+			case "WEEKLY":
+				current = current.AddDate(0, 0, 7*interval)
+			}
+		}
+	}
+
+	return out
+}
+
+// parseRRuleParams splits an RRULE value like "FREQ=WEEKLY;BYDAY=TH;COUNT=10"
+// into a map.
+func parseRRuleParams(rrule string) map[string]string {
+	params := make(map[string]string)
+	for _, part := range strings.Split(rrule, ";") {
+		if eqIdx := strings.Index(part, "="); eqIdx >= 0 {
+			params[part[:eqIdx]] = part[eqIdx+1:]
+		}
+	}
+	return params
 }
 
 // unescapeICS reverses ICS escaping: \n → newline, \, → comma, \; → semicolon, \\ → backslash.
