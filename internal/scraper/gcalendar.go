@@ -138,14 +138,16 @@ func matchLocation(loc string) (parish, location, parishLanguage string) {
 
 // icsEvent represents a parsed VEVENT from an ICS feed.
 type icsEvent struct {
-	summary     string
-	dtstart     string
-	dtend       string
-	location    string
-	description string
-	cancelled   bool
-	rrule       string   // raw RRULE value, e.g. "FREQ=WEEKLY;BYDAY=TH"
-	exdates     []string // raw EXDATE values for exclusions
+	summary      string
+	dtstart      string
+	dtend        string
+	location     string
+	description  string
+	cancelled    bool
+	rrule        string   // raw RRULE value, e.g. "FREQ=WEEKLY;BYDAY=TH"
+	exdates      []string // raw EXDATE values for exclusions
+	uid          string   // UID for correlating overrides with recurring series
+	recurrenceID string   // raw RECURRENCE-ID value (marks this as an override)
 }
 
 // parseICS parses an ICS feed into a slice of events.
@@ -211,6 +213,10 @@ func parseICS(data string) ([]icsEvent, error) {
 			current.rrule = value
 		case "EXDATE":
 			current.exdates = append(current.exdates, line[colonIdx+1:])
+		case "UID":
+			current.uid = value
+		case "RECURRENCE-ID":
+			current.recurrenceID = line[colonIdx+1:] // keep raw for timestamp parsing
 		case "STATUS":
 			if strings.EqualFold(value, "CANCELLED") {
 				current.cancelled = true
@@ -226,13 +232,30 @@ const defaultRecurringHorizon = 26 * 7 * 24 * time.Hour // 26 weeks
 
 // expandRecurringEvents expands any events with an RRULE into individual
 // occurrences up to the given horizon from now. Non-recurring events pass
-// through unchanged.
+// through unchanged. Events with a RECURRENCE-ID override a specific
+// occurrence of the recurring series they belong to (matched by UID).
 func expandRecurringEvents(events []icsEvent, loc *time.Location) []icsEvent {
 	now := time.Now()
 	horizon := now.Add(defaultRecurringHorizon)
 
+	// Build override map: uid+date → override event
+	overrides := make(map[string]icsEvent)
+	for _, ev := range events {
+		if ev.recurrenceID == "" {
+			continue
+		}
+		if t, _, err := parseICSTimestamp(ev.recurrenceID, loc); err == nil {
+			key := ev.uid + "|" + t.Format("2006-01-02")
+			overrides[key] = ev
+		}
+	}
+
 	var out []icsEvent
 	for _, ev := range events {
+		// Skip override events — they are applied during expansion
+		if ev.recurrenceID != "" {
+			continue
+		}
 		if ev.rrule == "" {
 			out = append(out, ev)
 			continue
@@ -300,21 +323,29 @@ func expandRecurringEvents(events []icsEvent, loc *time.Location) []icsEvent {
 
 			dateStr := current.Format("2006-01-02")
 			if !exdateSet[dateStr] {
-				inst := ev
-				inst.rrule = "" // mark as expanded
-				inst.exdates = nil
-				if allDay {
-					inst.dtstart = current.Format("20060102")
-					if duration > 0 {
-						inst.dtend = current.Add(duration).Format("20060102")
-					}
+				// Check for a RECURRENCE-ID override for this occurrence
+				overrideKey := ev.uid + "|" + dateStr
+				if ov, ok := overrides[overrideKey]; ok {
+					// Use the override event instead
+					ov.recurrenceID = "" // clear so it's treated as normal
+					out = append(out, ov)
 				} else {
-					inst.dtstart = current.Format("20060102T150405")
-					if duration > 0 {
-						inst.dtend = current.Add(duration).Format("20060102T150405")
+					inst := ev
+					inst.rrule = "" // mark as expanded
+					inst.exdates = nil
+					if allDay {
+						inst.dtstart = current.Format("20060102")
+						if duration > 0 {
+							inst.dtend = current.Add(duration).Format("20060102")
+						}
+					} else {
+						inst.dtstart = current.Format("20060102T150405")
+						if duration > 0 {
+							inst.dtend = current.Add(duration).Format("20060102T150405")
+						}
 					}
+					out = append(out, inst)
 				}
-				out = append(out, inst)
 			}
 
 			count++

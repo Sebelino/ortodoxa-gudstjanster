@@ -100,6 +100,47 @@ func TestExpandRecurringWithExdate(t *testing.T) {
 	}
 }
 
+func TestExpandRecurringWithOverride(t *testing.T) {
+	events := []icsEvent{
+		{
+			uid:     "abc123@google.com",
+			summary: "Katekesundervisning",
+			dtstart: "20260423T180000",
+			dtend:   "20260423T190000",
+			rrule:   "FREQ=WEEKLY;COUNT=3",
+			description: "Original description",
+		},
+		{
+			uid:          "abc123@google.com",
+			summary:      "Katekesundervisning",
+			dtstart:      "20260423T180000",
+			dtend:        "20260423T190000",
+			recurrenceID: "20260423T180000",
+			description:  "Overridden for this date",
+		},
+	}
+
+	loc, _ := time.LoadLocation("Europe/Stockholm")
+	expanded := expandRecurringEvents(events, loc)
+
+	// 3 occurrences, first one overridden
+	if len(expanded) != 3 {
+		t.Fatalf("expected 3 occurrences, got %d", len(expanded))
+	}
+
+	// First occurrence should use the override description
+	if expanded[0].description != "Overridden for this date" {
+		t.Errorf("first occurrence: got description %q, want %q", expanded[0].description, "Overridden for this date")
+	}
+	// Second and third should use original
+	if expanded[1].description != "Original description" {
+		t.Errorf("second occurrence: got description %q, want %q", expanded[1].description, "Original description")
+	}
+	if expanded[2].description != "Original description" {
+		t.Errorf("third occurrence: got description %q, want %q", expanded[2].description, "Original description")
+	}
+}
+
 func TestExpandNonRecurring(t *testing.T) {
 	events := []icsEvent{
 		{
