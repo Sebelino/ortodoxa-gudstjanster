@@ -13,8 +13,8 @@ import (
 
 const (
 	gcalendarManualSourceName = "Manuella händelser (Google Kalender)"
-	gcalendarManualURL        = "https://calendar.google.com/calendar/ical/08b462ffff796f14537a37b785e506122f9766983d93914ea4b0846341e907c0@group.calendar.google.com/public/basic.ics"
-	gcalendarManualSourcePage = "https://calendar.google.com/calendar/embed?src=08b462ffff796f14537a37b785e506122f9766983d93914ea4b0846341e907c0%40group.calendar.google.com&ctz=Europe%2FStockholm"
+	gcalendarManualURL        = "https://calendar.google.com/calendar/ical/baa3943fce1521aabda755b4eb192b1cc8d7579294eab99a8eb89f024ab6b218@group.calendar.google.com/public/basic.ics"
+	gcalendarManualSourcePage = "https://calendar.google.com/calendar/embed?src=baa3943fce1521aabda755b4eb192b1cc8d7579294eab99a8eb89f024ab6b218%40group.calendar.google.com&ctz=Europe%2FStockholm"
 )
 
 // Regex patterns for structured fields in the DESCRIPTION body.
