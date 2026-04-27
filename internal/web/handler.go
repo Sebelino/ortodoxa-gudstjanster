@@ -858,10 +858,12 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 		ParishInfo
 		LanguagesStr   string
 		WebsiteDisplay string
+		CountyDisplay  string
 	}{
 		ParishInfo:     p,
 		LanguagesStr:   strings.Join(p.Languages, ", "),
 		WebsiteDisplay: websiteDisplay,
+		CountyDisplay:  countyDisplayName(p.County),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

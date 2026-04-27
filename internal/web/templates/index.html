@@ -223,6 +223,15 @@
             font-size: 0.85rem;
         }
 
+        .parish-link {
+            color: var(--link);
+            text-decoration: none;
+        }
+
+        .parish-link:hover {
+            text-decoration: underline;
+        }
+
         .service-count {
             text-align: center;
             color: var(--text-muted);
@@ -866,7 +875,7 @@
                                         <tr class="service-row" onclick="toggleDetails(${id})">
                                             <td class="col-time">${formatTime(service)}</td>
                                             <td class="col-name">${escapeHtml(service.title || service.service_name)}</td>
-                                            <td class="col-source">${escapeHtml(getShortParish(getParishGroup(service)))}</td>
+                                            <td class="col-source">${parishSourceCell(service)}</td>
                                         </tr>
                                         <tr class="service-details" id="details-${id}">
                                             <td colspan="3">${details}</td>
@@ -911,6 +920,16 @@
         function getShortParish(parish) {
             const p = parishByName[parish];
             return p ? p.short_name : parish;
+        }
+
+        function parishSourceCell(service) {
+            const parish = getParishGroup(service);
+            const p = parishByName[parish];
+            const name = escapeHtml(p ? p.short_name : parish);
+            if (p && p.slug) {
+                return `<a href="/parish/${p.slug}" onclick="event.stopPropagation()" class="parish-link">${name}</a>`;
+            }
+            return name;
         }
 
         function escapeHtml(text) {

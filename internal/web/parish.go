@@ -117,6 +117,17 @@ var parishes = []ParishInfo{
 	},
 }
 
+var countyNames = map[string]string{
+	"Stockholm": "Stockholms län",
+}
+
+func countyDisplayName(county string) string {
+	if name, ok := countyNames[county]; ok {
+		return name
+	}
+	return county
+}
+
 var parishBySlug = func() map[string]ParishInfo {
 	m := make(map[string]ParishInfo, len(parishes))
 	for _, p := range parishes {
