@@ -282,8 +282,8 @@
         .filter-options {
             padding: 0.75rem;
             display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem 1rem;
+            flex-direction: column;
+            gap: 0;
         }
 
         .filter-options.hidden {
@@ -300,6 +300,59 @@
 
         .filter-option input {
             cursor: pointer;
+        }
+
+        .county-group {
+            width: 100%;
+        }
+
+        .county-header-row {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .county-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0 0.2rem;
+            display: flex;
+            align-items: center;
+            transition: transform 0.15s;
+        }
+
+        .county-toggle::after {
+            content: '';
+            display: block;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid var(--filter-text);
+        }
+
+        .county-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .parish-list {
+            padding-left: 1.2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem 1rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .parish-list.hidden {
+            display: none;
+        }
+
+        #lang-filter-options {
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
         }
 
         .subscribe-section {
@@ -429,8 +482,10 @@
         let allServices = [];
         let allParishes = [];
         let parishByName = {};
-        let excludedSources = new Set();
+        let includedCounties = new Set(['Stockholm']);
+        let excludedParishes = new Set();
         let excludedLanguages = new Set();
+        let collapsedCounties = new Set();
         let visibleWeeks = 4;
 
         async function loadServices() {
@@ -474,31 +529,59 @@
             // without touching localStorage so the user's normal filter is unaffected.
             const urlParish = new URLSearchParams(window.location.search).get('parish');
             if (urlParish) {
-                const all = [...new Set(allServices.map(s => getParishGroup(s)))];
-                excludedSources = new Set(all.filter(p => p !== urlParish));
+                const target = parishByName[urlParish];
+                if (target) {
+                    includedCounties = new Set([target.county]);
+                    excludedParishes = new Set(
+                        allParishes.filter(p => p.county === target.county && p.name !== urlParish).map(p => p.name)
+                    );
+                } else {
+                    includedCounties = new Set(allParishes.map(p => p.county));
+                    excludedParishes = new Set(allParishes.filter(p => p.name !== urlParish).map(p => p.name));
+                }
                 excludedLanguages = new Set();
                 return;
             }
-            try {
-                const saved = localStorage.getItem('excludedSources');
-                if (saved) {
-                    excludedSources = new Set(JSON.parse(saved));
+
+            // Migrate old excludedSources (blacklist) → new county-based format
+            const oldExcluded = localStorage.getItem('excludedSources');
+            if (oldExcluded !== null) {
+                try {
+                    const allCounties = [...new Set(allParishes.map(p => p.county))];
+                    includedCounties = new Set(allCounties);
+                    excludedParishes = new Set(JSON.parse(oldExcluded));
+                } catch (e) {
+                    includedCounties = new Set(['Stockholm']);
+                    excludedParishes = new Set();
                 }
-            } catch (e) {
-                excludedSources = new Set();
+                localStorage.removeItem('excludedSources');
+                saveFilterState();
+                try {
+                    const saved = localStorage.getItem('excludedLanguages');
+                    if (saved) excludedLanguages = new Set(JSON.parse(saved));
+                } catch (e) {}
+                return;
             }
+
+            // Load new format, default to Stockholm if never saved
+            try {
+                const saved = localStorage.getItem('includedCounties');
+                if (saved !== null) includedCounties = new Set(JSON.parse(saved));
+                // else keep default ['Stockholm']
+            } catch (e) { includedCounties = new Set(['Stockholm']); }
+            try {
+                const saved = localStorage.getItem('excludedParishes');
+                if (saved) excludedParishes = new Set(JSON.parse(saved));
+            } catch (e) {}
             try {
                 const saved = localStorage.getItem('excludedLanguages');
-                if (saved) {
-                    excludedLanguages = new Set(JSON.parse(saved));
-                }
-            } catch (e) {
-                excludedLanguages = new Set();
-            }
+                if (saved) excludedLanguages = new Set(JSON.parse(saved));
+            } catch (e) {}
         }
 
         function saveFilterState() {
-            localStorage.setItem('excludedSources', JSON.stringify([...excludedSources]));
+            localStorage.setItem('includedCounties', JSON.stringify([...includedCounties]));
+            localStorage.setItem('excludedParishes', JSON.stringify([...excludedParishes]));
             localStorage.setItem('excludedLanguages', JSON.stringify([...excludedLanguages]));
         }
 
@@ -506,32 +589,76 @@
             return s.parish || 'Övrigt';
         }
 
+        function countyDisplayName(county) {
+            const names = { 'Stockholm': 'Stockholms län' };
+            return names[county] || county;
+        }
+
+        function isParishShown(parishName) {
+            const p = parishByName[parishName];
+            if (!p) return true;
+            return includedCounties.has(p.county) && !excludedParishes.has(parishName);
+        }
+
         function buildFilterPanel() {
-            const parishes = [...new Set(allServices.map(s => getParishGroup(s)))].sort();
             const filterOptions = document.getElementById('filter-options');
             const filterPanel = document.getElementById('filter-panel');
 
-            filterOptions.innerHTML = parishes.map(parish => {
-                const checked = !excludedSources.has(parish) ? 'checked' : '';
-                const shortName = getShortParish(parish);
-                return `
-                    <label class="filter-option">
-                        <input type="checkbox" ${checked} onchange="toggleSource('${escapeAttr(parish)}', this.checked)">
-                        ${escapeHtml(shortName)}
-                    </label>
-                `;
+            // Group parishes by county
+            const countiesMap = {};
+            allParishes.forEach(p => {
+                if (!countiesMap[p.county]) countiesMap[p.county] = [];
+                countiesMap[p.county].push(p);
+            });
+            const counties = Object.keys(countiesMap).sort();
+
+            filterOptions.innerHTML = counties.map(county => {
+                const parishList = countiesMap[county];
+                const shownCount = parishList.filter(p => isParishShown(p.name)).length;
+                const allCount = parishList.length;
+                const collapsed = collapsedCounties.has(county);
+
+                const parishItems = parishList.map(p => {
+                    const checked = isParishShown(p.name) ? 'checked' : '';
+                    return `<label class="filter-option">
+                        <input type="checkbox" ${checked} onchange="toggleParish('${escapeAttr(p.name)}', this.checked)">
+                        ${escapeHtml(p.short_name)}
+                    </label>`;
+                }).join('');
+
+                return `<div class="county-group">
+                    <div class="county-header-row">
+                        <label class="filter-option">
+                            <input type="checkbox" id="county-cb-${escapeAttr(county)}"
+                                ${shownCount === allCount ? 'checked' : ''}
+                                onchange="toggleCounty('${escapeAttr(county)}', this.checked)">
+                            <strong>${escapeHtml(countyDisplayName(county))}</strong>
+                        </label>
+                        <button class="county-toggle${collapsed ? ' collapsed' : ''}"
+                            onclick="toggleCountyExpand('${escapeAttr(county)}')"></button>
+                    </div>
+                    <div class="parish-list${collapsed ? ' hidden' : ''}" id="parish-list-${escapeAttr(county)}">
+                        ${parishItems}
+                    </div>
+                </div>`;
             }).join('');
+
+            // Set indeterminate state (can't be done via HTML attribute)
+            counties.forEach(county => {
+                const parishList = countiesMap[county];
+                const shownCount = parishList.filter(p => isParishShown(p.name)).length;
+                const cb = document.getElementById(`county-cb-${county}`);
+                if (cb) cb.indeterminate = shownCount > 0 && shownCount < parishList.length;
+            });
 
             const langOptions = document.getElementById('lang-filter-options');
             const langChoices = ['Svenska', 'Engelska', 'Övrigt'];
             langOptions.innerHTML = langChoices.map(lang => {
                 const checked = !excludedLanguages.has(lang) ? 'checked' : '';
-                return `
-                    <label class="filter-option">
-                        <input type="checkbox" ${checked} onchange="toggleLanguage('${escapeAttr(lang)}', this.checked)">
-                        ${escapeHtml(lang)}
-                    </label>
-                `;
+                return `<label class="filter-option">
+                    <input type="checkbox" ${checked} onchange="toggleLanguage('${escapeAttr(lang)}', this.checked)">
+                    ${escapeHtml(lang)}
+                </label>`;
             }).join('');
 
             filterPanel.style.display = 'block';
@@ -541,11 +668,14 @@
         function getSubscribeUrl() {
             const base = window.location.origin + '/calendar.ics';
             const params = new URLSearchParams();
-            if (excludedSources.size > 0) {
-                const allParishNames = [...new Set(allServices.map(s => getParishGroup(s)))];
-                const includedSources = allParishNames.filter(p => !excludedSources.has(p));
-                params.set('include', includedSources.join(','));
+
+            const shownParishes = allParishes.filter(p => isParishShown(p.name));
+            const allStockholm = allParishes.filter(p => p.county === 'Stockholm');
+            const isDefault = includedCounties.size === 1 && includedCounties.has('Stockholm') && excludedParishes.size === 0;
+            if (!isDefault) {
+                params.set('include', shownParishes.map(p => p.name).join(','));
             }
+
             if (excludedLanguages.size > 0) {
                 const langChoices = ['Svenska', 'Engelska', 'Övrigt'];
                 const includedLangs = langChoices.filter(l => !excludedLanguages.has(l));
@@ -564,14 +694,40 @@
             });
         }
 
-        function toggleSource(source, included) {
-            if (included) {
-                excludedSources.delete(source);
+        function toggleCounty(county, checked) {
+            if (checked) {
+                includedCounties.add(county);
+                allParishes.filter(p => p.county === county).forEach(p => excludedParishes.delete(p.name));
             } else {
-                excludedSources.add(source);
+                includedCounties.delete(county);
+                allParishes.filter(p => p.county === county).forEach(p => excludedParishes.delete(p.name));
             }
             saveFilterState();
+            buildFilterPanel();
             renderServices();
+        }
+
+        function toggleParish(name, checked) {
+            const p = parishByName[name];
+            if (!checked) {
+                if (p) includedCounties.add(p.county);
+                excludedParishes.add(name);
+            } else {
+                excludedParishes.delete(name);
+                if (p) includedCounties.add(p.county);
+            }
+            saveFilterState();
+            buildFilterPanel();
+            renderServices();
+        }
+
+        function toggleCountyExpand(county) {
+            if (collapsedCounties.has(county)) {
+                collapsedCounties.delete(county);
+            } else {
+                collapsedCounties.add(county);
+            }
+            buildFilterPanel();
         }
 
         function toggleLanguage(lang, included) {
@@ -619,7 +775,7 @@
 
             const filteredServices = allServices.filter(s => {
                 if (s.date < today) return false;
-                if (excludedSources.has(getParishGroup(s))) return false;
+                if (!isParishShown(getParishGroup(s))) return false;
                 if (excludedLanguages.has(getLangCategory(s))) return false;
                 return true;
             });
