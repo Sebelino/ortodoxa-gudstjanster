@@ -152,12 +152,15 @@
         }
 
         .service-row td:first-child::before {
-            content: '▸';
+            content: '';
             display: inline-block;
-            margin-right: 0.4rem;
-            color: var(--arrow);
-            font-size: 0.7rem;
-            transition: transform 0.2s;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 6px solid var(--arrow);
         }
 
         .service-row.expanded td:first-child::before {
@@ -279,9 +282,13 @@
         }
 
         .filter-header::after {
-            content: '▾';
-            font-size: 0.7rem;
-            transition: transform 0.2s;
+            content: '';
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid currentColor;
         }
 
         .filter-header.collapsed::after {
