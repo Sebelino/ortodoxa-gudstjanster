@@ -349,6 +349,12 @@
             display: none;
         }
 
+        .misc-group {
+            border-top: 1px solid var(--border);
+            padding-top: 0.4rem;
+            margin-top: 0.2rem;
+        }
+
         #lang-filter-options {
             flex-direction: row;
             flex-wrap: wrap;
@@ -596,7 +602,7 @@
 
         function isParishShown(parishName) {
             const p = parishByName[parishName];
-            if (!p) return true;
+            if (!p) return !excludedParishes.has('Övrigt');
             return includedCounties.has(p.county) && !excludedParishes.has(parishName);
         }
 
@@ -650,6 +656,17 @@
                 const cb = document.getElementById(`county-cb-${county}`);
                 if (cb) cb.indeterminate = shownCount > 0 && shownCount < parishList.length;
             });
+
+            // Övrigt: standalone section for services not tied to a parish
+            const miscChecked = !excludedParishes.has('Övrigt') ? 'checked' : '';
+            filterOptions.innerHTML += `<div class="county-group misc-group">
+                <div class="county-header-row">
+                    <label class="filter-option">
+                        <input type="checkbox" ${miscChecked} onchange="toggleParish('Övrigt', this.checked)">
+                        <strong>Övrigt</strong>
+                    </label>
+                </div>
+            </div>`;
 
             const langOptions = document.getElementById('lang-filter-options');
             const langChoices = ['Svenska', 'Engelska', 'Övrigt'];
