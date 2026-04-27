@@ -653,8 +653,9 @@
             // Group parishes by county
             const countiesMap = {};
             allParishes.forEach(p => {
-                if (!countiesMap[p.county]) countiesMap[p.county] = [];
-                countiesMap[p.county].push(p);
+                const key = p.county || 'Övrigt';
+                if (!countiesMap[key]) countiesMap[key] = [];
+                countiesMap[key].push(p);
             });
             const counties = Object.keys(countiesMap).sort();
 

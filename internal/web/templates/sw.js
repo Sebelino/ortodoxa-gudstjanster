@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ortodoxa-v2';
+const CACHE_NAME = 'ortodoxa-v3';
 const SHELL = ['/', '/favicon.svg', '/manifest.json'];
 
 self.addEventListener('install', event => {
@@ -32,7 +32,7 @@ self.addEventListener('fetch', event => {
     }
 
     // Network-first with cache update for API and dynamic content
-    if (url.pathname === '/services' || url.pathname === '/last-updated' || url.pathname === '/') {
+    if (url.pathname === '/services' || url.pathname === '/api/parishes' || url.pathname === '/last-updated' || url.pathname === '/') {
         event.respondWith(
             fetch(event.request)
                 .then(response => {
