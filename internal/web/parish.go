@@ -7,6 +7,7 @@ type ParishInfo struct {
 	ShortName  string
 	Address    string
 	City       string
+	County     string // short county name used in filter params, e.g. "Stockholm"
 	Website    string
 	Languages  []string
 	Tradition  string
@@ -22,6 +23,7 @@ var parishes = []ParishInfo{
 		ShortName: "St. Georgios",
 		Address:   "Birger Jarlsgatan 92, Stockholm",
 		City:      "Stockholm",
+		County:    "Stockholm",
 		Website:   "https://gomos.se",
 		Languages: []string{"Grekiska", "Svenska", "Engelska"},
 		Tradition: "Grekisk-ortodox (Ekumeniska patriarkatet)",
@@ -35,6 +37,7 @@ var parishes = []ParishInfo{
 		ShortName: "Kristi Förklarings",
 		Address:   "Birger Jarlsgatan 98, Stockholm",
 		City:      "Stockholm",
+		County:    "Stockholm",
 		Website:   "https://www.ryskaortodoxakyrkan.se",
 		Languages: []string{"Kyrkoslaviska", "Svenska"},
 		Tradition: "Rysk-ortodox (Bulgariska patriarkatet)",
@@ -48,6 +51,7 @@ var parishes = []ParishInfo{
 		ShortName: "Heliga Anna",
 		Address:   "Kyrkvägen 27, Stocksund",
 		City:      "Stocksund",
+		County:    "Stockholm",
 		Website:   "https://heligaanna.nu",
 		Languages: []string{"Svenska"},
 		Tradition: "Svensk-ortodox (Georgiska patriarkatet)",
@@ -61,6 +65,7 @@ var parishes = []ParishInfo{
 		ShortName: "Helige Nikolai",
 		Address:   "Bellmansgatan 13, Stockholm",
 		City:      "Stockholm",
+		County:    "Stockholm",
 		Website:   "https://www.ortodox-finsk.se",
 		Languages: []string{"Svenska", "Finska"},
 		Tradition: "Finsk-ortodox (Ekumeniska patriarkatet)",
@@ -74,6 +79,7 @@ var parishes = []ParishInfo{
 		ShortName: "St. Ignatios",
 		Address:   "Nygatan 2, Södertälje",
 		City:      "Södertälje",
+		County:    "Stockholm",
 		Website:   "https://heligaanna.nu",
 		Languages: []string{"Svenska", "Grekiska", "Serbiska"},
 		Tradition: "Svensk-ortodox (Georgiska patriarkatet)",
@@ -87,6 +93,7 @@ var parishes = []ParishInfo{
 		ShortName: "Sankt Sava",
 		Address:   "Bägerstavägen 68, Enskede",
 		City:      "Enskede",
+		County:    "Stockholm",
 		Website:   "https://www.crkvastokholm.se",
 		Languages: []string{"Kyrkoslaviska"},
 		Tradition: "Serbisk-ortodox",
@@ -100,6 +107,7 @@ var parishes = []ParishInfo{
 		ShortName: "Sankt Göran",
 		Address:   "Vanadisvägen 35, Stockholm",
 		City:      "Stockholm",
+		County:    "Stockholm",
 		Website:   "https://borss.se",
 		Languages: []string{"Rumänska", "Svenska", "Engelska"},
 		Tradition: "Rumänsk-ortodox",

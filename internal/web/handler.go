@@ -275,7 +275,8 @@ func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
 	}
 	services = filterAndSort(services)
 
-	// Parish filter: include= (whitelist) takes precedence over exclude= (blacklist, legacy)
+	// Parish filter: include= (whitelist) takes precedence over exclude= (blacklist, legacy).
+	// No params defaults to Stockholm county only — safe when new counties are added later.
 	if includeParam := r.URL.Query().Get("include"); includeParam != "" {
 		included := make(map[string]bool)
 		for _, source := range strings.Split(includeParam, ",") {
@@ -290,18 +291,36 @@ func (h *Handler) handleICS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		services = filtered
-	} else if excludeParam := r.URL.Query().Get("exclude"); excludeParam != "" {
-		excluded := make(map[string]bool)
-		for _, source := range strings.Split(excludeParam, ",") {
-			excluded[strings.TrimSpace(source)] = true
-		}
-		var filtered []model.ChurchService
-		for _, s := range services {
-			if !excluded[parishGroup(s)] {
-				filtered = append(filtered, s)
+	} else {
+		stockholmParishes := make(map[string]bool)
+		for _, p := range parishes {
+			if p.County == "Stockholm" {
+				stockholmParishes[p.Name] = true
 			}
 		}
-		services = filtered
+		if excludeParam := r.URL.Query().Get("exclude"); excludeParam != "" {
+			// Legacy exclude= param: Stockholm only, minus explicitly excluded
+			excluded := make(map[string]bool)
+			for _, source := range strings.Split(excludeParam, ",") {
+				excluded[strings.TrimSpace(source)] = true
+			}
+			var filtered []model.ChurchService
+			for _, s := range services {
+				if stockholmParishes[parishGroup(s)] && !excluded[parishGroup(s)] {
+					filtered = append(filtered, s)
+				}
+			}
+			services = filtered
+		} else {
+			// No params: default to Stockholm only
+			var filtered []model.ChurchService
+			for _, s := range services {
+				if stockholmParishes[parishGroup(s)] {
+					filtered = append(filtered, s)
+				}
+			}
+			services = filtered
+		}
 	}
 
 	// Language filter: includeLang= (whitelist) takes precedence over excludeLang= (blacklist, legacy)
@@ -750,6 +769,7 @@ func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 		ShortName string   `json:"short_name"`
 		Address   string   `json:"address"`
 		City      string   `json:"city"`
+		County    string   `json:"county"`
 		Website   string   `json:"website"`
 		Languages []string `json:"languages"`
 		Tradition string   `json:"tradition"`
@@ -762,6 +782,7 @@ func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 			ShortName: p.ShortName,
 			Address:   p.Address,
 			City:      p.City,
+			County:    p.County,
 			Website:   p.Website,
 			Languages: p.Languages,
 			Tradition: p.Tradition,
