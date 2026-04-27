@@ -34,7 +34,7 @@ var parishes = []ParishInfo{
 	{
 		Slug:      "kristi-forklarings",
 		Name:      "Kristi Förklarings Ortodoxa Församling",
-		ShortName: "Kristi Förklarings",
+		ShortName: "Kristi Förklaring",
 		Address:   "Birger Jarlsgatan 98, Stockholm",
 		City:      "Stockholm",
 		County:    "Stockholm",
