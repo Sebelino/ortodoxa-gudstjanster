@@ -677,8 +677,7 @@
                 `;
             });
 
-            const totalCurrent = allServices.filter(s => s.date >= today).length;
-            html += `<p class="service-count">Visar ${visibleServices.length} av ${totalCurrent} gudstjänster</p>`;
+            html += `<p class="service-count">Visar ${visibleServices.length} av ${filteredServices.length} gudstjänster</p>`;
             if (hasMore) {
                 html += `<div style="text-align:center;"><button class="show-more-btn" onclick="showMore()">Visa fler</button></div>`;
             }
