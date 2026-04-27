@@ -2,48 +2,51 @@ package web
 
 // ParishInfo holds static information about an Orthodox parish.
 type ParishInfo struct {
-	Slug       string
-	Name       string
-	ShortName  string
-	Address    string
-	City       string
-	County     string // short county name used in filter params, e.g. "Stockholm"
-	Website    string
-	Languages  []string
-	Tradition  string
-	MapQuery   string
-	Lat        float64
-	Lng        float64
+	Slug            string
+	Name            string
+	ShortName       string
+	Address         string
+	City            string
+	County          string // short county name used in filter params, e.g. "Stockholm"
+	Website         string
+	Languages       []string
+	Tradition       string
+	MapQuery        string
+	Lat             float64
+	Lng             float64
+	DefaultLanguage string // default language for events with no explicit language set
 }
 
 var parishes = []ParishInfo{
 	{
-		Slug:      "st-georgios",
-		Name:      "St. Georgios Cathedral",
-		ShortName: "St. Georgios",
-		Address:   "Birger Jarlsgatan 92, Stockholm",
-		City:      "Stockholm",
-		County:    "Stockholm",
-		Website:   "https://gomos.se",
-		Languages: []string{"Grekiska", "Svenska", "Engelska"},
-		Tradition: "Grekisk-ortodox (Ekumeniska patriarkatet)",
-		MapQuery:  "St+Georgios+Cathedral+Birger+Jarlsgatan+92+Stockholm",
-		Lat:       59.34604475278758,
-		Lng:       18.06271002636969,
+		Slug:            "st-georgios",
+		Name:            "St. Georgios Cathedral",
+		ShortName:       "St. Georgios",
+		Address:         "Birger Jarlsgatan 92, Stockholm",
+		City:            "Stockholm",
+		County:          "Stockholm",
+		Website:         "https://gomos.se",
+		Languages:       []string{"Grekiska", "Svenska", "Engelska"},
+		Tradition:       "Grekisk-ortodox (Ekumeniska patriarkatet)",
+		MapQuery:        "St+Georgios+Cathedral+Birger+Jarlsgatan+92+Stockholm",
+		Lat:             59.34604475278758,
+		Lng:             18.06271002636969,
+		DefaultLanguage: "Grekiska",
 	},
 	{
-		Slug:      "kristi-forklarings",
-		Name:      "Kristi Förklarings Ortodoxa Församling",
-		ShortName: "Kristi Förklaring",
-		Address:   "Birger Jarlsgatan 98, Stockholm",
-		City:      "Stockholm",
-		County:    "Stockholm",
-		Website:   "https://www.ryskaortodoxakyrkan.se",
-		Languages: []string{"Kyrkoslaviska", "Svenska"},
-		Tradition: "Rysk-ortodox (Bulgariska patriarkatet)",
-		MapQuery:  "Birger+Jarlsgatan+98+Stockholm",
-		Lat:       59.34675752739769,
-		Lng:       18.06185982086056,
+		Slug:            "kristi-forklarings",
+		Name:            "Kristi Förklarings Ortodoxa Församling",
+		ShortName:       "Kristi Förklaring",
+		Address:         "Birger Jarlsgatan 98, Stockholm",
+		City:            "Stockholm",
+		County:          "Stockholm",
+		Website:         "https://www.ryskaortodoxakyrkan.se",
+		Languages:       []string{"Kyrkoslaviska", "Svenska"},
+		Tradition:       "Rysk-ortodox (Bulgariska patriarkatet)",
+		MapQuery:        "Birger+Jarlsgatan+98+Stockholm",
+		Lat:             59.34675752739769,
+		Lng:             18.06185982086056,
+		DefaultLanguage: "Kyrkoslaviska",
 	},
 	{
 		Slug:      "heliga-anna",
@@ -102,18 +105,19 @@ var parishes = []ParishInfo{
 		Lng:       18.061649082707426,
 	},
 	{
-		Slug:      "sankt-goran",
-		Name:      "Sankt Göran",
-		ShortName: "Sankt Göran",
-		Address:   "Vanadisvägen 35, Stockholm",
-		City:      "Stockholm",
-		County:    "Stockholm",
-		Website:   "https://borss.se",
-		Languages: []string{"Rumänska", "Svenska", "Engelska"},
-		Tradition: "Rumänsk-ortodox",
-		MapQuery:  "Matteus+Lillkyrkan+Vanadisvägen+35+Stockholm",
-		Lat:       59.3454446,
-		Lng:       18.0424408,
+		Slug:            "sankt-goran",
+		Name:            "Sankt Göran",
+		ShortName:       "Sankt Göran",
+		Address:         "Vanadisvägen 35, Stockholm",
+		City:            "Stockholm",
+		County:          "Stockholm",
+		Website:         "https://borss.se",
+		Languages:       []string{"Rumänska", "Svenska", "Engelska"},
+		Tradition:       "Rumänsk-ortodox",
+		MapQuery:        "Matteus+Lillkyrkan+Vanadisvägen+35+Stockholm",
+		Lat:             59.3454446,
+		Lng:             18.0424408,
+		DefaultLanguage: "Rumänska",
 	},
 }
 

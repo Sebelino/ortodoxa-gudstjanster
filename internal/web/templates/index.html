@@ -811,11 +811,16 @@
         }
 
         function getLangCategory(s) {
-            const el = s.event_language || '';
-            const pl = (s.parish_language || '').toLowerCase();
-            if (el === 'Svenska') return 'Svenska';
-            if (el === 'Engelska') return 'Engelska';
-            if (el === '') {
+            if (s.event_language === 'Svenska') return 'Svenska';
+            if (s.event_language === 'Engelska') return 'Engelska';
+            if (!s.event_language) {
+                const parish = parishByName[s.parish];
+                if (parish && parish.default_language) {
+                    if (parish.default_language === 'Svenska') return 'Svenska';
+                    if (parish.default_language === 'Engelska') return 'Engelska';
+                    return 'Övrigt';
+                }
+                const pl = (s.parish_language || '').toLowerCase();
                 if (pl.includes('svenska')) return 'Svenska';
                 if (pl.includes('engelska')) return 'Engelska';
             }

@@ -797,28 +797,30 @@ func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 	type parishJSON struct {
-		Slug      string   `json:"slug"`
-		Name      string   `json:"name"`
-		ShortName string   `json:"short_name"`
-		Address   string   `json:"address"`
-		City      string   `json:"city"`
-		County    string   `json:"county"`
-		Website   string   `json:"website"`
-		Languages []string `json:"languages"`
-		Tradition string   `json:"tradition"`
+		Slug            string   `json:"slug"`
+		Name            string   `json:"name"`
+		ShortName       string   `json:"short_name"`
+		Address         string   `json:"address"`
+		City            string   `json:"city"`
+		County          string   `json:"county"`
+		Website         string   `json:"website"`
+		Languages       []string `json:"languages"`
+		Tradition       string   `json:"tradition"`
+		DefaultLanguage string   `json:"default_language,omitempty"`
 	}
 	result := make([]parishJSON, len(parishes))
 	for i, p := range parishes {
 		result[i] = parishJSON{
-			Slug:      p.Slug,
-			Name:      p.Name,
-			ShortName: p.ShortName,
-			Address:   p.Address,
-			City:      p.City,
-			County:    p.County,
-			Website:   p.Website,
-			Languages: p.Languages,
-			Tradition: p.Tradition,
+			Slug:            p.Slug,
+			Name:            p.Name,
+			ShortName:       p.ShortName,
+			Address:         p.Address,
+			City:            p.City,
+			County:          p.County,
+			Website:         p.Website,
+			Languages:       p.Languages,
+			Tradition:       p.Tradition,
+			DefaultLanguage: p.DefaultLanguage,
 		}
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
