@@ -771,7 +771,7 @@
             const today = new Date().toISOString().slice(0, 10);
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() + visibleWeeks * 7);
-            const cutoff = cutoffDate.toISOString().slice(0, 10);
+            let cutoff = cutoffDate.toISOString().slice(0, 10);
 
             const filteredServices = allServices.filter(s => {
                 if (s.date < today) return false;
@@ -783,6 +783,12 @@
             if (filteredServices.length === 0) {
                 content.innerHTML = '<p class="loading">Inga gudstjänster matchar filtret.</p>';
                 return;
+            }
+
+            // Always show at least the first 3 services, extending the cutoff if needed
+            const minIdx = Math.min(2, filteredServices.length - 1);
+            if (filteredServices[minIdx].date > cutoff) {
+                cutoff = filteredServices[minIdx].date;
             }
 
             const visibleServices = filteredServices.filter(s => s.date <= cutoff);
