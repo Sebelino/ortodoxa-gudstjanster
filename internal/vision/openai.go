@@ -315,7 +315,13 @@ Capitalization:
 
 Service name examples:
 - "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Högvördighet Bartholomaios av Elaia")
+- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Hierarchical Synlitourgon" → "Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Gudomlig Liturgi, med Hans Eminens Kleopas av Sverige")
 - "Divine Liturgy" / "Θεία Λειτουργία" → "Gudomlig Liturgi"
+- "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Kleopas av Sverige")
+- "Sermon" / "Homily" / "Κήρυγμα" / "Ομιλία" / "Divine Proclamation" / "Gudomligt förkunnande" → "Predikan" (always use "Predikan", never "Gudomligt förkunnande"; include the preacher: "Predikan av Arkimandrit Bartholomaios")
+- "Memorial service for founders" / "Κτητορικόν Μνημόσυνον" → "Stiftarnas minnesgudstjänst"
+- "Memorial service" / "Μνημόσυνο" / "Panachida" → "Minnesgudstjänst"
+- "Kneeling Vespers" / "Vespers of the Genuflections" / "Εσπερινός της Γονυκλισίας" → "Vesper med knäfall"
 - "Great Vespers" / "Μέγας Εσπερινός" → "Stora aftongudstjänsten"
 - "Great Compline" / "Μέγα Απόδειπνο" → "Stora kompletoriet"
 - "Great Compline with the Canon of St. Andrew" → "Stora kompletoriet med den heliga Andreasakanonen"
@@ -327,6 +333,7 @@ Service name examples:
 - "Orthros" / "Όρθρος" → "Orthros"
 - "Vespers" / "Εσπερινός" → "Vesper"
 - "Hours" / "Ώρες" → "Tidebönerna"
+- Do NOT transliterate unknown Greek liturgical terms — map them to the nearest known Swedish equivalent above
 
 Input JSON:
 %s

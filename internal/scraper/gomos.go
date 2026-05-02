@@ -244,7 +244,7 @@ func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.Ra
 	}
 	hash := sha256.Sum256(entriesJSON)
 	hashStr := hex.EncodeToString(hash[:])
-	cacheKey := "translate/" + hashStr
+	cacheKey := "translate/v2/" + hashStr
 
 	var cached []vision.ScheduleEntry
 	if s.store.GetJSON(cacheKey, &cached) {
@@ -429,6 +429,10 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 	var services []model.ChurchService
 
 	for _, entry := range entries {
+		if strings.EqualFold(strings.TrimSpace(entry.ServiceName), "archeirinon") {
+			continue
+		}
+
 		location := gomosLocation
 		lang := gomosLanguage
 		time := entry.Time
