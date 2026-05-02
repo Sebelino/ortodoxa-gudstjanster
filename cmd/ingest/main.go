@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -210,6 +211,8 @@ func main() {
 				}
 			}
 		}
+
+		fillConsecutiveEndTimes(result.services)
 
 		if err := fsClient.ReplaceServicesForScraper(ctx, result.scraperName, result.services, batchID); err != nil {
 			log.Printf("ERROR: Failed to store services for %s: %v", result.scraperName, err)
@@ -461,6 +464,43 @@ func parseEventLanguages(accepted []acceptedResult) map[string]*string {
 	}
 	log.Printf("Event languages: %d detected out of %d unique events", detected, len(langMap))
 	return langMap
+}
+
+// fillConsecutiveEndTimes sets the end time of each service to the start time of
+// the next service on the same day from the same parish, when no explicit end
+// time exists and the gap is at most 3 hours (to avoid joining morning and evening
+// services into a single multi-hour block).
+func fillConsecutiveEndTimes(services []model.ChurchService) {
+	type groupKey struct{ parish, date string }
+	groups := make(map[groupKey][]*model.ChurchService)
+	for i := range services {
+		svc := &services[i]
+		if svc.StartTime == nil {
+			continue
+		}
+		k := groupKey{svc.Parish, svc.Date}
+		groups[k] = append(groups[k], svc)
+	}
+
+	for _, group := range groups {
+		sort.Slice(group, func(i, j int) bool {
+			return group[i].StartTime.Before(*group[j].StartTime)
+		})
+		for i, svc := range group {
+			if svc.EndTime != nil || i+1 >= len(group) {
+				continue
+			}
+			next := group[i+1]
+			if next.StartTime == nil {
+				continue
+			}
+			gap := next.StartTime.Sub(*svc.StartTime)
+			if gap > 0 && gap <= 3*time.Hour {
+				end := *next.StartTime
+				svc.EndTime = &end
+			}
+		}
+	}
 }
 
 // saveDiagnostics serializes rejected services to GCS and returns the object path.
