@@ -553,15 +553,6 @@
         }
 
         function loadFilterState() {
-            // ?parish=NAME from parish page deep link — show only that parish,
-            // without touching localStorage so the user's normal filter is unaffected.
-            const urlParish = new URLSearchParams(window.location.search).get('parish');
-            if (urlParish) {
-                includedParishes = new Set([urlParish]);
-                includedLanguages = new Set(ALL_LANGUAGES);
-                return;
-            }
-
             // Migrate from oldest format: excludedSources blacklist
             const oldExcluded = localStorage.getItem('excludedSources');
             if (oldExcluded !== null) {

@@ -197,8 +197,14 @@
         </div>
 
         <div class="cta">
-            <a href="/?parish={{.Name | urlquery}}">Se kommande gudstj&auml;nster</a>
+            <a href="/" id="parish-main-link" data-parish="{{.Name}}">Se kommande gudstj&auml;nster</a>
         </div>
+        <script>
+        document.getElementById('parish-main-link').addEventListener('click', function() {
+            localStorage.setItem('includedParishes', JSON.stringify([this.dataset.parish]));
+            localStorage.removeItem('includedLanguages');
+        });
+        </script>
     </main>
     {{template "theme-js" .}}
 </body>
