@@ -295,6 +295,7 @@ func rawEntriesToSwedish(entries []vision.RawScheduleEntry) []vision.ScheduleEnt
 			Time:        e.Time,
 			ServiceName: e.ServiceName,
 			Occasion:    e.Occasion,
+			Location:    e.Location,
 		}
 	}
 	return result
@@ -434,6 +435,9 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 		}
 
 		location := gomosLocation
+		if entry.Location != "" {
+			location = entry.Location
+		}
 		lang := gomosLanguage
 		time := entry.Time
 

@@ -22,6 +22,7 @@ type ScheduleEntry struct {
 	Time        string `json:"time"`
 	ServiceName string `json:"service_name"`
 	Occasion    string `json:"occasion,omitempty"`
+	Location    string `json:"location,omitempty"`
 }
 
 // RawScheduleResult holds the raw OCR output from an image in its original language.
@@ -37,6 +38,7 @@ type RawScheduleEntry struct {
 	Time        string `json:"time"`
 	ServiceName string `json:"service_name"`
 	Occasion    string `json:"occasion,omitempty"`
+	Location    string `json:"location,omitempty"`
 }
 
 // normalizeTime fixes invalid HH:MM values. In particular, 24:00 becomes 23:59.
@@ -95,6 +97,7 @@ Return a JSON object with these fields:
   - time: in HH:MM format (24-hour). Convert "π.μ." to AM and "μ.μ." to PM times in 24h format (e.g., 6:00 μ.μ. = 18:00)
   - service_name: the name of the service in the ORIGINAL language
   - occasion: optional, any special occasion or holiday mentioned, in the ORIGINAL language
+  - location: optional. Set ONLY when the text explicitly states the event takes place at a different named venue (e.g. "NOTERA: ... i Aposteln Bartholomaios församling i Reykjavik"). Do NOT set this for phrases like "från [place]" which describe where a visiting person is from, not where the event is held.
 
 Only include entries that have both a date/day and a time specified. Note that NOTERING/NOTE entries also have times — the time typically appears right-aligned at the end of the last line of wrapped text (e.g., after a closing parenthesis).
 IMPORTANT: Double-check that you have not skipped any date sections or services. The output should cover the ENTIRE schedule from first date to last date. Count the number of date headers you found and verify none were skipped. Verify that no entry has time 00:00 unless it genuinely says midnight.
@@ -344,6 +347,7 @@ Return a JSON array of services with these fields:
 - time: in HH:MM format (24-hour, keep the same times)
 - service_name: the name of the service translated to Swedish following all rules above
 - occasion: optional, any special occasion or holiday, translated to Swedish
+- location: optional. If present in the input, carry it through verbatim — do not translate or modify place names or church names.
 
 Return ONLY the JSON array, no other text.`, today, string(entriesJSON))
 
