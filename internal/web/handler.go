@@ -604,14 +604,14 @@ func filterAndSort(services []model.ChurchService) []model.ChurchService {
 		if future[i].Date != future[j].Date {
 			return future[i].Date < future[j].Date
 		}
-		// Same date - sort by time if available
+		// Same date - sort by normalized HHMMSS so "8:30" < "9:45" < "11:00"
 		timeI := ""
 		timeJ := ""
 		if future[i].Time != nil {
-			timeI = *future[i].Time
+			timeI = parseStartTime(*future[i].Time)
 		}
 		if future[j].Time != nil {
-			timeJ = *future[j].Time
+			timeJ = parseStartTime(*future[j].Time)
 		}
 		return timeI < timeJ
 	})
