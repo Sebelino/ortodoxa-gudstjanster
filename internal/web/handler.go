@@ -797,30 +797,30 @@ func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 	type parishJSON struct {
-		Slug            string   `json:"slug"`
-		Name            string   `json:"name"`
-		ShortName       string   `json:"short_name"`
-		Address         string   `json:"address"`
-		City            string   `json:"city"`
-		County          string   `json:"county"`
-		Website         string   `json:"website"`
-		Languages       []string `json:"languages"`
-		Tradition       string   `json:"tradition"`
-		DefaultLanguage string   `json:"default_language,omitempty"`
+		Slug               string   `json:"slug"`
+		Name               string   `json:"name"`
+		ShortName          string   `json:"short_name"`
+		Address            string   `json:"address"`
+		City               string   `json:"city"`
+		County             string   `json:"county"`
+		Website            string   `json:"website"`
+		PrimaryLanguage    string   `json:"primary_language"`
+		SecondaryLanguages []string `json:"secondary_languages"`
+		Tradition          string   `json:"tradition"`
 	}
 	result := make([]parishJSON, len(parishes))
 	for i, p := range parishes {
 		result[i] = parishJSON{
-			Slug:            p.Slug,
-			Name:            p.Name,
-			ShortName:       p.ShortName,
-			Address:         p.Address,
-			City:            p.City,
-			County:          p.County,
-			Website:         p.Website,
-			Languages:       p.Languages,
-			Tradition:       p.Tradition,
-			DefaultLanguage: p.DefaultLanguage,
+			Slug:               p.Slug,
+			Name:               p.Name,
+			ShortName:          p.ShortName,
+			Address:            p.Address,
+			City:               p.City,
+			County:             p.County,
+			Website:            p.Website,
+			PrimaryLanguage:    p.PrimaryLanguage,
+			SecondaryLanguages: p.SecondaryLanguages,
+			Tradition:          p.Tradition,
 		}
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -858,14 +858,20 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 
 	data := struct {
 		ParishInfo
-		LanguagesStr   string
-		WebsiteDisplay string
-		CountyDisplay  string
+		SecondaryLanguagesStr string
+		WebsiteDisplay        string
+		CountyDisplay         string
 	}{
-		ParishInfo:     p,
-		LanguagesStr:   strings.Join(p.Languages, ", "),
-		WebsiteDisplay: websiteDisplay,
-		CountyDisplay:  countyDisplayName(p.County),
+		ParishInfo:            p,
+		SecondaryLanguagesStr: func() string {
+			lower := make([]string, len(p.SecondaryLanguages))
+			for i, l := range p.SecondaryLanguages {
+				lower[i] = strings.ToLower(l)
+			}
+			return strings.Join(lower, ", ")
+		}(),
+		WebsiteDisplay:        websiteDisplay,
+		CountyDisplay:         countyDisplayName(p.County),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

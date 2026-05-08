@@ -807,9 +807,9 @@
             if (s.event_language === 'Engelska') return 'Engelska';
             if (!s.event_language) {
                 const parish = parishByName[s.parish];
-                if (parish && parish.default_language) {
-                    if (parish.default_language === 'Svenska') return 'Svenska';
-                    if (parish.default_language === 'Engelska') return 'Engelska';
+                if (parish && parish.primary_language) {
+                    if (parish.primary_language === 'Svenska') return 'Svenska';
+                    if (parish.primary_language === 'Engelska') return 'Engelska';
                     return 'Övrigt';
                 }
                 const pl = (s.parish_language || '').toLowerCase();
@@ -948,8 +948,8 @@
 
         function buildDetails(service) {
             let details = '';
+            const p = parishByName[service.parish];
             if (service.parish) {
-                const p = parishByName[service.parish];
                 if (p) {
                     details += `<div class="detail-item"><span class="detail-label">Församling:</span> <a href="/parish/${p.slug}">${escapeHtml(service.parish)}</a></div>`;
                 } else {
@@ -976,8 +976,12 @@
             }
             if (service.event_language) {
                 details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(service.event_language)}</div>`;
+            } else if (p && p.primary_language) {
+                const sec = p.secondary_languages && p.secondary_languages.length > 0
+                    ? ` (även ${escapeHtml(p.secondary_languages.map(l => l.toLowerCase()).join(', '))})` : '';
+                details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(p.primary_language)}${sec} (ej angivet)</div>`;
             } else if (service.parish_language) {
-                details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(service.parish_language)} (ej angivet)</div>`;
+                details += `<div class="detail-item"><span class="detail-label">Språk:</span> ${escapeHtml(service.parish_language)}</div>`;
             }
             if (service.occasion) {
                 details += `<div class="detail-item"><span class="detail-label">Tillfälle:</span> ${escapeHtml(service.occasion)}</div>`;
