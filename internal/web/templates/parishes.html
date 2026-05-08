@@ -152,6 +152,7 @@
 
         var bounds = [];
         parishes.forEach(function(p) {
+            if (!p.lat && !p.lng) return;
             var marker = L.marker([p.lat, p.lng]).addTo(map);
             marker.bindPopup('<b><a href="/parish/' + p.slug + '">' + p.name + '</a></b><br>' + p.address);
             bounds.push([p.lat, p.lng]);

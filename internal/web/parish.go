@@ -121,10 +121,21 @@ var parishes = []ParishInfo{
 		Lat:                59.3454446,
 		Lng:                18.0424408,
 	},
+	{
+		Slug:            "kristi-uppstandelse",
+		Name:            "Kristi Uppståndelses Ortodoxa församling",
+		ShortName:       "Kristi Uppståndelse",
+		City:            "Göteborg",
+		County:          "Västra Götaland",
+		Website:         "https://kristiuppstandelse.se",
+		PrimaryLanguage: "Svenska",
+		Tradition:       "Antiokiansk-ortodox (Antiokias Ortodoxa Patriarkat)",
+	},
 }
 
 var countyNames = map[string]string{
-	"Stockholm": "Stockholms län",
+	"Stockholm":      "Stockholms län",
+	"Västra Götaland": "Västra Götalands län",
 }
 
 func countyDisplayName(county string) string {

@@ -103,6 +103,7 @@ func main() {
 	registry.Register(scraper.NewSrpskaScraper(visionClient))
 	registry.Register(scraper.NewGCalendarScraper())
 	registry.Register(scraper.NewGCalendarManualScraper())
+	registry.Register(scraper.NewUppstandelseScraper())
 	registry.Register(scraper.NewRomanianScraper())
 	registry.Register(scraper.NewSommarlagerScraper(gcsStore, visionClient))
 	if uploadReader != nil {
