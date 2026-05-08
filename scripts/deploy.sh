@@ -17,4 +17,10 @@ gcloud run deploy ortodoxa-gudstjanster \
   --region="$REGION" \
   --project="$PROJECT"
 
-echo "Done. The ingestion job will use the new image on its next run."
+echo "Updating ingestion job..."
+gcloud run jobs update ortodoxa-gudstjanster-ingest \
+  --image="$IMAGE" \
+  --region="$REGION" \
+  --project="$PROJECT"
+
+echo "Done."
