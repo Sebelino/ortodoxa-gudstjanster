@@ -127,6 +127,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/apple-touch-icon.png", h.handleAppleTouchIcon)
 	mux.HandleFunc("/manifest.json", h.handleManifest)
 	mux.HandleFunc("/sw.js", h.handleServiceWorker)
+	mux.HandleFunc("/calendar", h.handleCalendar)
 	mux.HandleFunc("/about", h.handleAbout)
 	mux.HandleFunc("/privacy", h.handlePrivacy)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
@@ -778,6 +779,10 @@ func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
   <url>
     <loc>https://ortodoxagudstjanster.se/parishes</loc>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ortodoxagudstjanster.se/calendar</loc>
+    <priority>0.6</priority>
   </url>`)
 	for _, p := range parishes {
 		fmt.Fprintf(&sb, `
@@ -1045,6 +1050,16 @@ func (h *Handler) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func (h *Handler) handleCalendar(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := parseWithTheme("calendar.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl.Execute(w, nil)
 }
 
 func (h *Handler) handleAbout(w http.ResponseWriter, r *http.Request) {

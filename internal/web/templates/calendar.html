@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalenderprenumeration - Ortodoxa Gudstjänster</title>
+    <meta name="description" content="Prenumerera på ortodoxa gudstjänster i din kalenderapp. Instruktioner för Google Kalender, Apple Kalender och andra appar.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://ortodoxagudstjanster.se/calendar">
+    <style>
+        {{template "theme-css" .}}
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        main {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .calendar-container {
+            background: var(--surface);
+            border-radius: 6px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px var(--shadow);
+        }
+
+        .calendar-container h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: var(--parish-name);
+        }
+
+        .calendar-container p {
+            color: var(--text-detail);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .calendar-container a {
+            color: var(--link);
+        }
+
+        .calendar-container a:hover {
+            text-decoration: none;
+        }
+
+        .calendar-container ol {
+            color: var(--text-detail);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+
+        .calendar-container ol li {
+            margin-bottom: 0.3rem;
+        }
+
+        .calendar-container code {
+            background: var(--surface-alt);
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .ics-url-box {
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .ics-url-box code {
+            flex: 1;
+            background: none;
+            padding: 0;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: var(--btn);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: var(--btn-hover);
+        }
+
+        .copy-feedback {
+            font-size: 0.8rem;
+            color: var(--success);
+            opacity: 0;
+            transition: opacity 0.2s;
+            margin-left: 0.5rem;
+        }
+
+        .copy-feedback.visible {
+            opacity: 1;
+        }
+
+        .note {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+    </style>
+    {{template "theme-flash" .}}
+</head>
+<body>
+    <header>
+        <h1>Kalenderprenumeration</h1>
+    </header>
+
+    <main>
+        <div class="breadcrumb">
+            <span><a href="/">&larr; Tillbaka till kalendern</a></span>
+            <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
+        </div>
+
+        <div class="calendar-container">
+            <h2>ICS-kalenderflöde</h2>
+            <p>
+                Prenumerera på gudstjänsterna i din kalenderapp genom att använda ICS-flödet.
+                Kalendern synkroniseras automatiskt med nya gudstjänster.
+            </p>
+
+            <div class="ics-url-box">
+                <code id="ics-url">https://ortodoxagudstjanster.se/calendar.ics</code>
+                <button class="copy-btn" onclick="copyUrl()">Kopiera</button>
+                <span id="copy-feedback" class="copy-feedback">Kopierad!</span>
+            </div>
+
+            <p>
+                Du kan välja specifika församlingar med parametern <code>include</code>:
+            </p>
+            <div class="ics-url-box">
+                <code>https://ortodoxagudstjanster.se/calendar.ics?include=St.%20Georgios%20Cathedral</code>
+            </div>
+            <p class="note">
+                Tips: Du kan också kopiera en ICS-länk med dina aktuella filterval direkt från
+                <a href="/">startsidan</a> via knappen "Kopiera ICS-länk".
+            </p>
+
+            <h2>Lägga till i Google Kalender</h2>
+            <ol>
+                <li>Öppna <a href="https://calendar.google.com" target="_blank" rel="noopener">Google Calendar</a> i webbläsaren</li>
+                <li>Klicka på <strong>+</strong> bredvid "Andra kalendrar" i vänstermenyn</li>
+                <li>Välj <strong>Från webbadress</strong> / <strong>From URL</strong></li>
+                <li>Klistra in URL:en: <code>https://ortodoxagudstjanster.se/calendar.ics</code></li>
+                <li>Klicka på <strong>Lägg till kalender</strong></li>
+            </ol>
+
+            <h2>Lägga till i Apple Kalender</h2>
+            <ol>
+                <li>Öppna appen <strong>Kalender</strong> på din Mac, iPhone eller iPad</li>
+                <li>Välj <strong>Arkiv</strong> &rarr; <strong>Ny kalenderprenumeration...</strong> (Mac) eller <strong>Inställningar</strong> &rarr; <strong>Kalender</strong> &rarr; <strong>Konton</strong> &rarr; <strong>Lägg till konto</strong> &rarr; <strong>Annat</strong> &rarr; <strong>Lägg till prenumererad kalender</strong> (iPhone/iPad)</li>
+                <li>Klistra in URL:en: <code>https://ortodoxagudstjanster.se/calendar.ics</code></li>
+                <li>Klicka på <strong>Prenumerera</strong></li>
+            </ol>
+
+            <h2>Andra kalenderappar</h2>
+            <p>
+                De flesta kalenderappar stödjer ICS-prenumerationer. Leta efter ett alternativ som
+                "Prenumerera på kalender", "Lägg till kalender från URL" eller liknande och klistra in
+                adressen ovan.
+            </p>
+        </div>
+    </main>
+
+    <script>
+        function copyUrl() {
+            const url = document.getElementById('ics-url').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const feedback = document.getElementById('copy-feedback');
+                feedback.classList.add('visible');
+                setTimeout(() => feedback.classList.remove('visible'), 2000);
+            });
+        }
+    </script>
+    {{template "theme-js" .}}
+</body>
+</html>
