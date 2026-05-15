@@ -381,7 +381,7 @@
             border-top: 1px solid var(--border);
             padding: 0.75rem;
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 0.5rem;
             align-items: center;
         }
@@ -393,24 +393,38 @@
         .subscribe-label {
             font-size: 0.85rem;
             color: var(--filter-text);
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
-        .subscribe-btn {
-            background: var(--btn);
-            color: white;
-            border: none;
-            padding: 0.4rem 0.75rem;
-            border-radius: 4px;
+        .subscribe-url {
+            flex: 1;
+            min-width: 0;
             font-size: 0.8rem;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.3rem;
+            font-family: monospace;
+            color: var(--text-detail);
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.35rem 0.5rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
-        .subscribe-btn:hover {
-            background: var(--btn-hover);
+        .copy-icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.25rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .copy-icon-btn:hover {
+            color: var(--text);
         }
 
         .copy-feedback {
@@ -418,6 +432,8 @@
             color: var(--success);
             opacity: 0;
             transition: opacity 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .copy-feedback.visible {
@@ -474,7 +490,7 @@
             <span class="sep">|</span>
             <a href="/parishes">Församlingar</a>
             <span class="sep">|</span>
-            <a href="/calendar">Kalender</a>
+            <a href="/calendar">ICS</a>
             <span class="sep">|</span>
             <a href="/feedback">Rapportera fel/önskemål</a>
             <span class="sep">|</span>
@@ -492,8 +508,9 @@
             </div>
             <div id="lang-filter-options" class="filter-options"></div>
             <div id="subscribe-section" class="subscribe-section hidden">
-                <span class="subscribe-label">Prenumerera:</span>
-                <button class="subscribe-btn" onclick="copySubscribeUrl()">Kopiera ICS-länk</button>
+                <span class="subscribe-label">ICS:</span>
+                <span id="subscribe-url" class="subscribe-url"></span>
+                <button class="copy-icon-btn" onclick="copySubscribeUrl()" title="Kopiera ICS-länk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
                 <span id="copy-feedback" class="copy-feedback">Kopierad!</span>
             </div>
         </div>
@@ -713,6 +730,7 @@
 
             filterPanel.style.display = 'block';
             document.getElementById('subscribe-section').classList.remove('hidden');
+            updateSubscribeUrl();
         }
 
         function getSubscribeUrl() {
@@ -740,12 +758,17 @@
             if (includedLanguages.size < ALL_LANGUAGES.length) {
                 params.set('includeLang', [...includedLanguages].join(','));
             }
-            params.set('v', Math.random().toString(36).slice(2, 8));
-            return base + '?' + params.toString();
+            const qs = params.toString();
+            return qs ? base + '?' + qs : base;
+        }
+
+        function updateSubscribeUrl() {
+            const el = document.getElementById('subscribe-url');
+            if (el) el.textContent = getSubscribeUrl();
         }
 
         function copySubscribeUrl() {
-            const url = getSubscribeUrl();
+            const url = document.getElementById('subscribe-url').textContent;
             navigator.clipboard.writeText(url).then(() => {
                 const feedback = document.getElementById('copy-feedback');
                 feedback.classList.add('visible');
@@ -787,6 +810,7 @@
                 includedLanguages.delete(lang);
             }
             saveFilterState();
+            updateSubscribeUrl();
             renderServices();
         }
 
