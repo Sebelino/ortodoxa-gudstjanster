@@ -95,7 +95,7 @@ func main() {
 	registry.Register(scraper.NewFinskaScraper(""))
 	gomosScraper := scraper.NewGomosScraper(gcsStore, visionClient)
 	if uploadReader != nil {
-		gomosScraper.SetUploadSource(uploadReader, "gomos/")
+		gomosScraper.SetUploadSource(uploadReader, "st-georgios/")
 	}
 	registry.Register(gomosScraper)
 	registry.Register(scraper.NewHeligaAnnaScraper())
@@ -107,7 +107,19 @@ func main() {
 	registry.Register(scraper.NewRomanianScraper())
 	registry.Register(scraper.NewSommarlagerScraper(gcsStore, visionClient))
 	if uploadReader != nil {
-		registry.Register(scraper.NewUploadsScraper(gcsStore, visionClient, uploadReader, gcsUploadBucket))
+		uploadParishes := map[string]scraper.UploadParishInfo{
+			"helige-giorgis": {
+				Name:     "Helige Giorgis",
+				Location: "Kyrkvägen 27, 182 74 Stocksund",
+				Language: "Georgiska",
+			},
+			"sankt-sava": {
+				Name:     "Sankt Sava",
+				Location: "Bägerstavägen 68, 120 47 Enskede Gård",
+				Language: "Kyrkoslaviska",
+			},
+		}
+		registry.Register(scraper.NewUploadsScraper(gcsStore, visionClient, uploadReader, gcsUploadBucket, uploadParishes))
 	}
 
 	// Generate batch ID for this ingestion run

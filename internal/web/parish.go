@@ -133,7 +133,7 @@ var parishes = []ParishInfo{
 	},
 	{
 		Slug:            "helige-giorgis",
-		Name:            "Georgiska Ortodoxa St. Georgios",
+		Name:            "Helige Giorgis",
 		ShortName:       "Helige Giorgis",
 		Address:         "Kyrkvägen 27, Stocksund",
 		City:            "Stocksund",

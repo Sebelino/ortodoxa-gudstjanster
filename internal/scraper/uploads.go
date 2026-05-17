@@ -19,21 +19,33 @@ const (
 )
 
 // UploadsScraper processes uploaded images from a GCS bucket, using AI to extract
-// parish information and events from each image.
+// event information from each image. The parish is determined by the top-level
+// folder name, which must match a known parish slug.
 type UploadsScraper struct {
-	store  store.Store
-	vision *vision.Client
-	reader *store.BucketReader
-	bucket string
+	store      store.Store
+	vision     *vision.Client
+	reader     *store.BucketReader
+	bucket     string
+	parishInfo map[string]UploadParishInfo // slug → parish info
+}
+
+// UploadParishInfo holds the parish metadata needed by the uploads scraper.
+type UploadParishInfo struct {
+	Name     string
+	Location string
+	Language string
 }
 
 // NewUploadsScraper creates a new scraper that processes uploaded images.
-func NewUploadsScraper(s store.Store, v *vision.Client, reader *store.BucketReader, bucket string) *UploadsScraper {
+// The parishInfo map keys are parish slugs (matching bucket folder names)
+// and values contain the parish name, location, and language.
+func NewUploadsScraper(s store.Store, v *vision.Client, reader *store.BucketReader, bucket string, parishInfo map[string]UploadParishInfo) *UploadsScraper {
 	return &UploadsScraper{
-		store:  s,
-		vision: v,
-		reader: reader,
-		bucket: bucket,
+		store:      s,
+		vision:     v,
+		reader:     reader,
+		bucket:     bucket,
+		parishInfo: parishInfo,
 	}
 }
 
@@ -53,6 +65,7 @@ func (s *UploadsScraper) Fetch(ctx context.Context) ([]model.ChurchService, erro
 	}
 
 	var allServices []model.ChurchService
+	imageCount := 0
 
 	for _, name := range names {
 		lower := strings.ToLower(name)
@@ -60,8 +73,16 @@ func (s *UploadsScraper) Fetch(ctx context.Context) ([]model.ChurchService, erro
 			continue
 		}
 
-		// Skip gomos/ prefix — those images are handled by the Gomos scraper
-		if strings.HasPrefix(name, "gomos/") {
+		// Extract parish slug from first path component (e.g. "helige-giorgis/maj-2026.jpg" → "helige-giorgis")
+		slug, _, ok := strings.Cut(name, "/")
+		if !ok {
+			log.Printf("Uploads: skipping %s (not in a parish folder)", name)
+			continue
+		}
+
+		parish, known := s.parishInfo[slug]
+		if !known {
+			log.Printf("Uploads: skipping %s (unknown parish slug %q)", name, slug)
 			continue
 		}
 
@@ -71,28 +92,30 @@ func (s *UploadsScraper) Fetch(ctx context.Context) ([]model.ChurchService, erro
 			continue
 		}
 
-		services, err := s.processImage(ctx, imageData, name)
+		services, err := s.processImage(ctx, imageData, name, &parish)
 		if err != nil {
 			log.Printf("Uploads: failed to process %s: %v", name, err)
 			continue
 		}
 
+		imageCount++
 		allServices = append(allServices, services...)
 	}
 
-	log.Printf("Uploads: extracted %d services from %d images", len(allServices), len(names))
+	log.Printf("Uploads: extracted %d services from %d images", len(allServices), imageCount)
 	return allServices, nil
 }
 
 // processImage extracts events from a single image, with caching by checksum.
-func (s *UploadsScraper) processImage(ctx context.Context, imageData []byte, objectName string) ([]model.ChurchService, error) {
+// The parish info from the folder slug overrides whatever the AI extracts.
+func (s *UploadsScraper) processImage(ctx context.Context, imageData []byte, objectName string, parish *UploadParishInfo) ([]model.ChurchService, error) {
 	checksum := computeChecksum(imageData)
 	cacheKey := "uploads-ocr/v1/" + checksum
 
 	var cached vision.ImageEventResult
 	if s.store.GetJSON(cacheKey, &cached) {
 		log.Printf("Uploads: cache hit for %s (checksum %s)", objectName, checksum[:12])
-		return s.convertToServices(&cached, objectName), nil
+		return s.convertToServices(&cached, objectName, parish), nil
 	}
 
 	log.Printf("Uploads: cache miss for %s (checksum %s), calling API", objectName, checksum[:12])
@@ -114,17 +137,28 @@ func (s *UploadsScraper) processImage(ctx context.Context, imageData []byte, obj
 		}
 	}
 
-	log.Printf("Uploads: extracted %d events from %s (parish: %s)", len(result.Events), objectName, result.Parish)
-	return s.convertToServices(result, objectName), nil
+	log.Printf("Uploads: extracted %d events from %s (parish: %s)", len(result.Events), objectName, parish.Name)
+	return s.convertToServices(result, objectName, parish), nil
 }
 
-func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, objectName string) []model.ChurchService {
+func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, objectName string, parish *UploadParishInfo) []model.ChurchService {
 	publicURL := fmt.Sprintf("https://storage.googleapis.com/%s/%s", s.bucket, objectName)
+
+	// Use parish info from slug; fall back to AI-extracted values
+	parishName := parish.Name
+	location := parish.Location
+	if location == "" {
+		location = result.Location
+	}
+	language := parish.Language
+	if language == "" {
+		language = result.Language
+	}
 
 	var services []model.ChurchService
 	for _, event := range result.Events {
 		svc := model.ChurchService{
-			Parish:      result.Parish,
+			Parish:      parishName,
 			Source:      uploadsSourceName,
 			SourceURL:   publicURL,
 			Date:        event.Date,
@@ -137,8 +171,8 @@ func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, obje
 			svc.Time = &t
 		}
 
-		if result.Location != "" {
-			loc := result.Location
+		if location != "" {
+			loc := location
 			svc.Location = &loc
 		}
 
@@ -152,8 +186,8 @@ func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, obje
 			svc.Notes = &notes
 		}
 
-		if result.Language != "" {
-			lang := result.Language
+		if language != "" {
+			lang := language
 			svc.Language = &lang
 		}
 
