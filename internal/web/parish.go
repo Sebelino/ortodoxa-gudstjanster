@@ -131,6 +131,20 @@ var parishes = []ParishInfo{
 		PrimaryLanguage: "Svenska",
 		Tradition:       "Antiokiansk-ortodox (Antiokias Ortodoxa Patriarkat)",
 	},
+	{
+		Slug:            "helige-giorgis",
+		Name:            "Helige Giorgis",
+		ShortName:       "Helige Giorgis",
+		Address:         "Kyrkvägen 27, Stocksund",
+		City:            "Stocksund",
+		County:          "Stockholm",
+		Website:         "https://www.facebook.com/profile.php?id=100064717774879",
+		PrimaryLanguage: "Georgiska",
+		Tradition:       "Georgisk-ortodox (Georgiska patriarkatet)",
+		MapQuery:        "Kyrkvägen+27+Stocksund",
+		Lat:             59.39017384201317,
+		Lng:             18.057616987012704,
+	},
 }
 
 var countyNames = map[string]string{
