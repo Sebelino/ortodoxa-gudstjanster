@@ -31,9 +31,11 @@ type UploadsScraper struct {
 
 // UploadParishInfo holds the parish metadata needed by the uploads scraper.
 type UploadParishInfo struct {
-	Name     string
-	Location string
-	Language string
+	Name       string
+	Location   string
+	Language   string
+	SourceURL  string // if set, used as SourceURL instead of the GCS public URL
+	SourceName string // if set, used as Source instead of "Uppladdade bilder"
 }
 
 // NewUploadsScraper creates a new scraper that processes uploaded images.
@@ -142,7 +144,10 @@ func (s *UploadsScraper) processImage(ctx context.Context, imageData []byte, obj
 }
 
 func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, objectName string, parish *UploadParishInfo) []model.ChurchService {
-	publicURL := fmt.Sprintf("https://storage.googleapis.com/%s/%s", s.bucket, objectName)
+	sourceURL := parish.SourceURL
+	if sourceURL == "" {
+		sourceURL = fmt.Sprintf("https://storage.googleapis.com/%s/%s", s.bucket, objectName)
+	}
 
 	// Use parish info from slug; fall back to AI-extracted values
 	parishName := parish.Name
@@ -154,13 +159,17 @@ func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, obje
 	if language == "" {
 		language = result.Language
 	}
+	sourceName := parish.SourceName
+	if sourceName == "" {
+		sourceName = uploadsSourceName
+	}
 
 	var services []model.ChurchService
 	for _, event := range result.Events {
 		svc := model.ChurchService{
 			Parish:      parishName,
-			Source:      uploadsSourceName,
-			SourceURL:   publicURL,
+			Source:      sourceName,
+			SourceURL:   sourceURL,
 			Date:        event.Date,
 			DayOfWeek:   event.DayOfWeek,
 			ServiceName: event.ServiceName,

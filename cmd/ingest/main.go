@@ -109,9 +109,11 @@ func main() {
 	if uploadReader != nil {
 		uploadParishes := map[string]scraper.UploadParishInfo{
 			"helige-giorgis": {
-				Name:     "Helige Giorgis",
-				Location: "Kyrkvägen 27, 182 74 Stocksund",
-				Language: "Georgiska",
+				Name:       "Helige Giorgis",
+				Location:   "Kyrkvägen 27, 182 74 Stocksund",
+				Language:   "Georgiska",
+				SourceURL:  "https://www.facebook.com/share/17oMW5H9UN/?mibextid=wwXIfr",
+				SourceName: "Facebook",
 			},
 			"sankt-sava": {
 				Name:     "Sankt Sava",
