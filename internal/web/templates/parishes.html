@@ -128,7 +128,7 @@
             <a class="parish-card" href="/parish/{{.Slug}}">
                 <div class="parish-card-body">
                     <div class="parish-name">{{.Name}}</div>
-                    <div class="parish-tradition">{{.Tradition}}</div>
+                    <div class="parish-tradition">{{if .Tradition}}{{.Tradition}}{{if .Patriarchate}} &middot; {{.Patriarchate}}{{end}}{{else}}{{.Patriarchate}}{{end}}</div>
                     <div class="parish-address">{{.Address}}</div>
                 </div>
             </a>

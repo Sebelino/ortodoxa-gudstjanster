@@ -812,6 +812,7 @@ func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 		PrimaryLanguage    string   `json:"primary_language"`
 		SecondaryLanguages []string `json:"secondary_languages"`
 		Tradition          string   `json:"tradition"`
+		Patriarchate       string   `json:"patriarchate"`
 	}
 	result := make([]parishJSON, len(parishes))
 	for i, p := range parishes {
@@ -826,6 +827,7 @@ func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 			PrimaryLanguage:    p.PrimaryLanguage,
 			SecondaryLanguages: p.SecondaryLanguages,
 			Tradition:          p.Tradition,
+			Patriarchate:       p.Patriarchate,
 		}
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

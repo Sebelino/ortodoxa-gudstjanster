@@ -12,6 +12,7 @@ type ParishInfo struct {
 	PrimaryLanguage    string   // main liturgical language; used for language filtering of unlabelled events
 	SecondaryLanguages []string // additional languages used at this parish
 	Tradition          string
+	Patriarchate       string
 	MapQuery           string
 	Lat                float64
 	Lng                float64
@@ -28,7 +29,8 @@ var parishes = []ParishInfo{
 		Website:            "https://gomos.se",
 		PrimaryLanguage:    "Grekiska",
 		SecondaryLanguages: []string{"Svenska", "Engelska"},
-		Tradition:          "Grekisk-ortodox (Ekumeniska patriarkatet)",
+		Tradition:          "Grekisk-ortodox",
+		Patriarchate:       "Ekumeniska patriarkatet",
 		MapQuery:           "St+Georgios+Cathedral+Birger+Jarlsgatan+92+Stockholm",
 		Lat:                59.34604475278758,
 		Lng:                18.06271002636969,
@@ -43,7 +45,8 @@ var parishes = []ParishInfo{
 		Website:            "https://www.ryskaortodoxakyrkan.se",
 		PrimaryLanguage:    "Kyrkoslaviska",
 		SecondaryLanguages: []string{"Svenska"},
-		Tradition:          "Rysk-ortodox (Bulgariska patriarkatet)",
+		Tradition:          "Rysk-ortodox",
+		Patriarchate:       "Bulgariska patriarkatet",
 		MapQuery:           "Birger+Jarlsgatan+98+Stockholm",
 		Lat:                59.34675752739769,
 		Lng:                18.06185982086056,
@@ -57,7 +60,7 @@ var parishes = []ParishInfo{
 		County:          "Stockholm",
 		Website:         "https://heligaanna.nu",
 		PrimaryLanguage: "Svenska",
-		Tradition:       "Svensk-ortodox (Georgiska patriarkatet)",
+		Patriarchate:    "Georgiska patriarkatet",
 		MapQuery:        "Kyrkvägen+27+Stocksund",
 		Lat:             59.39017384201317,
 		Lng:             18.057616987012704,
@@ -72,7 +75,8 @@ var parishes = []ParishInfo{
 		Website:            "https://www.ortodox-finsk.se",
 		PrimaryLanguage:    "Finska",
 		SecondaryLanguages: []string{"Svenska"},
-		Tradition:          "Finsk-ortodox (Ekumeniska patriarkatet)",
+		Tradition:          "Finsk-ortodox",
+		Patriarchate:       "Ekumeniska patriarkatet",
 		MapQuery:           "Bellmansgatan+13+Stockholm",
 		Lat:                59.31843100230095,
 		Lng:                18.066269644544022,
@@ -87,7 +91,7 @@ var parishes = []ParishInfo{
 		Website:            "https://heligaanna.nu",
 		PrimaryLanguage:    "Svenska",
 		SecondaryLanguages: []string{"Grekiska", "Serbiska"},
-		Tradition:          "Svensk-ortodox (Georgiska patriarkatet)",
+		Patriarchate:       "Georgiska patriarkatet",
 		MapQuery:           "Sankt+Ignatios+Folkhögskola+Nygatan+2+Södertälje",
 		Lat:                59.1955,
 		Lng:                17.6253,
@@ -102,6 +106,7 @@ var parishes = []ParishInfo{
 		Website:         "https://www.crkvastokholm.se",
 		PrimaryLanguage: "Kyrkoslaviska",
 		Tradition:       "Serbisk-ortodox",
+		Patriarchate:    "Serbiska patriarkatet",
 		MapQuery:        "Bägerstavägen+68+Enskede",
 		Lat:             59.289587434290844,
 		Lng:             18.061649082707426,
@@ -117,6 +122,7 @@ var parishes = []ParishInfo{
 		PrimaryLanguage:    "Rumänska",
 		SecondaryLanguages: []string{"Svenska", "Engelska"},
 		Tradition:          "Rumänsk-ortodox",
+		Patriarchate:       "Rumänska patriarkatet",
 		MapQuery:           "Matteus+Lillkyrkan+Vanadisvägen+35+Stockholm",
 		Lat:                59.3454446,
 		Lng:                18.0424408,
@@ -129,7 +135,7 @@ var parishes = []ParishInfo{
 		County:          "Västra Götaland",
 		Website:         "https://kristiuppstandelse.se",
 		PrimaryLanguage: "Svenska",
-		Tradition:       "Antiokiansk-ortodox (Antiokias Ortodoxa Patriarkat)",
+		Patriarchate:    "Antiokias patriarkat",
 	},
 	{
 		Slug:            "helige-giorgis",
@@ -140,7 +146,8 @@ var parishes = []ParishInfo{
 		County:          "Stockholm",
 		Website:         "https://www.facebook.com/profile.php?id=100064717774879",
 		PrimaryLanguage: "Georgiska",
-		Tradition:       "Georgisk-ortodox (Georgiska patriarkatet)",
+		Tradition:       "Georgisk-ortodox",
+		Patriarchate:    "Georgiska patriarkatet",
 		MapQuery:        "Kyrkvägen+27+Stocksund",
 		Lat:             59.39017384201317,
 		Lng:             18.057616987012704,

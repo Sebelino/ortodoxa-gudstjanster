@@ -12,7 +12,7 @@
       gtag('config', 'G-HWYRT0Y0BY');
     </script>
     <title>{{.Name}} – Ortodoxa Gudstjänster</title>
-    <meta name="description" content="Gudstjänsttider och information om {{.Name}} i {{.City}}. {{.Tradition}} församling. Adress: {{.Address}}.">
+    <meta name="description" content="Gudstjänsttider och information om {{.Name}} i {{.City}}. {{.Tradition}} församling{{if .Patriarchate}} ({{.Patriarchate}}){{end}}. Adress: {{.Address}}.">
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -158,7 +158,7 @@
 <body>
     <header>
         <h1>{{.Name}}</h1>
-        <div class="subtitle">{{.Tradition}}</div>
+        <div class="subtitle">{{if .Tradition}}{{.Tradition}}{{if .Patriarchate}} &middot; {{.Patriarchate}}{{end}}{{else}}{{.Patriarchate}}{{end}}</div>
     </header>
 
     <main>
@@ -170,10 +170,18 @@
         <div class="info-card">
             <div class="info-card-header">Information</div>
             <div class="info-card-body">
+                {{if .Tradition}}
                 <div class="info-row">
                     <span class="info-label">Tradition</span>
                     <span class="info-value">{{.Tradition}}</span>
                 </div>
+                {{end}}
+                {{if .Patriarchate}}
+                <div class="info-row">
+                    <span class="info-label">Patriarkat</span>
+                    <span class="info-value">{{.Patriarchate}}</span>
+                </div>
+                {{end}}
                 {{if .Address}}
                 <div class="info-row">
                     <span class="info-label">Adress</span>
