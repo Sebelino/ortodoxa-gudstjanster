@@ -63,7 +63,7 @@ func main() {
 	}
 
 	// Srpska
-	srpska := scraper.NewSrpskaScraper(visionClient)
+	srpska := scraper.NewSrpskaScraper(visionClient, nil)
 	if services, err := srpska.Fetch(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "srpska: %v\n", err)
 	} else {

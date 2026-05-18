@@ -100,7 +100,7 @@ func main() {
 	registry.Register(gomosScraper)
 	registry.Register(scraper.NewHeligaAnnaScraper())
 	registry.Register(scraper.NewRyskaScraper(gcsStore, visionClient))
-	registry.Register(scraper.NewSrpskaScraper(visionClient))
+	registry.Register(scraper.NewSrpskaScraper(visionClient, gcsStore))
 	registry.Register(scraper.NewGCalendarScraper())
 	registry.Register(scraper.NewGCalendarManualScraper())
 	registry.Register(scraper.NewUppstandelseScraper())
@@ -160,8 +160,8 @@ func main() {
 			if err != nil {
 				log.Printf("WARNING: Failed to count existing services for %s: %v", scraperName, err)
 				// Proceed with replacement if we can't count
-			} else if newCount < existingCount {
-				log.Printf("WARNING: Scraper %s returned fewer future services (%d) than currently stored (%d). Skipping replacement.",
+			} else if newCount < existingCount-20 {
+				log.Printf("WARNING: Scraper %s returned significantly fewer future services (%d) than currently stored (%d). Skipping replacement.",
 					scraperName, newCount, existingCount)
 
 				// Save rejected data to GCS for diagnostics

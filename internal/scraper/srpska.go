@@ -2,11 +2,15 @@ package scraper
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"strings"
 
 	"ortodoxa-gudstjanster/internal/model"
 	"ortodoxa-gudstjanster/internal/srpska"
+	"ortodoxa-gudstjanster/internal/store"
 	"ortodoxa-gudstjanster/internal/vision"
 )
 
@@ -20,11 +24,12 @@ const (
 // SrpskaScraper scrapes the Serbian Orthodox Church schedule.
 type SrpskaScraper struct {
 	visionClient *vision.Client
+	store        store.Store
 }
 
 // NewSrpskaScraper creates a new scraper for the Serbian Orthodox Church.
-func NewSrpskaScraper(visionClient *vision.Client) *SrpskaScraper {
-	return &SrpskaScraper{visionClient: visionClient}
+func NewSrpskaScraper(visionClient *vision.Client, gcsStore store.Store) *SrpskaScraper {
+	return &SrpskaScraper{visionClient: visionClient, store: gcsStore}
 }
 
 func (s *SrpskaScraper) Name() string {
@@ -66,8 +71,24 @@ func (s *SrpskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 	return s.toChurchServices(events), nil
 }
 
-// interpretNotice sends the page body text and recurring schedule to the AI
+// extractNoticeSection returns just the announcement section of the page body,
+// starting from the Serbian word for "Announcement" (Обавештење). The full body
+// text includes navigation and footer which may contain dynamic content (dates,
+// counters) that would change the hash between runs even when the notice is the
+// same. Falling back to full body text when the marker is absent.
+func extractNoticeSection(bodyText string) string {
+	for _, marker := range []string{"Обавештење", "ОБАВЕШТЕЊЕ", "Obaveštenje", "OBAVEŠTENJE"} {
+		if idx := strings.Index(bodyText, marker); idx != -1 {
+			return bodyText[idx:]
+		}
+	}
+	return bodyText
+}
+
+// interpretNotice sends the notice section and recurring schedule to the AI
 // to identify dates where the notice overrides the recurring schedule.
+// Results are cached by the SHA256 of the notice section text so the same notice
+// always produces the same exceptions without re-querying the AI.
 func (s *SrpskaScraper) interpretNotice(ctx context.Context, bodyText string, schedule *srpska.RecurringSchedule) ([]srpska.ScheduleException, error) {
 	// Build a human-readable description of the recurring schedule
 	recurringDesc := ""
@@ -75,8 +96,23 @@ func (s *SrpskaScraper) interpretNotice(ctx context.Context, bodyText string, sc
 		recurringDesc += fmt.Sprintf("- %s on %v at %s\n", svc.Name, svc.Days, svc.Time)
 	}
 
+	// Extract only the notice section — stable across runs even if nav/footer changes.
+	noticeText := extractNoticeSection(bodyText)
+
+	// Check cache keyed by notice section checksum
+	sum := sha256.Sum256([]byte(noticeText))
+	cacheKey := "srpska-notice/v2/" + hex.EncodeToString(sum[:])
+	if s.store != nil {
+		var cached []srpska.ScheduleException
+		if s.store.GetJSON(cacheKey, &cached) {
+			log.Printf("Sankt Sava: notice cache hit (%s)", hex.EncodeToString(sum[:8]))
+			return cached, nil
+		}
+		log.Printf("Sankt Sava: notice cache miss (%s), calling AI", hex.EncodeToString(sum[:8]))
+	}
+
 	// Call AI to interpret the notice
-	visionExceptions, err := s.visionClient.InterpretScheduleNotice(ctx, bodyText, recurringDesc)
+	visionExceptions, err := s.visionClient.InterpretScheduleNotice(ctx, noticeText, recurringDesc)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +130,13 @@ func (s *SrpskaScraper) interpretNotice(ctx context.Context, bodyText string, sc
 			})
 		}
 		exceptions = append(exceptions, exc)
+	}
+
+	// Store result so future runs with the same notice skip the AI call
+	if s.store != nil {
+		if err := s.store.SetJSON(cacheKey, exceptions); err != nil {
+			log.Printf("WARNING: Failed to cache notice result: %v", err)
+		}
 	}
 
 	return exceptions, nil
