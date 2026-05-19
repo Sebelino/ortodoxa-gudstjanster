@@ -3,7 +3,6 @@ package scraper
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"ortodoxa-gudstjanster/internal/model"
@@ -84,8 +83,6 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 			notes = &ev.description
 		}
 
-		eventLang := parseRomanianEventLanguage(ev.summary)
-
 		svc := model.ChurchService{
 			Parish:         romanianSourceName,
 			Source:         romanianCalendarName,
@@ -97,7 +94,6 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 			Time:           timeStr,
 			Notes:          notes,
 			ParishLanguage: &lang,
-			EventLanguage:  eventLang,
 		}
 		services = append(services, svc)
 	}
@@ -105,25 +101,3 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 	return services, nil
 }
 
-// knownLanguages maps lowercase language name suffixes to their canonical form.
-var knownLanguages = map[string]string{
-	"rumänska":    "Rumänska",
-	"română":      "Rumänska",
-	"svenska":     "Svenska",
-	"engelska":    "Engelska",
-	"grekiska":    "Grekiska",
-	"kyrkslaviska": "Kyrkoslaviska",
-	"kyrkoslaviska": "Kyrkoslaviska",
-}
-
-// parseRomanianEventLanguage detects a language suffix like "- Rumänska" in an
-// event name and returns the canonical language string, or nil if not found.
-func parseRomanianEventLanguage(name string) *string {
-	if idx := strings.LastIndex(name, " - "); idx >= 0 {
-		suffix := strings.ToLower(strings.TrimSpace(name[idx+3:]))
-		if canonical, ok := knownLanguages[suffix]; ok {
-			return &canonical
-		}
-	}
-	return nil
-}
