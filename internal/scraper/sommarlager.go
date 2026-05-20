@@ -72,12 +72,14 @@ func (s *SommarlagerScraper) Fetch(ctx context.Context) ([]model.ChurchService, 
 	// Check cache by content hash
 	hash := sha256.Sum256([]byte(combined))
 	checksum := hex.EncodeToString(hash[:])
-	cacheKey := "sommarlager/v1/" + checksum
+	cacheKey := "sommarlager/v5/" + checksum
 
 	var events []vision.CampEvent
+	notice := extractSommarlagerNotice(combined)
+	log.Printf("sommarlager: notice=%q", notice)
 	if s.store.GetJSON(cacheKey, &events) {
 		log.Printf("sommarlager: using cached result (%d events)", len(events))
-		return s.eventsToServices(events), nil
+		return s.eventsToServices(events, notice), nil
 	}
 
 	// Use AI to extract events
@@ -92,7 +94,7 @@ func (s *SommarlagerScraper) Fetch(ctx context.Context) ([]model.ChurchService, 
 	}
 
 	log.Printf("sommarlager: extracted %d events", len(events))
-	return s.eventsToServices(events), nil
+	return s.eventsToServices(events, notice), nil
 }
 
 // fetchPageText fetches an HTML page and extracts its visible text content.
@@ -145,14 +147,57 @@ func findRegistrationLink(doc *goquery.Document) string {
 	return found
 }
 
-func (s *SommarlagerScraper) eventsToServices(events []vision.CampEvent) []model.ChurchService {
+// extractSommarlagerNotice scans page text for a prominent closed-registration
+// or OBSERVERA notice and returns it as a single string, or "" if not found.
+func extractSommarlagerNotice(text string) string {
+	lower := strings.ToLower(text)
+	keywords := []string{"observera", "är nu stängd", "är stängd", "återbud"}
+	for _, kw := range keywords {
+		idx := strings.Index(lower, kw)
+		if idx == -1 {
+			continue
+		}
+		// Walk back to the start of the line
+		start := strings.LastIndex(text[:idx], "\n")
+		if start == -1 {
+			start = 0
+		} else {
+			start++
+		}
+		// Take text up to the first paragraph break ( \n  is WordPress's empty paragraph),
+		// or up to 300 chars, trimmed to a sentence boundary.
+		chunk := strings.TrimSpace(text[start:])
+		if i := strings.Index(chunk, " \n "); i != -1 {
+			chunk = chunk[:i]
+			if j := strings.LastIndexAny(chunk, ".!?"); j != -1 {
+				chunk = chunk[:j+1]
+			}
+		} else if len(chunk) > 300 {
+			chunk = chunk[:300]
+			if j := strings.LastIndexAny(chunk, ".!?"); j != -1 {
+				chunk = chunk[:j+1]
+			}
+		}
+		return strings.TrimSpace(chunk)
+	}
+	return ""
+}
+
+func (s *SommarlagerScraper) eventsToServices(events []vision.CampEvent, notice string) []model.ChurchService {
 	var services []model.ChurchService
 	lang := "Svenska"
 
 	for _, event := range events {
+		notes := event.Notes
+		if notice != "" {
+			if notes != "" {
+				notes = notice + " " + notes
+			} else {
+				notes = notice
+			}
+		}
 		var notesPtr *string
-		if event.Notes != "" {
-			notes := event.Notes
+		if notes != "" {
 			notesPtr = &notes
 		}
 
