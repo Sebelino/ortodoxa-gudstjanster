@@ -147,6 +147,7 @@ func findRegistrationLink(doc *goquery.Document) string {
 
 func (s *SommarlagerScraper) eventsToServices(events []vision.CampEvent) []model.ChurchService {
 	var services []model.ChurchService
+	lang := "Svenska"
 
 	for _, event := range events {
 		var notesPtr *string
@@ -155,13 +156,20 @@ func (s *SommarlagerScraper) eventsToServices(events []vision.CampEvent) []model
 			notesPtr = &notes
 		}
 
+		var title string
+		if strings.HasPrefix(event.ServiceName, "Sista anmälningsdag") {
+			title = "Sista anmälningsdag: Sommarläger"
+		}
+
 		svc := model.ChurchService{
-			Source:      sommarlagerSourceName,
-			SourceURL:   sommarlagerURL,
-			Date:        event.Date,
-			DayOfWeek:   event.DayOfWeek,
-			ServiceName: event.ServiceName,
-			Notes:       notesPtr,
+			Source:         sommarlagerSourceName,
+			SourceURL:      sommarlagerURL,
+			Date:           event.Date,
+			DayOfWeek:      event.DayOfWeek,
+			ServiceName:    event.ServiceName,
+			Title:          title,
+			Notes:          notesPtr,
+			ParishLanguage: &lang,
 		}
 
 		// For multi-day events, set start time to 00:00 on start date
