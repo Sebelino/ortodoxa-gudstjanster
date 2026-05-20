@@ -151,10 +151,20 @@
         }).addTo(map);
 
         var bounds = [];
+        var groups = {};
         parishes.forEach(function(p) {
             if (!p.lat && !p.lng) return;
+            var key = p.lat + ',' + p.lng;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(p);
+        });
+        Object.values(groups).forEach(function(group) {
+            var p = group[0];
+            var popup = group.map(function(p) {
+                return '<b><a href="/parish/' + p.slug + '">' + p.name + '</a></b><br>' + p.address;
+            }).join('<hr style="margin:6px 0">');
             var marker = L.marker([p.lat, p.lng]).addTo(map);
-            marker.bindPopup('<b><a href="/parish/' + p.slug + '">' + p.name + '</a></b><br>' + p.address);
+            marker.bindPopup(popup);
             bounds.push([p.lat, p.lng]);
         });
 
