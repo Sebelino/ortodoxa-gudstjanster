@@ -86,12 +86,15 @@ func (s *UppstandelseScraper) Fetch(ctx context.Context) ([]model.ChurchService,
 		}
 
 		var location *string
-		for _, m := range uppstandelseLocationMapping {
-			if strings.Contains(ev.location, m.substring) {
-				loc := m.location
-				location = &loc
-				break
+		if ev.location != "" {
+			loc := ev.location
+			for _, m := range uppstandelseLocationMapping {
+				if strings.Contains(ev.location, m.substring) {
+					loc = m.location
+					break
+				}
 			}
+			location = &loc
 		}
 
 		var notes *string
