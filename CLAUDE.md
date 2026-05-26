@@ -328,3 +328,15 @@ Secrets must be populated manually in Google Secret Manager:
 | `ortodoxa-gudstjanster-sa` | Web service (Firestore read, SMTP secrets) |
 | `ortodoxa-ingest-sa` | Ingestion job (Firestore write, GCS, OpenAI secret) |
 | `ortodoxa-scheduler-sa` | Cloud Scheduler (invoke ingestion job) |
+
+## Android App (TWA)
+
+The `android/` directory contains a Trusted Web Activity (TWA) wrapper that packages the website as an Android app.
+
+- **Package name:** `se.ortodoxagudstjanster.twa`
+- **App name:** Ortodoxa Gudstjänster
+- **Min SDK:** 21, **Target SDK:** 35, **Compile SDK:** 36
+- **Default URL:** `https://ortodoxagudstjanster.se`
+- Uses `com.google.androidbrowserhelper:androidbrowserhelper:2.6.0`
+- Signing config loaded from `android/keystore.properties` (not checked in)
+- Build with Gradle: `cd android && ./gradlew assembleRelease`
