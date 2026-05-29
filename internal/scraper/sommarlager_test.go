@@ -48,7 +48,7 @@ func TestSommarlagerEventsToServices(t *testing.T) {
 		{Date: "2026-06-10", DayOfWeek: "Onsdag", ServiceName: "Sista anmälningsdag: Ortodoxt sommarläger"},
 	}
 
-	services := s.eventsToServices(events)
+	services := s.eventsToServices(events, "")
 	if len(services) != 2 {
 		t.Fatalf("expected 2 services, got %d", len(services))
 	}

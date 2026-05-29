@@ -463,34 +463,36 @@ func TestHandleServices(t *testing.T) {
 
 func TestHandleICSExcludeFilter(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
+	// Use real Stockholm parishes so that the exclude filter (scoped to Stockholm) works.
 	fetcher := &mockFetcher{
 		services: []model.ChurchService{
-			{Parish: "KeepMe", Source: "KeepMe", Date: today, ServiceName: "A"},
-			{Parish: "DropMe", Source: "DropMe", Date: today, ServiceName: "B"},
+			{Parish: "St. Georgios Cathedral", Source: "St. Georgios Cathedral", Date: today, ServiceName: "A"},
+			{Parish: "Sankt Göran", Source: "Sankt Göran", Date: today, ServiceName: "B"},
 		},
 	}
 
 	h := New(fetcher)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/calendar.ics?exclude=DropMe", nil)
+	r := httptest.NewRequest("GET", "/calendar.ics?exclude=Sankt+G%C3%B6ran", nil)
 
 	h.handleICS(w, r)
 
 	body := w.Body.String()
-	if !strings.Contains(body, "KeepMe") {
-		t.Error("ICS should contain KeepMe parish")
+	if !strings.Contains(body, "St. Georgios Cathedral") {
+		t.Error("ICS should contain St. Georgios Cathedral parish")
 	}
-	if strings.Contains(body, "CATEGORIES:DropMe") {
-		t.Error("ICS should not contain DropMe parish")
+	if strings.Contains(body, "CATEGORIES:Sankt Göran") {
+		t.Error("ICS should not contain Sankt Göran parish")
 	}
 }
 
 func TestHandleICSExcludeLangFilter(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
+	// Use real Stockholm parishes so default Stockholm scoping keeps them.
 	fetcher := &mockFetcher{
 		services: []model.ChurchService{
-			{Parish: "A", Source: "A", Date: today, ServiceName: "S1", EventLanguage: ptr("Svenska")},
-			{Parish: "B", Source: "B", Date: today, ServiceName: "S2", EventLanguage: ptr("Engelska")},
+			{Parish: "St. Georgios Cathedral", Source: "St. Georgios Cathedral", Date: today, ServiceName: "S1", EventLanguage: ptr("Svenska")},
+			{Parish: "Sankt Göran", Source: "Sankt Göran", Date: today, ServiceName: "S2", EventLanguage: ptr("Engelska")},
 		},
 	}
 
@@ -501,11 +503,11 @@ func TestHandleICSExcludeLangFilter(t *testing.T) {
 	h.handleICS(w, r)
 
 	body := w.Body.String()
-	if !strings.Contains(body, "CATEGORIES:A") {
-		t.Error("ICS should contain parish A (Svenska)")
+	if !strings.Contains(body, "CATEGORIES:St. Georgios Cathedral") {
+		t.Error("ICS should contain St. Georgios Cathedral (Svenska)")
 	}
-	if strings.Contains(body, "CATEGORIES:B") {
-		t.Error("ICS should not contain parish B (Engelska)")
+	if strings.Contains(body, "CATEGORIES:Sankt Göran") {
+		t.Error("ICS should not contain Sankt Göran (Engelska)")
 	}
 }
 

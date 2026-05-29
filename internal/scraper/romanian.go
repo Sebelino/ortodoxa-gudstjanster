@@ -35,68 +35,39 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 		return nil, fmt.Errorf("fetching ICS feed: %w", err)
 	}
 
-	events, err := parseICS(string(data))
-	if err != nil {
-		return nil, fmt.Errorf("parsing ICS feed: %w", err)
-	}
-
 	stockholm, err := time.LoadLocation("Europe/Stockholm")
 	if err != nil {
 		return nil, fmt.Errorf("loading timezone: %w", err)
+	}
+
+	events, err := ParseAndExpandICS(string(data), stockholm)
+	if err != nil {
+		return nil, fmt.Errorf("parsing ICS feed: %w", err)
 	}
 
 	lang := romanianLanguage
 
 	var services []model.ChurchService
 	for _, ev := range events {
-		if ev.cancelled {
+		if ev.Cancelled {
 			continue
-		}
-
-		start, allDay, err := parseICSTimestamp(ev.dtstart, stockholm)
-		if err != nil {
-			continue
-		}
-
-		date := start.Format("2006-01-02")
-		dayOfWeek := srpska.WeekdayToSwedish(start.Weekday())
-
-		var timeStr *string
-		if !allDay {
-			t := start.Format("15:04")
-			if ev.dtend != "" {
-				end, endAllDay, err := parseICSTimestamp(ev.dtend, stockholm)
-				if err == nil && !endAllDay {
-					r := fmt.Sprintf("%s - %s", t, end.Format("15:04"))
-					timeStr = &r
-				} else {
-					timeStr = &t
-				}
-			} else {
-				timeStr = &t
-			}
-		}
-
-		var notes *string
-		if ev.description != "" {
-			notes = &ev.description
 		}
 
 		location := romanianLocation
-		if ev.location != "" {
-			location = ev.location
+		if ev.Location != "" {
+			location = ev.Location
 		}
 
 		svc := model.ChurchService{
 			Parish:         romanianSourceName,
 			Source:         romanianCalendarName,
 			SourceURL:      romanianCalendarPage,
-			Date:           date,
-			DayOfWeek:      dayOfWeek,
-			ServiceName:    ev.summary,
+			Date:           ev.Start.Format("2006-01-02"),
+			DayOfWeek:      srpska.WeekdayToSwedish(ev.Start.Weekday()),
+			ServiceName:    ev.Summary,
 			Location:       &location,
-			Time:           timeStr,
-			Notes:          notes,
+			Time:           formatTimeRange(ev),
+			Notes:          strPtr(ev.Description),
 			ParishLanguage: &lang,
 		}
 		services = append(services, svc)
@@ -104,4 +75,3 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 
 	return services, nil
 }
-

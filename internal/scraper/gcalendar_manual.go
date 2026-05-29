@@ -19,10 +19,11 @@ const (
 
 // Regex patterns for structured fields in the DESCRIPTION body.
 // Each event's description is expected to contain lines like:
-//   Församling: St. Georgios Cathedral
-//   Språk: Engelska
-//   Källa: Whatsapp-grupp Ortodoxi Sverige
-//   Beskrivning: Undervisning för katekumener.
+//
+//	Församling: St. Georgios Cathedral
+//	Språk: Engelska
+//	Källa: Whatsapp-grupp Ortodoxi Sverige
+//	Beskrivning: Undervisning för katekumener.
 var (
 	gcalManualParishRE   = regexp.MustCompile(`(?im)^\s*F[öo]rsamling\s*:\s*(.+?)\s*$`)
 	gcalManualLanguageRE = regexp.MustCompile(`(?im)^\s*Spr[åa]k\s*:\s*(.+?)\s*$`)
@@ -48,66 +49,34 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 		return nil, fmt.Errorf("fetching ICS feed: %w", err)
 	}
 
-	events, err := parseICS(string(data))
-	if err != nil {
-		return nil, fmt.Errorf("parsing ICS feed: %w", err)
-	}
-
 	stockholm, err := time.LoadLocation("Europe/Stockholm")
 	if err != nil {
 		return nil, fmt.Errorf("loading timezone: %w", err)
 	}
 
-	// Expand recurring events into individual occurrences
-	events = expandRecurringEvents(events, stockholm)
+	events, err := ParseAndExpandICS(string(data), stockholm)
+	if err != nil {
+		return nil, fmt.Errorf("parsing ICS feed: %w", err)
+	}
 
 	var services []model.ChurchService
 	for _, ev := range events {
-		if ev.cancelled {
+		if ev.Cancelled {
 			continue
 		}
 
-		parish := firstSubmatch(gcalManualParishRE, ev.description)
+		parish := firstSubmatch(gcalManualParishRE, ev.Description)
 		if parish == "" {
-			// Without a parish the event can't be grouped or filtered — skip.
 			continue
 		}
-		language := firstSubmatch(gcalManualLanguageRE, ev.description)
-		source := firstSubmatch(gcalManualSourceRE, ev.description)
-		desc := firstSubmatch(gcalManualDescRE, ev.description)
-
-		start, allDay, err := parseICSTimestamp(ev.dtstart, stockholm)
-		if err != nil {
-			continue
-		}
-
-		date := start.Format("2006-01-02")
-		dayOfWeek := srpska.WeekdayToSwedish(start.Weekday())
-
-		var timeStr *string
-		if !allDay {
-			t := start.Format("15:04")
-			if ev.dtend != "" {
-				end, endAllDay, err := parseICSTimestamp(ev.dtend, stockholm)
-				if err == nil && !endAllDay {
-					r := fmt.Sprintf("%s - %s", t, end.Format("15:04"))
-					timeStr = &r
-				} else {
-					timeStr = &t
-				}
-			} else {
-				timeStr = &t
-			}
-		}
+		language := firstSubmatch(gcalManualLanguageRE, ev.Description)
+		source := firstSubmatch(gcalManualSourceRE, ev.Description)
+		desc := firstSubmatch(gcalManualDescRE, ev.Description)
 
 		// Use Beskrivning field as notes; fall back to remaining free text
 		notesText := desc
 		if notesText == "" {
-			notesText = stripStructuredFields(ev.description)
-		}
-		var notes *string
-		if notesText != "" {
-			notes = &notesText
+			notesText = stripStructuredFields(ev.Description)
 		}
 
 		// Use Källa field as source; fall back to scraper name
@@ -116,29 +85,17 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 			eventSource = source
 		}
 
-		var location *string
-		if ev.location != "" {
-			loc := ev.location
-			location = &loc
-		}
-
-		var eventLang *string
-		if language != "" {
-			l := language
-			eventLang = &l
-		}
-
 		svc := model.ChurchService{
 			Parish:        parish,
 			Source:        eventSource,
 			SourceURL:     gcalendarManualSourcePage,
-			Date:          date,
-			DayOfWeek:     dayOfWeek,
-			ServiceName:   ev.summary,
-			Location:      location,
-			Time:          timeStr,
-			Notes:         notes,
-			EventLanguage: eventLang,
+			Date:          ev.Start.Format("2006-01-02"),
+			DayOfWeek:     srpska.WeekdayToSwedish(ev.Start.Weekday()),
+			ServiceName:   ev.Summary,
+			Location:      strPtr(ev.Location),
+			Time:          formatTimeRange(ev),
+			Notes:         strPtr(notesText),
+			EventLanguage: strPtr(language),
 		}
 		services = append(services, svc)
 	}

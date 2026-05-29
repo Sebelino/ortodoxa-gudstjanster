@@ -6,87 +6,6 @@ import (
 	"time"
 )
 
-func TestParseICS(t *testing.T) {
-	ics := `BEGIN:VCALENDAR
-VERSION:2.0
-BEGIN:VEVENT
-DTSTART:20250316T090000Z
-DTEND:20250316T103000Z
-SUMMARY:Second Sunday of Great Lent - Divine Liturgy
-LOCATION:Sankt Ignatios Folkhögskola and Sankt Ignatios College\, Nygatan 2
- \, 151 72 Södertälje\, Sweden
-DESCRIPTION:Fr Milutin
-STATUS:CONFIRMED
-END:VEVENT
-BEGIN:VEVENT
-DTSTART:20250419T190000Z
-DTEND:20250419T200000Z
-SUMMARY:Reading of the Book of Acts
-LOCATION:Petruskyrkan\, Kyrkvägen 27\, 182 74 Stocksund\, Sweden
-STATUS:CONFIRMED
-END:VEVENT
-BEGIN:VEVENT
-DTSTART:20250101T090000Z
-SUMMARY:[CANCELLED] Divine Liturgy
-LOCATION:Sankt Ignatios Folkhögskola and Sankt Ignatios College\, Nygatan 2\, Södertälje
-STATUS:CONFIRMED
-END:VEVENT
-BEGIN:VEVENT
-DTSTART:20250201T090000Z
-SUMMARY:Divine Liturgy
-LOCATION:Ryska Ortodoxa Kyrkan i Stockholm\, Birger Jarlsgatan 98
-STATUS:CONFIRMED
-END:VEVENT
-BEGIN:VEVENT
-DTSTART:20250301T090000Z
-SUMMARY:Cancelled Service
-LOCATION:Sankt Ignatios Folkhögskola\, Södertälje
-STATUS:CANCELLED
-END:VEVENT
-END:VCALENDAR`
-
-	events, err := parseICS(ics)
-	if err != nil {
-		t.Fatalf("parseICS failed: %v", err)
-	}
-
-	if len(events) != 5 {
-		t.Fatalf("expected 5 events, got %d", len(events))
-	}
-
-	// First event: St. Ignatios
-	if events[0].summary != "Second Sunday of Great Lent - Divine Liturgy" {
-		t.Errorf("event 0 summary = %q", events[0].summary)
-	}
-	if events[0].description != "Fr Milutin" {
-		t.Errorf("event 0 description = %q", events[0].description)
-	}
-	if events[0].cancelled {
-		t.Error("event 0 should not be cancelled")
-	}
-
-	// Second event: Heliga Anna (Petruskyrkan)
-	if events[1].summary != "Reading of the Book of Acts" {
-		t.Errorf("event 1 summary = %q", events[1].summary)
-	}
-
-	// Third: cancelled in summary
-	if !events[2].cancelled {
-		t.Error("event 2 should be cancelled (summary contains CANCELLED)")
-	}
-
-	// Fourth: Ryska location (should be skipped by matchLocation)
-	parish, _, _ := matchLocation(events[3].location)
-	if parish != "" {
-		t.Errorf("event 3 should not match any parish, got %q", parish)
-	}
-
-	// Fifth: cancelled by STATUS
-	if !events[4].cancelled {
-		t.Error("event 4 should be cancelled (STATUS=CANCELLED)")
-	}
-}
-
 func TestMatchLocation(t *testing.T) {
 	tests := []struct {
 		location   string
@@ -109,36 +28,186 @@ func TestMatchLocation(t *testing.T) {
 	}
 }
 
-func TestParseICSTimestamp(t *testing.T) {
-	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+func TestParseAndExpandICS(t *testing.T) {
+	ics := `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20250316T090000Z
+DTEND:20250316T103000Z
+SUMMARY:Divine Liturgy
+LOCATION:Sankt Ignatios Folkhögskola, Nygatan 2, Södertälje
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20250101T090000Z
+SUMMARY:[CANCELLED] Divine Liturgy
+LOCATION:Sankt Ignatios Folkhögskola, Södertälje
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20250301T090000Z
+SUMMARY:Cancelled Service
+LOCATION:Sankt Ignatios Folkhögskola, Södertälje
+STATUS:CANCELLED
+END:VEVENT
+END:VCALENDAR`
 
-	tests := []struct {
-		ts       string
-		wantDate string
-		wantTime string
-		allDay   bool
-	}{
-		{"20250316T090000Z", "2025-03-16", "10:00", false}, // UTC+1 in March
-		{"20250616T090000Z", "2025-06-16", "11:00", false}, // UTC+2 in June (DST)
-		{"20250101", "2025-01-01", "", true},
-		{"20250316T100000", "2025-03-16", "10:00", false},
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	events, err := ParseAndExpandICS(ics, stockholm)
+	if err != nil {
+		t.Fatalf("ParseAndExpandICS failed: %v", err)
 	}
 
-	for _, tt := range tests {
-		parsed, allDay, err := parseICSTimestamp(tt.ts, stockholm)
-		if err != nil {
-			t.Errorf("parseICSTimestamp(%q) error: %v", tt.ts, err)
-			continue
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(events))
+	}
+
+	// First event: normal
+	if events[0].Summary != "Divine Liturgy" {
+		t.Errorf("event 0 summary = %q", events[0].Summary)
+	}
+	if events[0].Cancelled {
+		t.Error("event 0 should not be cancelled")
+	}
+
+	// Second: cancelled in summary
+	if !events[1].Cancelled {
+		t.Error("event 1 should be cancelled (summary contains CANCELLED)")
+	}
+
+	// Third: cancelled by STATUS
+	if !events[2].Cancelled {
+		t.Error("event 2 should be cancelled (STATUS=CANCELLED)")
+	}
+}
+
+func TestParseAndExpandICSRecurring(t *testing.T) {
+	ics := `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20260423T180000
+DTEND:20260423T190000
+RRULE:FREQ=WEEKLY;COUNT=4
+SUMMARY:Weekly service
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR`
+
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	events, err := ParseAndExpandICS(ics, stockholm)
+	if err != nil {
+		t.Fatalf("ParseAndExpandICS failed: %v", err)
+	}
+
+	if len(events) != 4 {
+		t.Fatalf("expected 4 occurrences, got %d", len(events))
+	}
+
+	expectedDates := []string{"2026-04-23", "2026-04-30", "2026-05-07", "2026-05-14"}
+	for i, ev := range events {
+		got := ev.Start.Format("2006-01-02")
+		if got != expectedDates[i] {
+			t.Errorf("occurrence %d: got date %s, want %s", i, got, expectedDates[i])
 		}
-		if allDay != tt.allDay {
-			t.Errorf("parseICSTimestamp(%q) allDay = %v, want %v", tt.ts, allDay, tt.allDay)
-		}
-		if parsed.Format("2006-01-02") != tt.wantDate {
-			t.Errorf("parseICSTimestamp(%q) date = %s, want %s", tt.ts, parsed.Format("2006-01-02"), tt.wantDate)
-		}
-		if !allDay && parsed.Format("15:04") != tt.wantTime {
-			t.Errorf("parseICSTimestamp(%q) time = %s, want %s", tt.ts, parsed.Format("15:04"), tt.wantTime)
-		}
+	}
+}
+
+func TestParseAndExpandICSWithExdate(t *testing.T) {
+	ics := `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20260423T180000
+DTEND:20260423T190000
+RRULE:FREQ=WEEKLY;COUNT=3
+EXDATE:20260430T180000
+SUMMARY:Weekly service
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR`
+
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	events, err := ParseAndExpandICS(ics, stockholm)
+	if err != nil {
+		t.Fatalf("ParseAndExpandICS failed: %v", err)
+	}
+
+	// 3 counted, but one excluded → 2 output events
+	if len(events) != 2 {
+		t.Fatalf("expected 2 occurrences (1 excluded), got %d", len(events))
+	}
+
+	if events[0].Start.Format("2006-01-02") != "2026-04-23" {
+		t.Errorf("first: got %s, want 2026-04-23", events[0].Start.Format("2006-01-02"))
+	}
+	if events[1].Start.Format("2006-01-02") != "2026-05-07" {
+		t.Errorf("second: got %s, want 2026-05-07", events[1].Start.Format("2006-01-02"))
+	}
+}
+
+func TestParseAndExpandICSWithOverride(t *testing.T) {
+	ics := `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:abc123@google.com
+DTSTART:20260423T180000
+DTEND:20260423T190000
+RRULE:FREQ=WEEKLY;COUNT=3
+SUMMARY:Katekesundervisning
+DESCRIPTION:Original description
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:abc123@google.com
+DTSTART:20260423T180000
+DTEND:20260423T190000
+RECURRENCE-ID:20260423T180000
+SUMMARY:Katekesundervisning
+DESCRIPTION:Overridden for this date
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR`
+
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	events, err := ParseAndExpandICS(ics, stockholm)
+	if err != nil {
+		t.Fatalf("ParseAndExpandICS failed: %v", err)
+	}
+
+	if len(events) != 3 {
+		t.Fatalf("expected 3 occurrences, got %d", len(events))
+	}
+
+	// First occurrence should use the override description
+	if events[0].Description != "Overridden for this date" {
+		t.Errorf("first occurrence: got description %q, want %q", events[0].Description, "Overridden for this date")
+	}
+	// Second and third should use original
+	if events[1].Description != "Original description" {
+		t.Errorf("second occurrence: got description %q, want %q", events[1].Description, "Original description")
+	}
+}
+
+func TestParseAndExpandICSNonRecurring(t *testing.T) {
+	ics := `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20260501T100000Z
+SUMMARY:One-time event
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR`
+
+	stockholm, _ := time.LoadLocation("Europe/Stockholm")
+	events, err := ParseAndExpandICS(ics, stockholm)
+	if err != nil {
+		t.Fatalf("ParseAndExpandICS failed: %v", err)
+	}
+
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].Start.Format("2006-01-02") != "2026-05-01" {
+		t.Errorf("date = %s, want 2026-05-01", events[0].Start.Format("2006-01-02"))
 	}
 }
 
