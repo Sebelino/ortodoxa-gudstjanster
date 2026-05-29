@@ -45,7 +45,6 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 		return nil, fmt.Errorf("loading timezone: %w", err)
 	}
 
-	location := romanianLocation
 	lang := romanianLanguage
 
 	var services []model.ChurchService
@@ -81,6 +80,11 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 		var notes *string
 		if ev.description != "" {
 			notes = &ev.description
+		}
+
+		location := romanianLocation
+		if ev.location != "" {
+			location = ev.location
 		}
 
 		svc := model.ChurchService{
