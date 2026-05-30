@@ -17,6 +17,7 @@ import (
 	"ortodoxa-gudstjanster/internal/model"
 	"ortodoxa-gudstjanster/internal/scraper"
 	"ortodoxa-gudstjanster/internal/store"
+	"ortodoxa-gudstjanster/internal/umap"
 	"ortodoxa-gudstjanster/internal/vision"
 )
 
@@ -61,6 +62,18 @@ func main() {
 	}
 	defer fsClient.Close()
 	log.Printf("Firestore: project %s, collection %s", projectID, firestoreCollection)
+
+	// Sync parishes from uMap to Firestore
+	umapParishes, err := umap.FetchParishes()
+	if err != nil {
+		log.Printf("WARNING: failed to fetch parishes from uMap: %v", err)
+	} else if len(umapParishes) > 0 {
+		if err := fsClient.SaveParishes(ctx, umapParishes); err != nil {
+			log.Printf("WARNING: failed to save parishes to Firestore: %v", err)
+		} else {
+			log.Printf("Synced %d parishes from uMap to Firestore", len(umapParishes))
+		}
+	}
 
 	// Initialize upload bucket reader (optional)
 	gcsUploadBucket := os.Getenv("GCS_UPLOAD_BUCKET")

@@ -71,10 +71,15 @@ func main() {
 	lng := flag.Float64("lng", 0, "Longitude (required)")
 	sessionID := flag.String("session-id", "", "uMap session cookie (required)")
 	csrfToken := flag.String("csrf-token", "", "CSRF token (auto-fetched if omitted)")
+	slug := flag.String("slug", "", "URL slug")
+	shortName := flag.String("short-name", "", "Short display name")
 	description := flag.String("description", "", "Description")
 	patriarchate := flag.String("patriarchate", "", "Patriarchate name")
+	tradition := flag.String("tradition", "", "Orthodox tradition")
 	address := flag.String("address", "", "Street address")
+	city := flag.String("city", "", "City")
 	county := flag.String("county", "", "County (län)")
+	website := flag.String("website", "", "Website URL")
 	primaryLang := flag.String("primary-language", "", "Primary liturgical language")
 	secondaryLangs := flag.String("secondary-languages", "", "Secondary languages (comma-separated)")
 	flag.Parse()
@@ -124,10 +129,15 @@ func main() {
 		},
 		Properties: map[string]any{
 			"name":                *name,
+			"slug":                *slug,
+			"short_name":          *shortName,
 			"description":         *description,
 			"patriarchate":        *patriarchate,
+			"tradition":           *tradition,
 			"address":             *address,
+			"city":                *city,
 			"county":              *county,
+			"website":             *website,
 			"primary_language":    *primaryLang,
 			"secondary_languages": *secondaryLangs,
 		},

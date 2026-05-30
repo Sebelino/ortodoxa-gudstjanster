@@ -9,7 +9,6 @@ import (
 
 	"ortodoxa-gudstjanster/internal/email"
 	"ortodoxa-gudstjanster/internal/firestore"
-	"ortodoxa-gudstjanster/internal/umap"
 	"ortodoxa-gudstjanster/internal/web"
 )
 
@@ -39,25 +38,15 @@ func main() {
 	defer fsClient.Close()
 	log.Printf("Firestore: project %s, collection %s", projectID, firestoreCollection)
 
-	// Load parishes: try uMap first, fall back to Firestore
-	parishes, err := umap.FetchParishes()
+	// Load parishes from Firestore
+	parishes, err := fsClient.GetParishes(ctx)
 	if err != nil {
-		log.Printf("WARNING: failed to fetch parishes from uMap: %v", err)
-		log.Printf("Falling back to Firestore parish cache")
-		parishes, err = fsClient.GetParishes(ctx)
-		if err != nil {
-			log.Fatalf("Failed to load parishes from Firestore: %v", err)
-		}
-	} else {
-		// Sync to Firestore for future fallback
-		if err := fsClient.SaveParishes(ctx, parishes); err != nil {
-			log.Printf("WARNING: failed to cache parishes in Firestore: %v", err)
-		}
+		log.Fatalf("Failed to load parishes from Firestore: %v", err)
 	}
 	if len(parishes) == 0 {
-		log.Fatal("No parishes loaded from uMap or Firestore")
+		log.Fatal("No parishes in Firestore. Run ingestion first to sync from uMap.")
 	}
-	log.Printf("Loaded %d parishes", len(parishes))
+	log.Printf("Loaded %d parishes from Firestore", len(parishes))
 	web.SetParishes(parishes)
 
 	// Initialize HTTP handlers
