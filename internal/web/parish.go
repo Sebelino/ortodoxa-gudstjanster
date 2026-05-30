@@ -1,7 +1,7 @@
 package web
 
 import (
-	"net/url"
+	"fmt"
 	"strings"
 
 	"ortodoxa-gudstjanster/internal/umap"
@@ -67,7 +67,7 @@ func mapQuery(p umap.Parish) string {
 	if p.MapQuery != "" {
 		return p.MapQuery
 	}
-	return strings.ReplaceAll(url.PathEscape(p.Name+" "+p.Address), "%20", "+")
+	return fmt.Sprintf("%f,%f", p.Lat, p.Lng)
 }
 
 var countyNames = map[string]string{
