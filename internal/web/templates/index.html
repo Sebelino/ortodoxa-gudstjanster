@@ -542,6 +542,9 @@
                 allServices = await servicesRes.json();
                 if (parishesRes.ok) {
                     allParishes = await parishesRes.json();
+                    // Only show parishes that have at least one service
+                    const parishesWithServices = new Set(allServices.map(s => s.parish).filter(Boolean));
+                    allParishes = allParishes.filter(p => parishesWithServices.has(p.name));
                     parishByName = {};
                     allParishes.forEach(p => { parishByName[p.name] = p; });
                 }
