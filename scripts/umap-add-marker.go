@@ -80,6 +80,7 @@ func main() {
 	city := flag.String("city", "", "City")
 	county := flag.String("county", "", "County (län)")
 	website := flag.String("website", "", "Website URL")
+	mapQuery := flag.String("map-query", "", "Google Maps search query override")
 	primaryLang := flag.String("primary-language", "", "Primary liturgical language")
 	secondaryLangs := flag.String("secondary-languages", "", "Secondary languages (comma-separated)")
 	flag.Parse()
@@ -138,6 +139,7 @@ func main() {
 			"city":                *city,
 			"county":              *county,
 			"website":             *website,
+			"map_query":           *mapQuery,
 			"primary_language":    *primaryLang,
 			"secondary_languages": *secondaryLangs,
 		},

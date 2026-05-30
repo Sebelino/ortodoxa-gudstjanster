@@ -44,7 +44,7 @@ func SetParishes(umapParishes []umap.Parish) {
 			SecondaryLanguages: p.SecondaryLanguages,
 			Tradition:          p.Tradition,
 			Patriarchate:       p.Patriarchate,
-			MapQuery:           buildMapQuery(p.Name, p.Address),
+			MapQuery:           mapQuery(p),
 			Lat:                p.Lat,
 			Lng:                p.Lng,
 		}
@@ -63,9 +63,11 @@ func shortCounty(county string) string {
 	return county
 }
 
-// buildMapQuery creates a Google Maps search query from the parish name and address.
-func buildMapQuery(name, address string) string {
-	return strings.ReplaceAll(url.PathEscape(name+" "+address), "%20", "+")
+func mapQuery(p umap.Parish) string {
+	if p.MapQuery != "" {
+		return p.MapQuery
+	}
+	return strings.ReplaceAll(url.PathEscape(p.Name+" "+p.Address), "%20", "+")
 }
 
 var countyNames = map[string]string{

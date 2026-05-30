@@ -25,6 +25,7 @@ type Parish struct {
 	SecondaryLanguages []string `json:"secondary_languages" firestore:"secondary_languages"`
 	Tradition          string   `json:"tradition" firestore:"tradition"`
 	Patriarchate       string   `json:"patriarchate" firestore:"patriarchate"`
+	MapQuery           string   `json:"map_query" firestore:"map_query"`
 	Lat                float64  `json:"lat" firestore:"lat"`
 	Lng                float64  `json:"lng" firestore:"lng"`
 }
@@ -73,6 +74,7 @@ func FetchParishes() ([]Parish, error) {
 			PrimaryLanguage: str(f.Properties["primary_language"]),
 			Tradition:       str(f.Properties["tradition"]),
 			Patriarchate:    str(f.Properties["patriarchate"]),
+			MapQuery:        str(f.Properties["map_query"]),
 			Lat:             f.Geometry.Coordinates[1],
 			Lng:             f.Geometry.Coordinates[0],
 		}
