@@ -1,3 +1,5 @@
+//go:build ignore
+
 // check-romanian verifies that the /services endpoint contains exactly the
 // events from the Romanian Orthodox church's Google Calendar.
 //

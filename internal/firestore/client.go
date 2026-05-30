@@ -11,6 +11,7 @@ import (
 	"google.golang.org/api/iterator"
 
 	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/umap"
 )
 
 const batchSize = 250 // Stay well under Firestore's 500 operation limit
@@ -361,4 +362,54 @@ func mapToService(m map[string]interface{}) (model.ChurchService, error) {
 	}
 
 	return svc, nil
+}
+
+const parishCollection = "parishes"
+
+// SaveParishes replaces all documents in the parishes collection.
+func (c *Client) SaveParishes(ctx context.Context, parishes []umap.Parish) error {
+	coll := c.client.Collection(parishCollection)
+
+	// Delete existing
+	if err := c.deleteDocs(ctx, coll.Query); err != nil {
+		return fmt.Errorf("deleting existing parishes: %w", err)
+	}
+
+	// Write new
+	for i := 0; i < len(parishes); i += batchSize {
+		end := i + batchSize
+		if end > len(parishes) {
+			end = len(parishes)
+		}
+		batch := c.client.Batch()
+		for _, p := range parishes[i:end] {
+			doc := coll.Doc(p.Slug)
+			batch.Set(doc, p)
+		}
+		if _, err := batch.Commit(ctx); err != nil {
+			return fmt.Errorf("committing parish batch: %w", err)
+		}
+	}
+	return nil
+}
+
+// GetParishes retrieves all parishes from the parishes collection.
+func (c *Client) GetParishes(ctx context.Context) ([]umap.Parish, error) {
+	var parishes []umap.Parish
+	iter := c.client.Collection(parishCollection).Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("iterating parishes: %w", err)
+		}
+		var p umap.Parish
+		if err := doc.DataTo(&p); err != nil {
+			return nil, fmt.Errorf("parsing parish %s: %w", doc.Ref.ID, err)
+		}
+		parishes = append(parishes, p)
+	}
+	return parishes, nil
 }

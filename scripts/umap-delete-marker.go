@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Script to delete a marker from the "Ortodoxi i Sverige" uMap.
 //
 // Usage:

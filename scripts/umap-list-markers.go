@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Script to list all markers on the "Ortodoxi i Sverige" uMap.
 //
 // Usage:

@@ -1,6 +1,13 @@
 package web
 
-// ParishInfo holds static information about an Orthodox parish.
+import (
+	"net/url"
+	"strings"
+
+	"ortodoxa-gudstjanster/internal/umap"
+)
+
+// ParishInfo holds information about an Orthodox parish.
 type ParishInfo struct {
 	Slug               string
 	Name               string
@@ -18,148 +25,51 @@ type ParishInfo struct {
 	Lng                float64
 }
 
-var parishes = []ParishInfo{
-	{
-		Slug:               "st-georgios",
-		Name:               "St. Georgios Cathedral",
-		ShortName:          "St. Georgios",
-		Address:            "Birger Jarlsgatan 92, Stockholm",
-		City:               "Stockholm",
-		County:             "Stockholm",
-		Website:            "https://gomos.se",
-		PrimaryLanguage:    "Grekiska",
-		SecondaryLanguages: []string{"Svenska", "Engelska"},
-		Tradition:          "Grekisk-ortodox",
-		Patriarchate:       "Ekumeniska patriarkatet",
-		MapQuery:           "St+Georgios+Cathedral+Birger+Jarlsgatan+92+Stockholm",
-		Lat:                59.34604475278758,
-		Lng:                18.06271002636969,
-	},
-	{
-		Slug:               "kristi-forklarings",
-		Name:               "Kristi Förklarings Ortodoxa Församling",
-		ShortName:          "Kristi Förklaring",
-		Address:            "Birger Jarlsgatan 98, Stockholm",
-		City:               "Stockholm",
-		County:             "Stockholm",
-		Website:            "https://www.ryskaortodoxakyrkan.se",
-		PrimaryLanguage:    "Kyrkoslaviska",
-		SecondaryLanguages: []string{"Svenska"},
-		Tradition:          "Rysk-ortodox",
-		Patriarchate:       "Bulgariska patriarkatet",
-		MapQuery:           "Birger+Jarlsgatan+98+Stockholm",
-		Lat:                59.34675752739769,
-		Lng:                18.06185982086056,
-	},
-	{
-		Slug:            "heliga-anna",
-		Name:            "Heliga Anna av Novgorod",
-		ShortName:       "Heliga Anna",
-		Address:         "Kyrkvägen 27, Stocksund",
-		City:            "Stocksund",
-		County:          "Stockholm",
-		Website:         "https://heligaanna.nu",
-		PrimaryLanguage: "Svenska",
-		Patriarchate:    "Georgiska patriarkatet",
-		MapQuery:        "Kyrkvägen+27+Stocksund",
-		Lat:             59.39017384201317,
-		Lng:             18.057616987012704,
-	},
-	{
-		Slug:               "finska-ortodoxa",
-		Name:               "Finska Ortodoxa Församlingen",
-		ShortName:          "Helige Nikolai",
-		Address:            "Bellmansgatan 13, Stockholm",
-		City:               "Stockholm",
-		County:             "Stockholm",
-		Website:            "https://www.ortodox-finsk.se",
-		PrimaryLanguage:    "Finska",
-		SecondaryLanguages: []string{"Svenska"},
-		Tradition:          "Finsk-ortodox",
-		Patriarchate:       "Ekumeniska patriarkatet",
-		MapQuery:           "Bellmansgatan+13+Stockholm",
-		Lat:                59.31843100230095,
-		Lng:                18.066269644544022,
-	},
-	{
-		Slug:               "st-ignatios",
-		Name:               "St. Ignatios",
-		ShortName:          "St. Ignatios",
-		Address:            "Nygatan 2, Södertälje",
-		City:               "Södertälje",
-		County:             "Stockholm",
-		Website:            "https://heligaanna.nu",
-		PrimaryLanguage:    "Svenska",
-		SecondaryLanguages: []string{"Grekiska", "Serbiska"},
-		Patriarchate:       "Georgiska patriarkatet",
-		MapQuery:           "Sankt+Ignatios+Folkhögskola+Nygatan+2+Södertälje",
-		Lat:                59.1955,
-		Lng:                17.6253,
-	},
-	{
-		Slug:            "sankt-sava",
-		Name:            "Sankt Sava",
-		ShortName:       "Sankt Sava",
-		Address:         "Bägerstavägen 68, Enskede",
-		City:            "Enskede",
-		County:          "Stockholm",
-		Website:         "https://www.crkvastokholm.se",
-		PrimaryLanguage: "Kyrkoslaviska",
-		Tradition:       "Serbisk-ortodox",
-		Patriarchate:    "Serbiska patriarkatet",
-		MapQuery:        "Bägerstavägen+68+Enskede",
-		Lat:             59.289587434290844,
-		Lng:             18.061649082707426,
-	},
-	{
-		Slug:               "sankt-goran",
-		Name:               "Sankt Göran",
-		ShortName:          "Sankt Göran",
-		Address:            "Vanadisvägen 35, Stockholm",
-		City:               "Stockholm",
-		County:             "Stockholm",
-		Website:            "https://borss.se",
-		PrimaryLanguage:    "Rumänska",
-		SecondaryLanguages: []string{"Svenska", "Engelska"},
-		Tradition:          "Rumänsk-ortodox",
-		Patriarchate:       "Rumänska patriarkatet",
-		MapQuery:           "Matteus+Lillkyrkan+Vanadisvägen+35+Stockholm",
-		Lat:                59.3454446,
-		Lng:                18.0424408,
-	},
-	{
-		Slug:            "kristi-uppstandelse",
-		Name:            "Kristi Uppståndelses Ortodoxa församling",
-		ShortName:       "Kristi Uppståndelse",
-		Address:         "Sannaplan 1, Göteborg",
-		City:            "Göteborg",
-		County:          "Västra Götaland",
-		Website:         "https://kristiuppstandelse.se",
-		PrimaryLanguage: "Svenska",
-		Patriarchate:    "Antiokias patriarkat",
-		MapQuery:        "Sannaplan+1+Göteborg",
-		Lat:             57.6840796,
-		Lng:             11.9160110,
-	},
-	{
-		Slug:            "helige-giorgis",
-		Name:            "Helige Giorgis",
-		ShortName:       "Helige Giorgis",
-		Address:         "Kyrkvägen 27, Stocksund",
-		City:            "Stocksund",
-		County:          "Stockholm",
-		Website:         "https://www.facebook.com/profile.php?id=100064717774879",
-		PrimaryLanguage: "Georgiska",
-		Tradition:       "Georgisk-ortodox",
-		Patriarchate:    "Georgiska patriarkatet",
-		MapQuery:        "Kyrkvägen+27+Stocksund",
-		Lat:             59.39017384201317,
-		Lng:             18.057616987012704,
-	},
+var parishes []ParishInfo
+var parishBySlug map[string]ParishInfo
+
+// SetParishes replaces the in-memory parish list. Must be called before serving requests.
+func SetParishes(umapParishes []umap.Parish) {
+	parishes = make([]ParishInfo, len(umapParishes))
+	for i, p := range umapParishes {
+		parishes[i] = ParishInfo{
+			Slug:               p.Slug,
+			Name:               p.Name,
+			ShortName:          p.ShortName,
+			Address:            p.Address,
+			City:               p.City,
+			County:             shortCounty(p.County),
+			Website:            p.Website,
+			PrimaryLanguage:    p.PrimaryLanguage,
+			SecondaryLanguages: p.SecondaryLanguages,
+			Tradition:          p.Tradition,
+			Patriarchate:       p.Patriarchate,
+			MapQuery:           buildMapQuery(p.Name, p.Address),
+			Lat:                p.Lat,
+			Lng:                p.Lng,
+		}
+	}
+
+	parishBySlug = make(map[string]ParishInfo, len(parishes))
+	for _, p := range parishes {
+		parishBySlug[p.Slug] = p
+	}
+}
+
+// shortCounty converts "Stockholms län" → "Stockholm", "Västra Götalands län" → "Västra Götaland".
+func shortCounty(county string) string {
+	county = strings.TrimSuffix(county, "s län")
+	county = strings.TrimSuffix(county, " län")
+	return county
+}
+
+// buildMapQuery creates a Google Maps search query from the parish name and address.
+func buildMapQuery(name, address string) string {
+	return strings.ReplaceAll(url.PathEscape(name+" "+address), "%20", "+")
 }
 
 var countyNames = map[string]string{
-	"Stockholm":      "Stockholms län",
+	"Stockholm":       "Stockholms län",
 	"Västra Götaland": "Västra Götalands län",
 }
 
@@ -169,11 +79,3 @@ func countyDisplayName(county string) string {
 	}
 	return county
 }
-
-var parishBySlug = func() map[string]ParishInfo {
-	m := make(map[string]ParishInfo, len(parishes))
-	for _, p := range parishes {
-		m[p.Slug] = p
-	}
-	return m
-}()

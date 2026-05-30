@@ -6,12 +6,22 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"ortodoxa-gudstjanster/internal/model"
+	"ortodoxa-gudstjanster/internal/umap"
 )
+
+func TestMain(m *testing.M) {
+	SetParishes([]umap.Parish{
+		{Slug: "st-georgios", Name: "St. Georgios Cathedral", ShortName: "St. Georgios", Address: "Birger Jarlsgatan 92, Stockholm", City: "Stockholm", County: "Stockholms län", PrimaryLanguage: "Grekiska", SecondaryLanguages: []string{"Svenska", "Engelska"}, Patriarchate: "Ekumeniska patriarkatet", Lat: 59.346, Lng: 18.063},
+		{Slug: "sankt-goran", Name: "Sankt Göran", ShortName: "Sankt Göran", Address: "Vanadisvägen 35, Stockholm", City: "Stockholm", County: "Stockholms län", PrimaryLanguage: "Rumänska", SecondaryLanguages: []string{"Svenska", "Engelska"}, Patriarchate: "Rumänska patriarkatet", Lat: 59.345, Lng: 18.042},
+	})
+	os.Exit(m.Run())
+}
 
 // mockFetcher implements ServiceFetcher for testing.
 type mockFetcher struct {
