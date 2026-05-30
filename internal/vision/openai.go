@@ -1101,7 +1101,7 @@ Identify:
 1. The parish/church name — you MUST map it to one of these known Orthodox parishes in Sweden:
    - "Sankt Sava" — the Serbian Orthodox parish in Stockholm (also known as "Serbisk-ortodoxa Kyrkan i Stockholm", "SPC Stockholm", "@spcstockholm")
    - "St. Georgios Cathedral" — the Greek Orthodox cathedral in Stockholm (also known as "Gomos", "Hagios Georgios")
-   - "Finska Ortodoxa Församlingen" — the Finnish Orthodox parish in Stockholm (also known as "Helige Nikolai")
+   - "Helige Nikolai ortodoxa kyrka" — the Finnish Orthodox parish in Stockholm (also known as "Finska Ortodoxa Församlingen")
    - "Heliga Anna av Novgorod" — a parish in Stockholm
    - "Kristi Förklarings Ortodoxa Församling" — the Russian Orthodox parish in Stockholm (also known as "Ryska ortodoxa kyrkan")
    If the church does not match any of the above, use the name as given in the image.

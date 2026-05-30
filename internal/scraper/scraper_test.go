@@ -95,7 +95,7 @@ func TestFinskaScraper(t *testing.T) {
 
 	scraper := NewFinskaScraper("")
 
-	if scraper.Name() != "Finska Ortodoxa Församlingen" {
+	if scraper.Name() != "Helige Nikolai ortodoxa kyrka" {
 		t.Errorf("Unexpected scraper name: %s", scraper.Name())
 	}
 

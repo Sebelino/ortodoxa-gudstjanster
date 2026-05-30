@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	finskaSourceName = "Finska Ortodoxa Församlingen"
+	finskaSourceName = "Helige Nikolai ortodoxa kyrka"
 	finskaDefaultURL = "https://www.ortodox-finsk.se/kalender/"
 	finskaLanguage   = "Svenska, finska"
 )
