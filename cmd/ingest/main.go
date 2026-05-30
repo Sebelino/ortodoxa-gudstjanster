@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -72,6 +73,14 @@ func main() {
 			log.Printf("WARNING: failed to save parishes to Firestore: %v", err)
 		} else {
 			log.Printf("Synced %d parishes from uMap to Firestore", len(umapParishes))
+			// Notify the web server to reload parishes
+			reloadResp, err := http.Post("https://ortodoxagudstjanster.se/reload-parishes", "", nil)
+			if err != nil {
+				log.Printf("WARNING: failed to notify web server to reload parishes: %v", err)
+			} else {
+				reloadResp.Body.Close()
+				log.Printf("Web server parish reload: HTTP %d", reloadResp.StatusCode)
+			}
 		}
 	}
 

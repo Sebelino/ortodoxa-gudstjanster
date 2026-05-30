@@ -9,6 +9,7 @@ import (
 
 	"ortodoxa-gudstjanster/internal/email"
 	"ortodoxa-gudstjanster/internal/firestore"
+	"ortodoxa-gudstjanster/internal/umap"
 	"ortodoxa-gudstjanster/internal/web"
 )
 
@@ -49,8 +50,14 @@ func main() {
 	log.Printf("Loaded %d parishes from Firestore", len(parishes))
 	web.SetParishes(parishes)
 
+	// Configure parish reload callback
+	fsClient.SetOnParishesReloaded(func(p []umap.Parish) {
+		web.SetParishes(p)
+	})
+
 	// Initialize HTTP handlers
 	handler := web.New(fsClient)
+	handler.SetParishReloader(fsClient)
 
 	// Configure SMTP if environment variables are set
 	if smtpHost := strings.TrimSpace(os.Getenv("SMTP_HOST")); smtpHost != "" {

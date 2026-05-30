@@ -18,8 +18,9 @@ const batchSize = 250 // Stay well under Firestore's 500 operation limit
 
 // Client wraps the Firestore client for church service operations.
 type Client struct {
-	client     *firestore.Client
-	collection string
+	client              *firestore.Client
+	collection          string
+	onParishesReloaded  func([]umap.Parish)
 }
 
 // New creates a new Firestore client.
@@ -391,6 +392,24 @@ func (c *Client) SaveParishes(ctx context.Context, parishes []umap.Parish) error
 		}
 	}
 	return nil
+}
+
+// ReloadParishes fetches parishes from Firestore and updates the in-memory list.
+// Implements the web.ParishReloader interface.
+func (c *Client) ReloadParishes(ctx context.Context) error {
+	parishes, err := c.GetParishes(ctx)
+	if err != nil {
+		return err
+	}
+	if c.onParishesReloaded != nil {
+		c.onParishesReloaded(parishes)
+	}
+	return nil
+}
+
+// SetOnParishesReloaded sets a callback invoked when parishes are reloaded.
+func (c *Client) SetOnParishesReloaded(fn func([]umap.Parish)) {
+	c.onParishesReloaded = fn
 }
 
 // GetParishes retrieves all parishes from the parishes collection.

@@ -29,6 +29,11 @@ type ServiceFetcher interface {
 	GetLatestBatchID(ctx context.Context) (string, error)
 }
 
+// ParishReloader loads parish data from the database.
+type ParishReloader interface {
+	ReloadParishes(ctx context.Context) error
+}
+
 // rateLimiter tracks submissions per IP address.
 type rateLimiter struct {
 	mu        sync.Mutex
@@ -90,9 +95,10 @@ func (rl *rateLimiter) allow(ip string) bool {
 
 // Handler holds the HTTP handlers and their dependencies.
 type Handler struct {
-	fetcher     ServiceFetcher
-	smtp        *email.SMTPConfig
-	rateLimiter *rateLimiter
+	fetcher         ServiceFetcher
+	parishReloader  ParishReloader
+	smtp            *email.SMTPConfig
+	rateLimiter     *rateLimiter
 }
 
 // New creates a new Handler with the given service fetcher.
@@ -101,6 +107,11 @@ func New(fetcher ServiceFetcher) *Handler {
 		fetcher:     fetcher,
 		rateLimiter: newRateLimiter(3, time.Hour), // 3 submissions per hour per IP
 	}
+}
+
+// SetParishReloader sets the parish reloader for the reload-parishes endpoint.
+func (h *Handler) SetParishReloader(r ParishReloader) {
+	h.parishReloader = r
 }
 
 // SetSMTP configures SMTP for sending feedback emails.
@@ -120,6 +131,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/feedback", h.handleFeedback)
 	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
+	mux.HandleFunc("/reload-parishes", h.handleReloadParishes)
 	mux.HandleFunc("/favicon.svg", h.handleFavicon)
 	mux.HandleFunc("/favicon-48.png", h.handleFavicon48)
 	mux.HandleFunc("/icon-192.png", h.handleIcon192)
@@ -700,6 +712,27 @@ func (h *Handler) handleLastUpdated(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
+}
+
+func (h *Handler) handleReloadParishes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.parishReloader == nil {
+		http.Error(w, "Parish reloader not configured", http.StatusInternalServerError)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := h.parishReloader.ReloadParishes(ctx); err != nil {
+		log.Printf("ERROR: reloading parishes: %v", err)
+		http.Error(w, "Failed to reload parishes", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Parishes reloaded: %d parishes", len(parishes))
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Reloaded %d parishes\n", len(parishes))
 }
 
 func (h *Handler) handleFavicon(w http.ResponseWriter, r *http.Request) {
