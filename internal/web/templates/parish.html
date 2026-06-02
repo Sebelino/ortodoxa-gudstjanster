@@ -207,6 +207,7 @@
             </div>
         </div>
 
+        {{if .HasCalendar}}
         <div class="cta">
             <a href="/" id="parish-main-link" data-parish="{{.Name}}">Se kommande gudstj&auml;nster</a>
         </div>
@@ -216,6 +217,7 @@
             localStorage.removeItem('includedLanguages');
         });
         </script>
+        {{end}}
     </main>
     {{template "theme-js" .}}
 </body>

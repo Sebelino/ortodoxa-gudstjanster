@@ -50,6 +50,18 @@ func main() {
 	log.Printf("Loaded %d parishes from Firestore", len(parishes))
 	web.SetParishes(parishes)
 
+	// Compute which parishes have services, for conditional UI on parish pages.
+	services, err := fsClient.GetAllServices(ctx)
+	if err != nil {
+		log.Fatalf("Failed to load services from Firestore: %v", err)
+	}
+	parishSet := make(map[string]bool, len(services))
+	for _, s := range services {
+		parishSet[s.Parish] = true
+	}
+	web.SetParishesWithCalendar(parishSet)
+	log.Printf("Parishes with calendar data: %d", len(parishSet))
+
 	// Configure parish reload callback
 	fsClient.SetOnParishesReloaded(func(p []umap.Parish) {
 		web.SetParishes(p)

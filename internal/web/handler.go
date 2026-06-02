@@ -911,6 +911,7 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 		SecondaryLanguagesStr string
 		WebsiteDisplay        string
 		CountyDisplay         string
+		HasCalendar           bool
 	}{
 		ParishInfo:            p,
 		SecondaryLanguagesStr: func() string {
@@ -922,6 +923,7 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 		}(),
 		WebsiteDisplay:        websiteDisplay,
 		CountyDisplay:         countyDisplayName(p.County),
+		HasCalendar:           parishesWithCalendar[p.Name],
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

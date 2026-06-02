@@ -27,6 +27,12 @@ type ParishInfo struct {
 
 var parishes []ParishInfo
 var parishBySlug map[string]ParishInfo
+var parishesWithCalendar map[string]bool
+
+// SetParishesWithCalendar records which parishes have services in Firestore.
+func SetParishesWithCalendar(set map[string]bool) {
+	parishesWithCalendar = set
+}
 
 // SetParishes replaces the in-memory parish list. Must be called before serving requests.
 func SetParishes(umapParishes []umap.Parish) {
