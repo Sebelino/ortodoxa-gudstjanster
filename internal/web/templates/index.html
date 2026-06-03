@@ -761,8 +761,8 @@
             if (includedLanguages.size < ALL_LANGUAGES.length) {
                 params.set('includeLang', [...includedLanguages].join(','));
             }
-            const qs = params.toString();
-            return qs ? base + '?' + qs : base;
+            params.set('v', Math.random().toString(36).slice(2, 6));
+            return base + '?' + params.toString();
         }
 
         function updateSubscribeUrl() {
