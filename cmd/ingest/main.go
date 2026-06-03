@@ -182,7 +182,7 @@ func main() {
 			if err != nil {
 				log.Printf("WARNING: Failed to count existing services for %s: %v", scraperName, err)
 				// Proceed with replacement if we can't count
-			} else if newCount < existingCount-20 {
+			} else if newCount*3 < existingCount {
 				log.Printf("WARNING: Scraper %s returned significantly fewer future services (%d) than currently stored (%d). Skipping replacement.",
 					scraperName, newCount, existingCount)
 

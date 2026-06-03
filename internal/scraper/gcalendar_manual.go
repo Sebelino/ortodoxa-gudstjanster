@@ -11,6 +11,9 @@ import (
 	"ortodoxa-gudstjanster/internal/srpska"
 )
 
+var htmlBrRE = regexp.MustCompile(`(?i)<br\s*/?>`)
+var htmlTagRE = regexp.MustCompile(`<[^>]+>`)
+
 const (
 	gcalendarManualSourceName = "Manuella händelser (Google Kalender)"
 	gcalendarManualURL        = "https://calendar.google.com/calendar/ical/baa3943fce1521aabda755b4eb192b1cc8d7579294eab99a8eb89f024ab6b218@group.calendar.google.com/public/basic.ics"
@@ -65,18 +68,22 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 			continue
 		}
 
-		parish := firstSubmatch(gcalManualParishRE, ev.Description)
+		// Normalize HTML: Google Calendar basic.ics may use <br> instead of \n
+		desc := htmlBrRE.ReplaceAllString(ev.Description, "\n")
+		desc = htmlTagRE.ReplaceAllString(desc, "")
+
+		parish := firstSubmatch(gcalManualParishRE, desc)
 		if parish == "" {
 			continue
 		}
-		language := firstSubmatch(gcalManualLanguageRE, ev.Description)
-		source := firstSubmatch(gcalManualSourceRE, ev.Description)
-		desc := firstSubmatch(gcalManualDescRE, ev.Description)
+		language := firstSubmatch(gcalManualLanguageRE, desc)
+		source := firstSubmatch(gcalManualSourceRE, desc)
+		descField := firstSubmatch(gcalManualDescRE, desc)
 
 		// Use Beskrivning field as notes; fall back to remaining free text
-		notesText := desc
+		notesText := descField
 		if notesText == "" {
-			notesText = stripStructuredFields(ev.Description)
+			notesText = stripStructuredFields(desc)
 		}
 
 		// Use Källa field as source; fall back to scraper name
