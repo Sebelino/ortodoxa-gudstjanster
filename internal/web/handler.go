@@ -235,10 +235,14 @@ func buildEventJSONLD(services []model.ChurchService) string {
 			}
 		}
 
-		if s.Parish != "" {
+		orgName := s.Parish
+		if orgName == "" {
+			orgName = s.Source
+		}
+		if orgName != "" {
 			organizer := map[string]interface{}{
 				"@type": "Organization",
-				"name":  s.Parish,
+				"name":  orgName,
 			}
 			if s.SourceURL != "" {
 				organizer["url"] = s.SourceURL
