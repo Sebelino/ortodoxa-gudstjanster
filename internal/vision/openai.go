@@ -321,9 +321,9 @@ Capitalization:
 
 Service name examples:
 - "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Högvördighet Bartholomaios av Elaia")
-- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Hierarchical Synlitourgon" → "Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Gudomlig Liturgi, med Hans Eminens Kleopas av Sverige")
+- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Hierarchical Synlitourgon" → "Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Gudomlig Liturgi, med Hans Eminens Cleopas av Sverige")
 - "Divine Liturgy" / "Θεία Λειτουργία" → "Gudomlig Liturgi"
-- "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Kleopas av Sverige")
+- "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Cleopas av Sverige")
 - "Sermon" / "Homily" / "Κήρυγμα" / "Ομιλία" / "Divine Proclamation" / "Gudomligt förkunnande" → "Predikan" (always use "Predikan", never "Gudomligt förkunnande"; include the preacher: "Predikan av Arkimandrit Bartholomaios")
 - "Memorial service for founders" / "Κτητορικόν Μνημόσυνον" → "Stiftarnas minnesgudstjänst"
 - "Memorial service" / "Μνημόσυνο" / "Panachida" → "Minnesgudstjänst"
