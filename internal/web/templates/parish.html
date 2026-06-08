@@ -203,7 +203,7 @@
                 {{if .WebsiteLinks}}
                 <div class="info-row">
                     <span class="info-label">Webbplats</span>
-                    <span class="info-value">{{range $i, $w := .WebsiteLinks}}{{if $i}}, {{end}}<a href="{{$w.URL}}" target="_blank" rel="noopener">{{$w.Display}}</a>{{end}}</span>
+                    <span class="info-value">{{range $i, $w := .WebsiteLinks}}{{if $i}}<br>{{end}}<a href="{{$w.URL}}" target="_blank" rel="noopener">{{$w.Display}}</a>{{end}}</span>
                 </div>
                 {{end}}
             </div>
