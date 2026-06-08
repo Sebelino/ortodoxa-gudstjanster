@@ -62,13 +62,6 @@ func main() {
 		all = append(all, services...)
 	}
 
-	// Srpska
-	srpska := scraper.NewSrpskaScraper(visionClient, nil)
-	if services, err := srpska.Fetch(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "srpska: %v\n", err)
-	} else {
-		all = append(all, services...)
-	}
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

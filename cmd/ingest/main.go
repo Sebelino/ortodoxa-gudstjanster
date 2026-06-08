@@ -122,8 +122,7 @@ func main() {
 	registry.Register(gomosScraper)
 	registry.Register(scraper.NewHeligaAnnaScraper())
 	registry.Register(scraper.NewRyskaScraper(gcsStore, visionClient))
-	registry.Register(scraper.NewSrpskaScraper(visionClient, gcsStore))
-	registry.Register(scraper.NewGCalendarScraper())
+registry.Register(scraper.NewGCalendarScraper())
 	registry.Register(scraper.NewGCalendarManualScraper())
 	registry.Register(scraper.NewUppstandelseScraper())
 	registry.Register(scraper.NewRomanianScraper())
@@ -136,11 +135,6 @@ func main() {
 				Language:   "Georgiska",
 				SourceURL:  "https://www.facebook.com/share/17oMW5H9UN/?mibextid=wwXIfr",
 				SourceName: "Facebook",
-			},
-			"sankt-sava": {
-				Name:     "Sankt Sava",
-				Location: "Bägerstavägen 68, 120 47 Enskede Gård",
-				Language: "Kyrkoslaviska",
 			},
 		}
 		registry.Register(scraper.NewUploadsScraper(gcsStore, visionClient, uploadReader, gcsUploadBucket, uploadParishes))
