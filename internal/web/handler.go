@@ -510,6 +510,13 @@ func generateICS(services []model.ChurchService) string {
 	return sb.String()
 }
 
+func firstWebsite(p ParishInfo) string {
+	if len(p.Websites) > 0 {
+		return p.Websites[0]
+	}
+	return ""
+}
+
 // parishGroup returns the parish name, or "Övrigt" for services without a parish.
 func parishGroup(s model.ChurchService) string {
 	if s.Parish == "" {
@@ -846,6 +853,7 @@ func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 		City               string   `json:"city"`
 		County             string   `json:"county"`
 		Website            string   `json:"website"`
+		Websites           []string `json:"websites"`
 		PrimaryLanguage    string   `json:"primary_language"`
 		SecondaryLanguages []string `json:"secondary_languages"`
 		Tradition          string   `json:"tradition"`
@@ -863,7 +871,8 @@ func (h *Handler) handleParishesAPI(w http.ResponseWriter, r *http.Request) {
 			Address:            p.Address,
 			City:               p.City,
 			County:             p.County,
-			Website:            p.Website,
+			Website:            firstWebsite(p),
+			Websites:           p.Websites,
 			PrimaryLanguage:    p.PrimaryLanguage,
 			SecondaryLanguages: p.SecondaryLanguages,
 			Tradition:          p.Tradition,
@@ -903,13 +912,23 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	websiteDisplay := strings.TrimPrefix(p.Website, "https://")
-	websiteDisplay = strings.TrimPrefix(websiteDisplay, "www.")
+	type websiteLink struct {
+		URL     string
+		Display string
+	}
+	var websiteLinks []websiteLink
+	for _, w := range p.Websites {
+		display := strings.TrimPrefix(w, "https://")
+		display = strings.TrimPrefix(display, "http://")
+		display = strings.TrimPrefix(display, "www.")
+		display = strings.TrimSuffix(display, "/")
+		websiteLinks = append(websiteLinks, websiteLink{URL: w, Display: display})
+	}
 
 	data := struct {
 		ParishInfo
 		SecondaryLanguagesStr string
-		WebsiteDisplay        string
+		WebsiteLinks          []websiteLink
 		CountyDisplay         string
 		HasCalendar           bool
 	}{
@@ -921,7 +940,7 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 			}
 			return strings.Join(lower, ", ")
 		}(),
-		WebsiteDisplay:        websiteDisplay,
+		WebsiteLinks:          websiteLinks,
 		CountyDisplay:         countyDisplayName(p.County),
 		HasCalendar:           parishesWithCalendar[p.Name],
 	}

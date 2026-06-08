@@ -15,7 +15,7 @@ type ParishInfo struct {
 	Address            string
 	City               string
 	County             string // short county name used in filter params, e.g. "Stockholm"
-	Website            string
+	Websites           []string
 	PrimaryLanguage    string   // main liturgical language; used for language filtering of unlabelled events
 	SecondaryLanguages []string // additional languages used at this parish
 	Tradition          string
@@ -45,7 +45,7 @@ func SetParishes(umapParishes []umap.Parish) {
 			Address:            p.Address,
 			City:               p.City,
 			County:             shortCounty(p.County),
-			Website:            p.Website,
+			Websites:           p.Websites,
 			PrimaryLanguage:    p.PrimaryLanguage,
 			SecondaryLanguages: p.SecondaryLanguages,
 			Tradition:          p.Tradition,

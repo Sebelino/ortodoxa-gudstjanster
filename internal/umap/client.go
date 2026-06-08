@@ -20,7 +20,7 @@ type Parish struct {
 	Address            string   `json:"address" firestore:"address"`
 	City               string   `json:"city" firestore:"city"`
 	County             string   `json:"county" firestore:"county"`
-	Website            string   `json:"website" firestore:"website"`
+	Websites           []string `json:"websites" firestore:"websites"`
 	PrimaryLanguage    string   `json:"primary_language" firestore:"primary_language"`
 	SecondaryLanguages []string `json:"secondary_languages" firestore:"secondary_languages"`
 	Tradition          string   `json:"tradition" firestore:"tradition"`
@@ -70,7 +70,6 @@ func FetchParishes() ([]Parish, error) {
 			Address:         str(f.Properties["address"]),
 			City:            str(f.Properties["city"]),
 			County:          str(f.Properties["county"]),
-			Website:         str(f.Properties["website"]),
 			PrimaryLanguage: str(f.Properties["primary_language"]),
 			Tradition:       str(f.Properties["tradition"]),
 			Patriarchate:    str(f.Properties["patriarchate"]),
@@ -83,6 +82,14 @@ func FetchParishes() ([]Parish, error) {
 				lang = strings.TrimSpace(lang)
 				if lang != "" {
 					p.SecondaryLanguages = append(p.SecondaryLanguages, lang)
+				}
+			}
+		}
+		if w := str(f.Properties["website"]); w != "" {
+			for _, url := range strings.Split(w, ",") {
+				url = strings.TrimSpace(url)
+				if url != "" {
+					p.Websites = append(p.Websites, url)
 				}
 			}
 		}

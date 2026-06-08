@@ -146,7 +146,7 @@
       "@context": "https://schema.org",
       "@type": "PlaceOfWorship",
       "name": "{{.Name}}",
-      "url": "{{.Website}}",
+      {{if .WebsiteLinks}}"url": "{{(index .WebsiteLinks 0).URL}}",{{end}}
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "{{.Address}}",
@@ -200,10 +200,12 @@
                     <span class="info-label">Spr&aring;k</span>
                     <span class="info-value">{{.PrimaryLanguage}}{{if .SecondaryLanguages}} (även {{.SecondaryLanguagesStr}}){{end}}</span>
                 </div>
+                {{if .WebsiteLinks}}
                 <div class="info-row">
                     <span class="info-label">Webbplats</span>
-                    <span class="info-value"><a href="{{.Website}}" target="_blank" rel="noopener">{{.WebsiteDisplay}}</a></span>
+                    <span class="info-value">{{range $i, $w := .WebsiteLinks}}{{if $i}}, {{end}}<a href="{{$w.URL}}" target="_blank" rel="noopener">{{$w.Display}}</a>{{end}}</span>
                 </div>
+                {{end}}
             </div>
         </div>
 
