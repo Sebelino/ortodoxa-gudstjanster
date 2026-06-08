@@ -88,14 +88,18 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 
 		// Use Källa field as source; fall back to scraper name
 		eventSource := gcalendarManualSourceName
+		sourceURL := gcalendarManualSourcePage
 		if source != "" {
 			eventSource = source
+			if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
+				sourceURL = source
+			}
 		}
 
 		svc := model.ChurchService{
 			Parish:        parish,
 			Source:        eventSource,
-			SourceURL:     gcalendarManualSourcePage,
+			SourceURL:     sourceURL,
 			Date:          ev.Start.Format("2006-01-02"),
 			DayOfWeek:     srpska.WeekdayToSwedish(ev.Start.Weekday()),
 			ServiceName:   ev.Summary,
