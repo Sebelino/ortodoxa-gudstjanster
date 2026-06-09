@@ -880,8 +880,10 @@
             const grouped = {};
             visibleServices.forEach(service => {
                 if (!grouped[service.date]) {
+                    const d = new Date(service.date + 'T12:00:00');
+                    const dn = d.toLocaleDateString('sv-SE', {weekday: 'long', timeZone: 'Europe/Stockholm'});
                     grouped[service.date] = {
-                        dayOfWeek: service.day_of_week,
+                        dayOfWeek: dn.charAt(0).toUpperCase() + dn.slice(1),
                         services: []
                     };
                 }
