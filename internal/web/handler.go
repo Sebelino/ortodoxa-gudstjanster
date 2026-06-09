@@ -122,14 +122,16 @@ func (h *Handler) SetSMTP(config *email.SMTPConfig) {
 // RegisterRoutes registers all HTTP routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", h.noCache(h.handleIndex))
-	mux.HandleFunc("/services", h.noCache(h.handleServices))
+	mux.HandleFunc("/api/services", h.noCache(h.handleServices))
+	mux.HandleFunc("/api/last-updated", h.noCache(h.handleLastUpdated))
+	mux.HandleFunc("/services", redirect("/api/services"))
+	mux.HandleFunc("/last-updated", redirect("/api/last-updated"))
 	mux.HandleFunc("/calendar.ics", h.noCache(h.handleICS))
 	mux.HandleFunc("/api/parishes", h.handleParishesAPI)
 	mux.HandleFunc("/parishes", h.handleParishesPage)
 	mux.HandleFunc("/parish/", h.handleParish)
 	mux.HandleFunc("/event/", h.handleEvent)
 	mux.HandleFunc("/feedback", h.handleFeedback)
-	mux.HandleFunc("/last-updated", h.noCache(h.handleLastUpdated))
 	mux.HandleFunc("/health", h.handleHealth)
 	mux.HandleFunc("/reload-parishes", h.handleReloadParishes)
 	mux.HandleFunc("/favicon.svg", h.handleFavicon)
@@ -900,6 +902,10 @@ func (h *Handler) handleParishesPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 	slug := strings.TrimPrefix(r.URL.Path, "/parish/")
+	if newSlug, ok := slugRedirects[slug]; ok {
+		http.Redirect(w, r, "/parish/"+newSlug, http.StatusMovedPermanently)
+		return
+	}
 	p, ok := parishBySlug[slug]
 	if !ok {
 		http.NotFound(w, r)
@@ -1146,6 +1152,12 @@ func (h *Handler) handlePrivacy(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmpl.Execute(w, nil)
+}
+
+func redirect(target string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+	}
 }
 
 func getClientIP(r *http.Request) string {
