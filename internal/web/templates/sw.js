@@ -32,7 +32,7 @@ self.addEventListener('fetch', event => {
     }
 
     // Network-first with cache update for API and dynamic content
-    if (url.pathname === '/services' || url.pathname === '/api/parishes' || url.pathname === '/last-updated' || url.pathname === '/') {
+    if (url.pathname === '/api/services' || url.pathname === '/api/parishes' || url.pathname === '/api/last-updated' || url.pathname === '/') {
         event.respondWith(
             fetch(event.request)
                 .then(response => {

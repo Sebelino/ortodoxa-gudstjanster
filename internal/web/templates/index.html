@@ -534,7 +534,7 @@
 
             try {
                 const [servicesRes, parishesRes] = await Promise.all([
-                    fetch('/services'),
+                    fetch('/api/services'),
                     fetch('/api/parishes')
                 ]);
                 if (!servicesRes.ok) throw new Error('Failed to fetch services');
@@ -1043,7 +1043,7 @@
 
         async function loadLastUpdated() {
             try {
-                const response = await fetch('/last-updated');
+                const response = await fetch('/api/last-updated');
                 if (!response.ok) return;
                 const data = await response.json();
                 if (!data.batch_id) return;

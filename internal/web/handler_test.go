@@ -449,7 +449,7 @@ func TestHandleServices(t *testing.T) {
 
 	h := New(fetcher)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/services", nil)
+	r := httptest.NewRequest("GET", "/api/services", nil)
 
 	h.handleServices(w, r)
 
@@ -610,7 +610,7 @@ func TestHandleLastUpdated(t *testing.T) {
 	fetcher := &mockFetcher{batchID: "batch-123"}
 	h := New(fetcher)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/last-updated", nil)
+	r := httptest.NewRequest("GET", "/api/last-updated", nil)
 
 	h.handleLastUpdated(w, r)
 
