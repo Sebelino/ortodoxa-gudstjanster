@@ -23,7 +23,6 @@ const (
 	heligeSergijParishSlug      = "helige-sergij"
 	heligeSergijURL             = "https://t.me/s/helige_sergij"
 	heligeSergijDefaultLocation = "Helige Sergij Ryska Ortodoxa Församling, Solkraftsvägen 16A, 135 70 Stockholm"
-	heligeSergijLanguage        = "Kyrkoslaviska"
 )
 
 // HeligeSergijScraper fetches the schedule for Helige Sergij from their Telegram channel.
@@ -72,7 +71,6 @@ func (s *HeligeSergijScraper) Fetch(ctx context.Context) ([]model.ChurchService,
 }
 
 func (s *HeligeSergijScraper) entriesToServices(entries []vision.ScheduleEntry) []model.ChurchService {
-	lang := heligeSergijLanguage
 	var services []model.ChurchService
 	for _, e := range entries {
 		location := heligeSergijDefaultLocation
@@ -98,7 +96,6 @@ func (s *HeligeSergijScraper) entriesToServices(entries []vision.ScheduleEntry) 
 			Location:    &location,
 			Time:        timePtr,
 			Occasion:    occasionPtr,
-			Language:    &lang,
 		})
 	}
 	return services

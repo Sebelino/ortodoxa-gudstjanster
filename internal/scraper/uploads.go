@@ -33,7 +33,6 @@ type UploadsScraper struct {
 type UploadParishInfo struct {
 	Name       string
 	Location   string
-	Language   string
 	SourceURL  string // if set, used as SourceURL instead of the GCS public URL
 	SourceName string // if set, used as Source instead of "Uppladdade bilder"
 }
@@ -155,10 +154,6 @@ func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, obje
 	if location == "" {
 		location = result.Location
 	}
-	language := parish.Language
-	if language == "" {
-		language = result.Language
-	}
 	sourceName := parish.SourceName
 	if sourceName == "" {
 		sourceName = uploadsSourceName
@@ -193,11 +188,6 @@ func (s *UploadsScraper) convertToServices(result *vision.ImageEventResult, obje
 		if event.Notes != "" {
 			notes := event.Notes
 			svc.Notes = &notes
-		}
-
-		if language != "" {
-			lang := language
-			svc.Language = &lang
 		}
 
 		services = append(services, svc)

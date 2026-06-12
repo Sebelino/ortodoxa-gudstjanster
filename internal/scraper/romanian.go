@@ -15,8 +15,7 @@ const (
 	romanianICSURL       = "https://calendar.google.com/calendar/ical/e55ade1dbe3651b62babb5e6012c4bde4765646a8932498de709d7816ee026e4@group.calendar.google.com/public/basic.ics"
 	romanianCalendarPage = "https://calendar.google.com/calendar/embed?src=e55ade1dbe3651b62babb5e6012c4bde4765646a8932498de709d7816ee026e4%40group.calendar.google.com&ctz=Europe%2FStockholm"
 	romanianCalendarName = "Google Calendar (Rumänska Ortodoxa Kyrkan)"
-	romanianLocation     = "Matteus Lillkyrkan, Vanadisvägen 35, 113 23 Stockholm"
-	romanianLanguage     = "Rumänska, svenska, engelska"
+	romanianLocation = "Matteus Lillkyrkan, Vanadisvägen 35, 113 23 Stockholm"
 )
 
 // RomanianScraper fetches events from the Romanian Orthodox church Sankt Göran's Google Calendar.
@@ -46,8 +45,6 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 		return nil, fmt.Errorf("parsing ICS feed: %w", err)
 	}
 
-	lang := romanianLanguage
-
 	var services []model.ChurchService
 	for _, ev := range events {
 		if ev.Cancelled {
@@ -60,17 +57,16 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 		}
 
 		svc := model.ChurchService{
-			Parish:         "",
-			ParishSlug:     romanianParishSlug,
-			Source:         romanianCalendarName,
-			SourceURL:      romanianCalendarPage,
-			Date:           ev.Start.Format("2006-01-02"),
-			DayOfWeek:      srpska.WeekdayToSwedish(ev.Start.Weekday()),
-			ServiceName:    ev.Summary,
-			Location:       &location,
-			Time:           formatTimeRange(ev),
-			Notes:          strPtr(ev.Description),
-			ParishLanguage: &lang,
+			Parish:      "",
+			ParishSlug:  romanianParishSlug,
+			Source:      romanianCalendarName,
+			SourceURL:   romanianCalendarPage,
+			Date:        ev.Start.Format("2006-01-02"),
+			DayOfWeek:   srpska.WeekdayToSwedish(ev.Start.Weekday()),
+			ServiceName: ev.Summary,
+			Location:    &location,
+			Time:        formatTimeRange(ev),
+			Notes:       strPtr(ev.Description),
 		}
 		services = append(services, svc)
 	}

@@ -18,7 +18,6 @@ const (
 	heligaAnnaParishSlug = "heliga-anna"
 	heligaAnnaURL        = "https://heligaanna.nu/gudstjanster/"
 	heligaAnnaLocation   = "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden"
-	heligaAnnaLanguage   = "Svenska"
 )
 
 // HeligaAnnaScraper scrapes the Heliga Anna av Novgorod schedule.
@@ -120,7 +119,6 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 			}
 
 			location := heligaAnnaLocation
-			lang := heligaAnnaLanguage
 			services = append(services, model.ChurchService{
 				Parish:      "",
 				ParishSlug:  heligaAnnaParishSlug,
@@ -132,8 +130,6 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 				Location:    &location,
 				Time:        timeStr,
 				Occasion:    occasion,
-				Notes:       nil,
-				Language:    &lang,
 			})
 		})
 	})

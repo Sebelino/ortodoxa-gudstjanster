@@ -14,7 +14,6 @@ const (
 	finskaSourceName = "Helige Nikolai ortodoxa kyrka"
 	finskaParishSlug = "helige-nikolai"
 	finskaDefaultURL = "https://www.ortodox-finsk.se/kalender/"
-	finskaLanguage   = "Svenska, finska"
 )
 
 // FinskaScraper scrapes the Finnish Orthodox Congregation calendar.
@@ -104,7 +103,6 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			notesPtr = &joined
 		}
 
-		lang := finskaLanguage
 		services = append(services, model.ChurchService{
 			Parish:      "",
 			ParishSlug:  finskaParishSlug,
@@ -117,7 +115,6 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 			Time:        time,
 			Occasion:    occasion,
 			Notes:       notesPtr,
-			Language:    &lang,
 		})
 	})
 

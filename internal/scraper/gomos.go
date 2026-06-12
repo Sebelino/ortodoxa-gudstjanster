@@ -21,7 +21,6 @@ const (
 	gomosParishSlug  = "st-georgios"
 	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
 	gomosLocation    = "St. Georgios Cathedral, Birger Jarlsgatan 92, 114 20 Stockholm"
-	gomosLanguage    = "Grekiska, svenska, engelska"
 )
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
@@ -443,7 +442,6 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 			}
 			location = entry.Location
 		}
-		lang := gomosLanguage
 		time := entry.Time
 
 		var occasion *string
@@ -459,11 +457,9 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 			Date:        entry.Date,
 			DayOfWeek:   entry.DayOfWeek,
 			ServiceName: entry.ServiceName,
-			Location:    &location,
-			Time:        &time,
-			Occasion:    occasion,
-			Notes:       nil,
-			Language:    &lang,
+			Location:  &location,
+			Time:      &time,
+			Occasion:  occasion,
 		})
 	}
 

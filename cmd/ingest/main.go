@@ -77,10 +77,10 @@ func main() {
 			time.Sleep(time.Duration(attempt*3) * time.Second)
 		}
 	}
-	slugToParishName := make(map[string]string)
+	slugToParish := make(map[string]umap.Parish)
 	parishNameToSlug := make(map[string]string)
 	for _, p := range umapParishes {
-		slugToParishName[p.Slug] = p.Name
+		slugToParish[p.Slug] = p
 		parishNameToSlug[p.Name] = p.Slug
 	}
 	if err != nil {
@@ -148,10 +148,9 @@ registry.Register(scraper.NewGCalendarScraper())
 	if uploadReader != nil {
 		uploadParishes := map[string]scraper.UploadParishInfo{
 			"helige-giorgis": {
-				Name:       "Helige Giorgis",
-				Location:   "Helige Giorgis, Kyrkvägen 27, 182 74 Stocksund",
-				Language:   "Georgiska",
-				SourceURL:  "https://www.facebook.com/share/17oMW5H9UN/?mibextid=wwXIfr",
+				Name:      "Helige Giorgis",
+				Location:  "Helige Giorgis, Kyrkvägen 27, 182 74 Stocksund",
+				SourceURL: "https://www.facebook.com/share/17oMW5H9UN/?mibextid=wwXIfr",
 				SourceName: "Facebook",
 			},
 		}
@@ -251,10 +250,6 @@ registry.Register(scraper.NewGCalendarScraper())
 					result.services[i].EndTime = pt.End
 				}
 			}
-			// Copy Language → ParishLanguage if not already set by the scraper
-			if result.services[i].Language != nil && result.services[i].ParishLanguage == nil {
-				result.services[i].ParishLanguage = result.services[i].Language
-			}
 			// Set EventLanguage from parsed results, but only if detected and not already set
 			if result.services[i].EventLanguage == nil {
 				mapKey := eventLangMapKey(result.services[i].ServiceName, result.services[i].Occasion, result.services[i].Notes)
@@ -262,7 +257,7 @@ registry.Register(scraper.NewGCalendarScraper())
 					result.services[i].EventLanguage = lang
 				}
 			}
-			if resolveParishFields(&result.services[i], result.scraperName, slugToParishName, parishNameToSlug) {
+			if resolveParishFields(&result.services[i], result.scraperName, slugToParish, parishNameToSlug) {
 				if _, seen := unknownSlugs[result.scraperName]; !seen {
 					unknownSlugs[result.scraperName] = result.services[i].ParishSlug
 				}
@@ -618,30 +613,52 @@ func saveDiagnostics(gcsStore *store.GCSStore, scraperName string, services []mo
 	return path
 }
 
-// resolveParishFields fills in missing Parish or ParishSlug using the uMap indexes.
-// Scrapers that set only ParishSlug get Parish resolved from uMap (slug→name).
-// Scrapers that set only Parish get ParishSlug resolved when the name matches uMap (name→slug).
-// If both are set, or the slug/name is unknown, the service is left unchanged.
-// resolveParishFields fills in missing Parish or ParishSlug using the uMap indexes.
-// scraperName is the scraper's Name() return value, used as a fallback display name
-// when uMap is unavailable (it equals the canonical parish name for all fixed scrapers).
-// Returns true if a slug was set but not found in uMap while uMap data was available —
-// indicating a likely typo or stale slug that warrants an alert.
-func resolveParishFields(svc *model.ChurchService, scraperName string, slugToName, nameToSlug map[string]string) bool {
+// resolveParishFields fills in missing Parish, ParishSlug, and ParishLanguage using
+// the uMap data. Scrapers that set only ParishSlug get Parish and ParishLanguage resolved
+// from uMap. Scrapers that set only Parish get ParishSlug resolved via reverse lookup,
+// then ParishLanguage from uMap.
+// scraperName is used as a Parish fallback when uMap is unavailable.
+// Returns true if a slug was set but not found in uMap while uMap data was available.
+func resolveParishFields(svc *model.ChurchService, scraperName string, slugToParish map[string]umap.Parish, nameToSlug map[string]string) bool {
+	unknown := false
 	if svc.ParishSlug != "" && svc.Parish == "" {
-		if name, ok := slugToName[svc.ParishSlug]; ok {
-			svc.Parish = name
+		if parish, ok := slugToParish[svc.ParishSlug]; ok {
+			svc.Parish = parish.Name
 		} else {
 			// Use scraper name as fallback: for fixed scrapers it equals the canonical
 			// parish name (unlike Source, which may be a calendar/feed name).
 			svc.Parish = scraperName
 			// Only signal unknown if uMap data was actually available.
-			return len(slugToName) > 0
+			unknown = len(slugToParish) > 0
 		}
 	} else if svc.Parish != "" && svc.ParishSlug == "" {
 		if slug, ok := nameToSlug[svc.Parish]; ok {
 			svc.ParishSlug = slug
 		}
 	}
-	return false
+
+	// Set ParishLanguage from uMap if not already set by the scraper.
+	if svc.ParishSlug != "" && svc.ParishLanguage == nil {
+		if parish, ok := slugToParish[svc.ParishSlug]; ok {
+			if lang := buildParishLanguage(parish.PrimaryLanguage, parish.SecondaryLanguages); lang != "" {
+				svc.ParishLanguage = &lang
+			}
+		}
+	}
+
+	return unknown
+}
+
+// buildParishLanguage joins primary and secondary languages into a single display string.
+func buildParishLanguage(primary string, secondary []string) string {
+	parts := []string{}
+	if primary != "" {
+		parts = append(parts, primary)
+	}
+	for _, s := range secondary {
+		if s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, ", ")
 }
