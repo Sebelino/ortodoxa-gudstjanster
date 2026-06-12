@@ -23,7 +23,7 @@ const (
 	heligeSergijParishSlug      = "helige-sergij"
 	heligeSergijURL             = "https://t.me/s/helige_sergij"
 	heligeSergijDefaultLocation = "Helige Sergij Ryska Ortodoxa Församling, Solkraftsvägen 16A, 135 70 Stockholm"
-	heligeSergijLanguage        = "Ryska"
+	heligeSergijLanguage        = "Kyrkoslaviska"
 )
 
 // HeligeSergijScraper fetches the schedule for Helige Sergij from their Telegram channel.
