@@ -64,8 +64,19 @@ func main() {
 	defer fsClient.Close()
 	log.Printf("Firestore: project %s, collection %s", projectID, firestoreCollection)
 
-	// Sync parishes from uMap to Firestore and build slug/name indexes for resolution
-	umapParishes, err := umap.FetchParishes()
+	// Sync parishes from uMap to Firestore and build slug/name indexes for resolution.
+	// Retry up to 3 times with increasing delays to handle transient API errors.
+	var umapParishes []umap.Parish
+	for attempt := 1; attempt <= 3; attempt++ {
+		umapParishes, err = umap.FetchParishes()
+		if err == nil {
+			break
+		}
+		if attempt < 3 {
+			log.Printf("WARNING: uMap fetch attempt %d/3 failed: %v, retrying in %ds...", attempt, err, attempt*3)
+			time.Sleep(time.Duration(attempt*3) * time.Second)
+		}
+	}
 	slugToParishName := make(map[string]string)
 	parishNameToSlug := make(map[string]string)
 	for _, p := range umapParishes {
@@ -73,7 +84,7 @@ func main() {
 		parishNameToSlug[p.Name] = p.Slug
 	}
 	if err != nil {
-		log.Printf("WARNING: failed to fetch parishes from uMap: %v", err)
+		log.Printf("WARNING: failed to fetch parishes from uMap after 3 attempts: %v", err)
 	} else if len(umapParishes) > 0 {
 		if err := fsClient.SaveParishes(ctx, umapParishes); err != nil {
 			log.Printf("WARNING: failed to save parishes to Firestore: %v", err)
