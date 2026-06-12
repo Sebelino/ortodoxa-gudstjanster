@@ -1206,3 +1206,196 @@ Return ONLY the JSON object, no other text.`, currentYear)
 
 	return &result, content, nil
 }
+
+// ExtractScheduleFromRussianText extracts Orthodox church service schedule entries
+// from Russian-language text, translating service names to Swedish.
+func (c *Client) ExtractScheduleFromRussianText(ctx context.Context, text string) ([]ScheduleEntry, error) {
+	today := time.Now().Format("January 2, 2006")
+	currentYear := time.Now().Year()
+
+	prompt := fmt.Sprintf(`Extract Orthodox church service schedule entries from Russian text and translate service names to Swedish.
+
+Today is %s. Use year %d if no year is specified.
+
+━━━ TIME FORMATS ━━━
+- "с 10:00" or "с 10.00" = start time 10:00
+- "с 9:00 до 10:00" or "с 9.00 до 10.00" = time range "09:00 - 10:00"
+- "(с 11:00)" = time in parentheses at end of service line = start time 11:00
+- "ок. 11.30" = approximately 11:30 — use "11:30"
+- "10.00" or "кл. 10.00" = 10:00
+
+━━━ OCCASION ━━━
+Text appearing BEFORE the date line describes the feast/Sunday and applies as the occasion for
+ALL services on that date. Translate the Sunday designation and feast name(s) to Swedish and
+combine them. Example:
+  Input:
+    Неделя 4-я по Пятидесятнице
+    свт. Ионы, митрополита Московского и всея Руси, чудотворца
+    28 июня воскресение
+    10:00 Литургия (исповедь с 9:00 до 10:00)
+  → occasion for all June 28 services: "4:e söndagen efter Pingst. Den helige Jona, metropolit av Moskva och hela Ryssland, undergörare"
+
+━━━ EMBEDDED CONFESSION ━━━
+When a Liturgy line contains "(исповедь с HH до HH)" or "(исповедь с HH)", extract TWO separate entries:
+1. Bikt at the confession time range (or single time if no end given)
+2. Gudomlig Liturgi at the Liturgy start time
+Example:
+  "Литургия с 10:00, (исповедь с 9:00)" → Bikt 09:00  +  Gudomlig Liturgi 10:00
+  "10:00 Литургия (исповедь с 9:00 до 10:00)" → Bikt "09:00 - 10:00"  +  Gudomlig Liturgi 10:00
+
+━━━ SERVICE NAME MAPPINGS ━━━
+- Литургия / Божественная Литургия → "Gudomlig Liturgi"
+- Молебен с акафистом → "Förbön med akatist till [saint in Swedish]"
+  Example: "Молебен с акафистом преп. Сергию Радонежскому" → "Förbön med akatist till den helige Sergij av Radonezj"
+- Молебен → "Förbön"
+- Акафист → "Akatist"
+- Лития → "Litia"
+- Панихида → "Panichida"
+- Исповедь → "Bikt"
+- Всенощное бдение → "Allnattsvaka"
+- Вечерня → "Vesper"
+- Утреня → "Orthros"
+- Водосвятный молебен → "Vattenvigselmoleben"
+
+━━━ SAINT TITLE ABBREVIATIONS ━━━
+Expand these abbreviations before translating:
+- прп. / преп. (преподобный/преподобная) → "den helige" / "den heliga" (monastic saint)
+- сщмч. (священномученик) → "hieromartyren" — a bishop or priest who died as a martyr; ALWAYS use "hieromartyren", never just "martyren"
+- мч. / мчц. (мученик/мученица) → "martyren" / "martyrinnan"
+- вмч. / вмчц. (великомученик/великомученица) → "stormartyren" / "storemartyrinnаn"
+- свт. (святитель) → bishop-confessor; use title "den helige biskopen [Name]" or "ärkebiskopen" if archbishop
+- блгвв. (благоверные) → "de heliga furstarna" (blessed princes/rulers)
+- равноап. (равноапостольный) → "likapostolike" / "likapostoliska"
+- ап. (апостол) → "aposteln"
+- прор. (пророк) → "profeten"
+
+━━━ KEY FEAST TRANSLATIONS ━━━
+Use these established Swedish Orthodox forms:
+- "Собор [X] святых" → "[X]helgons synaxis" — "Собор" here means synaxis (liturgical commemoration of a group of saints), NOT "rådet" or "konciliet"
+- "Вселенских Соборов" / "Вселенского Собора" → "ekumeniska koncilierna" / "ekumeniska konciliet" — use "konciliet/koncilierna", NOT "rådet/råden"
+- "undergörare av [place]" → "undergörare i [place]" — always use "i" (in), not "av" (of), for location
+  Example: "Собор Радонежских святых" → "Radonezjshelgons synaxis"
+- "Обретение мощей" → "Återfinnandet av heliga reliker" (not "fyndet" or "upphittandet")
+- "честных мощей" → "heliga reliker" (not "hedervärda relikvierna")
+- "первоверховных апостолов Петра и Павла" → "förstapostlarna Petrus och Paulus" (chief apostles — specific Orthodox title; do NOT translate the epithets word for word)
+- "Всех святых, в земле Русской просиявших" → "Alla heliga som strålat fram i det ryska landet"
+- "Рождество Иоанна Предтечи" → "Johannes Döparens födelse"
+- "Успение Пресвятой Богородицы" → "Gudsmoderns insomning"
+- "Воздвижение Креста" → "Korsets upphöjelse"
+- "Неделя X по Пятидесятнице" → "X:e söndagen efter Pingst"
+- "Неделя X по Пасхе" → "X:e söndagen efter Påsk"
+- "Преполовение Пятидесятницы" → "Pingstens mitt"
+- "Пятидесятница" / "День Святой Троицы" → "Pingstdagen / Heliga Treenighets dag"
+- "Троицкая родительская суббота" → "Treenighets minneslördag"
+- "Вознесение Господне" → "Herrens himmelsfärd"
+- "Престольный праздник" → "Församlingens högtidsdag"
+
+━━━ SAINT NAME FORMS ━━━
+Use Greek/Byzantine forms, not Latin or Slavic forms:
+- Eusebios (not Eusebius)
+- Theodoros Stratelates (not Feodor Stratilat)
+- Georgios (not Georg/Georgy) — ALWAYS "Stormartyren Georgios" without "den store" before it (stormartyren already implies greatness)
+- Sisoes (not Sisoj) — but ALWAYS "Sisoes den store" (epithet after the name, not before)
+- Use standard Swedish Orthodox spellings: Sergij av Radonezj, Johannes Döparen, Petrus, Paulus, Fevronia
+- ALWAYS spell "Radonezj" with j (not "Radonezh" or "Radonezhsk") — e.g. "Radonezjshelgons synaxis"
+- ALWAYS spell "undergörare" (not "undgörare")
+
+Avoid overly long chains of epithets — use the concise established Swedish Orthodox form.
+Example: "Славных и всехвальных первоверховных апостолов Петра и Павла" → "förstapostlarna Petrus och Paulus"
+
+━━━ RULES ━━━
+- Extract ALL services that have a date and a time: Литургия, Молебен, Лития, Исповедь, Панихида, etc.
+- SKIP lines that are ONLY opening hours with no service ("церковь открыта с X до Y") — but still
+  extract any actual services listed on the same date.
+- SKIP services explicitly held at a different address (e.g. "Литургия в Вестеросе").
+- Notes in parentheses like "(поминовение усопших)" after a service name are explanatory — do not
+  include them in service_name; put relevant ones in occasion.
+- Panichida noted as occurring after the Liturgy (e.g. "По окончании Литургии совершается Панихида (ок. 11.30)")
+  should be extracted as a separate entry on the same date.
+
+━━━ OUTPUT ━━━
+Return a JSON array, one object per service:
+- date: YYYY-MM-DD
+- day_of_week: Swedish weekday (Måndag/Tisdag/Onsdag/Torsdag/Fredag/Lördag/Söndag)
+- time: HH:MM or "HH:MM - HH:MM"
+- service_name: Swedish service name
+- occasion: optional — feast/Sunday designation translated to Swedish
+
+Return ONLY the JSON array, no other text.
+
+Text:
+`, today, currentYear) + text
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o",
+		"messages": []map[string]interface{}{
+			{
+				"role":    "user",
+				"content": prompt,
+			},
+		},
+		"max_tokens": 16384,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.doRequest(req, "ExtractScheduleFromRussianText", "gpt-4o")
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from API")
+	}
+
+	content := apiResp.Choices[0].Message.Content
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var entries []ScheduleEntry
+	if err := json.Unmarshal([]byte(content), &entries); err != nil {
+		return nil, fmt.Errorf("parsing schedule entries: %w (content: %s)", err, content)
+	}
+
+	for i := range entries {
+		entries[i].Time = normalizeTime(entries[i].Time)
+	}
+
+	return entries, nil
+}
