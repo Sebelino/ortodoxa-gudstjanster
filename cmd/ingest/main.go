@@ -157,6 +157,7 @@ registry.Register(scraper.NewGCalendarScraper())
 	scrapers := registry.Scrapers()
 	var accepted []acceptedResult
 	failedScrapers := 0
+	var scraperErrors []scraperFailure // collected for email alert
 
 	for _, s := range scrapers {
 		scraperName := s.Name()
@@ -166,6 +167,7 @@ registry.Register(scraper.NewGCalendarScraper())
 		if err != nil {
 			log.Printf("ERROR: Scraper %s failed: %v", scraperName, err)
 			failedScrapers++
+			scraperErrors = append(scraperErrors, scraperFailure{name: scraperName, err: err})
 			continue
 		}
 
@@ -222,6 +224,7 @@ registry.Register(scraper.NewGCalendarScraper())
 
 	// Pass 2: Annotate services with titles, times, and languages, then write to Firestore
 	totalServices := 0
+	unknownSlugs := make(map[string]string) // scraperName → first unknown slug
 	for _, result := range accepted {
 		for i := range result.services {
 			// Only apply generated title if the scraper didn't set one explicitly
@@ -248,7 +251,11 @@ registry.Register(scraper.NewGCalendarScraper())
 					result.services[i].EventLanguage = lang
 				}
 			}
-			resolveParishFields(&result.services[i], result.scraperName, slugToParishName, parishNameToSlug)
+			if resolveParishFields(&result.services[i], result.scraperName, slugToParishName, parishNameToSlug) {
+				if _, seen := unknownSlugs[result.scraperName]; !seen {
+					unknownSlugs[result.scraperName] = result.services[i].ParishSlug
+				}
+			}
 		}
 
 		fillConsecutiveEndTimes(result.services)
@@ -260,6 +267,37 @@ registry.Register(scraper.NewGCalendarScraper())
 		}
 		log.Printf("Stored %d services for %s", len(result.services), result.scraperName)
 		totalServices += len(result.services)
+	}
+
+	// Send consolidated alerts
+	if smtpConfig != nil {
+		if len(scraperErrors) > 0 {
+			var lines []string
+			for _, f := range scraperErrors {
+				lines = append(lines, fmt.Sprintf("- %s: %v", f.name, f.err))
+			}
+			body := "The following scrapers failed during ingestion:\r\n\r\n" + strings.Join(lines, "\r\n")
+			if err := smtpConfig.Send("Ingestion alert: scrapers failed", body); err != nil {
+				log.Printf("ERROR: Failed to send scraper failure alert: %v", err)
+			} else {
+				log.Printf("Alert email sent: %d scraper failure(s)", len(scraperErrors))
+			}
+		}
+		if len(unknownSlugs) > 0 {
+			var lines []string
+			for scraper, slug := range unknownSlugs {
+				lines = append(lines, fmt.Sprintf("- %s: slug %q", scraper, slug))
+			}
+			body := "The following scrapers have parish slugs that could not be resolved from uMap.\r\n" +
+				"uMap data was available, so these are likely typos or stale slugs.\r\n" +
+				"Falling back to scraper name as Parish for these scrapers.\r\n\r\n" +
+				strings.Join(lines, "\r\n")
+			if err := smtpConfig.Send("Ingestion alert: unknown parish slugs", body); err != nil {
+				log.Printf("ERROR: Failed to send unknown slug alert: %v", err)
+			} else {
+				log.Printf("Alert email sent: %d unknown parish slug(s)", len(unknownSlugs))
+			}
+		}
 	}
 
 	log.Printf("Ingestion complete. Total services: %d, Failed scrapers: %d/%d",
@@ -274,6 +312,11 @@ registry.Register(scraper.NewGCalendarScraper())
 type acceptedResult struct {
 	scraperName string
 	services    []model.ChurchService
+}
+
+type scraperFailure struct {
+	name string
+	err  error
 }
 
 // titleCacheKey returns the GCS cache key for a service name's title.
