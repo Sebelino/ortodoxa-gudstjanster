@@ -14,7 +14,7 @@ const (
 	uppstandelseSourceName = "Kristi Uppståndelses Ortodoxa församling"
 	uppstandelseURL        = "https://calendar.google.com/calendar/ical/9s8no8slakq0m15ft6d3b8a9m4@group.calendar.google.com/public/basic.ics"
 	uppstandelseSourcePage = "https://calendar.google.com/calendar/u/0/embed?src=9s8no8slakq0m15ft6d3b8a9m4@group.calendar.google.com&ctz=Europe/Stockholm"
-	uppstandelseParish     = "Kristi Uppståndelses Ortodoxa församling"
+	uppstandelseParishSlug = "kristi-uppstandelse"
 	uppstandelseParishLang = "Svenska"
 )
 
@@ -72,7 +72,8 @@ func (s *UppstandelseScraper) Fetch(ctx context.Context) ([]model.ChurchService,
 		}
 
 		svc := model.ChurchService{
-			Parish:         uppstandelseParish,
+			Parish:         "",
+			ParishSlug:     uppstandelseParishSlug,
 			Source:         uppstandelseSourceName,
 			SourceURL:      uppstandelseSourcePage,
 			Date:           ev.Start.Format("2006-01-02"),

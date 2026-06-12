@@ -994,12 +994,15 @@ func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Look up parish slug
-	var parishSlug string
-	for _, p := range parishes {
-		if p.Name == svc.Parish {
-			parishSlug = p.Slug
-			break
+	// Look up parish slug: use stored ParishSlug when available, fall back to
+	// name matching for backward compat with old Firestore docs.
+	parishSlug := svc.ParishSlug
+	if parishSlug == "" {
+		for _, p := range parishes {
+			if p.Name == svc.Parish {
+				parishSlug = p.Slug
+				break
+			}
 		}
 	}
 

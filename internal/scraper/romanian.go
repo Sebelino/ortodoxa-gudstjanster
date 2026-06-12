@@ -11,6 +11,7 @@ import (
 
 const (
 	romanianSourceName   = "Sankt Göran"
+	romanianParishSlug   = "sankt-goran"
 	romanianICSURL       = "https://calendar.google.com/calendar/ical/e55ade1dbe3651b62babb5e6012c4bde4765646a8932498de709d7816ee026e4@group.calendar.google.com/public/basic.ics"
 	romanianCalendarPage = "https://calendar.google.com/calendar/embed?src=e55ade1dbe3651b62babb5e6012c4bde4765646a8932498de709d7816ee026e4%40group.calendar.google.com&ctz=Europe%2FStockholm"
 	romanianCalendarName = "Google Calendar (Rumänska Ortodoxa Kyrkan)"
@@ -59,7 +60,8 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 		}
 
 		svc := model.ChurchService{
-			Parish:         romanianSourceName,
+			Parish:         "",
+			ParishSlug:     romanianParishSlug,
 			Source:         romanianCalendarName,
 			SourceURL:      romanianCalendarPage,
 			Date:           ev.Start.Format("2006-01-02"),

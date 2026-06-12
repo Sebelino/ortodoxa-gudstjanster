@@ -6,6 +6,7 @@ import "time"
 type ChurchService struct {
 	ID          string     `json:"id,omitempty"`
 	Parish      string     `json:"parish"`
+	ParishSlug  string     `json:"parish_slug,omitempty"`
 	Source      string     `json:"source"`
 	SourceURL   string     `json:"source_url,omitempty"`
 	Date        string     `json:"date"`

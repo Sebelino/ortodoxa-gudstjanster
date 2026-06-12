@@ -15,6 +15,7 @@ import (
 
 const (
 	heligaAnnaSourceName = "Heliga Anna av Novgorod"
+	heligaAnnaParishSlug = "heliga-anna"
 	heligaAnnaURL        = "https://heligaanna.nu/gudstjanster/"
 	heligaAnnaLocation   = "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden"
 	heligaAnnaLanguage   = "Svenska"
@@ -121,7 +122,8 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 			location := heligaAnnaLocation
 			lang := heligaAnnaLanguage
 			services = append(services, model.ChurchService{
-				Parish:      heligaAnnaSourceName,
+				Parish:      "",
+				ParishSlug:  heligaAnnaParishSlug,
 				Source:      heligaAnnaSourceName,
 				SourceURL:   heligaAnnaURL,
 				Date:        date,

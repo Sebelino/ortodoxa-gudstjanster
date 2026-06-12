@@ -20,6 +20,7 @@ import (
 
 const (
 	heligeSergijSourceName      = "Helige Sergij rysk-ortodoxa församling"
+	heligeSergijParishSlug      = "helige-sergij"
 	heligeSergijURL             = "https://t.me/s/helige_sergij"
 	heligeSergijDefaultLocation = "Helige Sergij Ryska Ortodoxa Församling, Solkraftsvägen 16A, 135 70 Stockholm"
 	heligeSergijLanguage        = "Ryska"
@@ -87,7 +88,8 @@ func (s *HeligeSergijScraper) entriesToServices(entries []vision.ScheduleEntry) 
 			occasionPtr = &e.Occasion
 		}
 		services = append(services, model.ChurchService{
-			Parish:      heligeSergijSourceName,
+			Parish:      "",
+			ParishSlug:  heligeSergijParishSlug,
 			Source:      heligeSergijSourceName,
 			SourceURL:   heligeSergijURL,
 			Date:        e.Date,

@@ -79,6 +79,7 @@ func ExtractRyskaScheduleTextFromHTML(htmlContent string) string {
 
 const (
 	ryskaSourceName = "Kristi Förklarings Ortodoxa Församling"
+	ryskaParishSlug = "kristi-forklaring"
 	ryskaURL        = "https://www.ryskaortodoxakyrkan.se/gudstjänst"
 	ryskaLocation   = "Kristi Förklarings Ortodoxa Församling, Birger Jarlsgatan 98, 114 20 Stockholm"
 	ryskaLanguage   = "Kyrkoslaviska, svenska"
@@ -150,7 +151,8 @@ func (s *RyskaScraper) entriesToServices(entries []vision.ScheduleEntry) []model
 		}
 
 		services = append(services, model.ChurchService{
-			Parish:      ryskaSourceName,
+			Parish:      "",
+			ParishSlug:  ryskaParishSlug,
 			Source:      ryskaSourceName,
 			SourceURL:   ryskaURL,
 			Date:        entry.Date,

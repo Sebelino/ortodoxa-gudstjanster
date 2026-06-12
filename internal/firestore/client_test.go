@@ -55,6 +55,7 @@ func TestServiceToMapAndBack(t *testing.T) {
 
 	original := model.ChurchService{
 		Parish:         "Test Parish",
+		ParishSlug:     "test-slug",
 		Source:         "Test Source",
 		SourceURL:      "https://example.com",
 		Date:           "2026-03-08",
@@ -97,6 +98,9 @@ func TestServiceToMapAndBack(t *testing.T) {
 
 	if roundtrip.Parish != original.Parish {
 		t.Errorf("Parish = %q, want %q", roundtrip.Parish, original.Parish)
+	}
+	if roundtrip.ParishSlug != original.ParishSlug {
+		t.Errorf("ParishSlug = %q, want %q", roundtrip.ParishSlug, original.ParishSlug)
 	}
 	if roundtrip.Source != original.Source {
 		t.Errorf("Source = %q, want %q", roundtrip.Source, original.Source)
@@ -215,7 +219,7 @@ func TestServiceToMapOmitsEmptyOptionals(t *testing.T) {
 
 	m := serviceToMap(svc, "scraper", "batch")
 
-	for _, key := range []string{"title", "source_url", "location", "time", "occasion", "notes", "language", "parish_language", "event_language", "start_time", "end_time"} {
+	for _, key := range []string{"title", "source_url", "location", "time", "occasion", "notes", "language", "parish_language", "event_language", "start_time", "end_time", "parish_slug"} {
 		if _, ok := m[key]; ok {
 			t.Errorf("map should not contain %q for zero-value service", key)
 		}

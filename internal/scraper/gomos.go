@@ -18,6 +18,7 @@ import (
 
 const (
 	gomosSourceName  = "St. Georgios Cathedral"
+	gomosParishSlug  = "st-georgios"
 	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
 	gomosLocation    = "St. Georgios Cathedral, Birger Jarlsgatan 92, 114 20 Stockholm"
 	gomosLanguage    = "Grekiska, svenska, engelska"
@@ -451,7 +452,8 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 		}
 
 		services = append(services, model.ChurchService{
-			Parish:      gomosSourceName,
+			Parish:      "",
+			ParishSlug:  gomosParishSlug,
 			Source:      gomosSourceName,
 			SourceURL:   sourceURL,
 			Date:        entry.Date,

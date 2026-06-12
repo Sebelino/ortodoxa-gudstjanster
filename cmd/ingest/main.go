@@ -64,8 +64,14 @@ func main() {
 	defer fsClient.Close()
 	log.Printf("Firestore: project %s, collection %s", projectID, firestoreCollection)
 
-	// Sync parishes from uMap to Firestore
+	// Sync parishes from uMap to Firestore and build slug/name indexes for resolution
 	umapParishes, err := umap.FetchParishes()
+	slugToParishName := make(map[string]string)
+	parishNameToSlug := make(map[string]string)
+	for _, p := range umapParishes {
+		slugToParishName[p.Slug] = p.Name
+		parishNameToSlug[p.Name] = p.Slug
+	}
 	if err != nil {
 		log.Printf("WARNING: failed to fetch parishes from uMap: %v", err)
 	} else if len(umapParishes) > 0 {
@@ -242,6 +248,7 @@ registry.Register(scraper.NewGCalendarScraper())
 					result.services[i].EventLanguage = lang
 				}
 			}
+			resolveParishFields(&result.services[i], result.scraperName, slugToParishName, parishNameToSlug)
 		}
 
 		fillConsecutiveEndTimes(result.services)
@@ -555,4 +562,32 @@ func saveDiagnostics(gcsStore *store.GCSStore, scraperName string, services []mo
 	}
 
 	return path
+}
+
+// resolveParishFields fills in missing Parish or ParishSlug using the uMap indexes.
+// Scrapers that set only ParishSlug get Parish resolved from uMap (slug→name).
+// Scrapers that set only Parish get ParishSlug resolved when the name matches uMap (name→slug).
+// If both are set, or the slug/name is unknown, the service is left unchanged.
+// resolveParishFields fills in missing Parish or ParishSlug using the uMap indexes.
+// scraperName is the scraper's Name() return value, used as a fallback display name
+// when uMap is unavailable (it equals the canonical parish name for all fixed scrapers).
+// Returns true if a slug was set but not found in uMap while uMap data was available —
+// indicating a likely typo or stale slug that warrants an alert.
+func resolveParishFields(svc *model.ChurchService, scraperName string, slugToName, nameToSlug map[string]string) bool {
+	if svc.ParishSlug != "" && svc.Parish == "" {
+		if name, ok := slugToName[svc.ParishSlug]; ok {
+			svc.Parish = name
+		} else {
+			// Use scraper name as fallback: for fixed scrapers it equals the canonical
+			// parish name (unlike Source, which may be a calendar/feed name).
+			svc.Parish = scraperName
+			// Only signal unknown if uMap data was actually available.
+			return len(slugToName) > 0
+		}
+	} else if svc.Parish != "" && svc.ParishSlug == "" {
+		if slug, ok := nameToSlug[svc.Parish]; ok {
+			svc.ParishSlug = slug
+		}
+	}
+	return false
 }

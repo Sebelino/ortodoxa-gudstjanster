@@ -12,6 +12,7 @@ import (
 
 const (
 	finskaSourceName = "Helige Nikolai ortodoxa kyrka"
+	finskaParishSlug = "helige-nikolai"
 	finskaDefaultURL = "https://www.ortodox-finsk.se/kalender/"
 	finskaLanguage   = "Svenska, finska"
 )
@@ -105,7 +106,8 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 
 		lang := finskaLanguage
 		services = append(services, model.ChurchService{
-			Parish:      finskaSourceName,
+			Parish:      "",
+			ParishSlug:  finskaParishSlug,
 			Source:      finskaSourceName,
 			SourceURL:   s.url,
 			Date:        date,
