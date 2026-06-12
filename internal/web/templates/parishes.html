@@ -66,6 +66,21 @@
             margin-bottom: 1rem;
         }
 
+        .county-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .county-heading {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-label);
+            padding: 0.25rem 0;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
         .parish-list {
             display: flex;
             flex-direction: column;
@@ -125,25 +140,30 @@
         <div id="map"></div>
         <p style="text-align:right;margin:-0.5rem 0 0.75rem;font-size:0.8rem;"><a href="https://umap.openstreetmap.fr/sv/map/ortodoxi-i-sverige_1414550" target="_blank" rel="noopener" style="color:var(--link);">Visa fullständig karta</a></p>
 
-        <div class="parish-list">
-            {{range .}}
-            <a class="parish-card" href="/parish/{{.Slug}}">
-                <div class="parish-card-body">
-                    <div class="parish-name">{{.Name}}</div>
-                    <div class="parish-tradition">{{if .Tradition}}{{.Tradition}}{{if .Patriarchate}} &middot; {{.Patriarchate}}{{end}}{{else}}{{.Patriarchate}}{{end}}</div>
-                    <div class="parish-address">{{.Address}}</div>
-                </div>
-            </a>
-            {{end}}
+        {{range .}}
+        <div class="county-group">
+            <div class="county-heading">{{.County}}</div>
+            <div class="parish-list">
+                {{range .Parishes}}
+                <a class="parish-card" href="/parish/{{.Slug}}">
+                    <div class="parish-card-body">
+                        <div class="parish-name">{{.Name}}</div>
+                        <div class="parish-tradition">{{if .Tradition}}{{.Tradition}}{{if .Patriarchate}} &middot; {{.Patriarchate}}{{end}}{{else}}{{.Patriarchate}}{{end}}</div>
+                        <div class="parish-address">{{.Address}}</div>
+                    </div>
+                </a>
+                {{end}}
+            </div>
         </div>
+        {{end}}
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
         var parishes = [
-            {{range .}}
+            {{range .}}{{range .Parishes}}
             {name: "{{.ShortName}}", slug: "{{.Slug}}", lat: {{.Lat}}, lng: {{.Lng}}, address: "{{.Address}}"},
-            {{end}}
+            {{end}}{{end}}
         ];
 
         var map = L.map('map');

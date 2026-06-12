@@ -896,8 +896,25 @@ func (h *Handler) handleParishesPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type countyGroup struct {
+		County   string
+		Parishes []ParishInfo
+	}
+
+	// Group parishes by county, sort within each group alphabetically.
+	groupMap := make(map[string][]ParishInfo)
+	for _, p := range parishes {
+		groupMap[p.County] = append(groupMap[p.County], p)
+	}
+	var groups []countyGroup
+	for county, ps := range groupMap {
+		sort.Slice(ps, func(i, j int) bool { return ps[i].Name < ps[j].Name })
+		groups = append(groups, countyGroup{County: countyDisplayName(county), Parishes: ps})
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].County < groups[j].County })
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl.Execute(w, parishes)
+	tmpl.Execute(w, groups)
 }
 
 func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
