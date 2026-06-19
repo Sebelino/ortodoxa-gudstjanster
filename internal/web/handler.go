@@ -235,15 +235,46 @@ func buildEventJSONLD(services []model.ChurchService) string {
 		}
 
 		if s.Location != nil && *s.Location != "" {
-			event["location"] = map[string]interface{}{
+			loc := map[string]interface{}{
 				"@type": "Place",
 				"name":  *s.Location,
 				"address": map[string]interface{}{
 					"@type":           "PostalAddress",
 					"streetAddress":   *s.Location,
-					"addressLocality": "Stockholm",
 					"addressCountry":  "SE",
 				},
+			}
+			if p, ok := parishBySlug[s.ParishSlug]; ok && p.Lat != 0 && p.Lng != 0 {
+				loc["geo"] = map[string]interface{}{
+					"@type":     "GeoCoordinates",
+					"latitude":  p.Lat,
+					"longitude": p.Lng,
+				}
+			}
+			event["location"] = loc
+		} else if p, ok := parishBySlug[s.ParishSlug]; ok && p.Address != "" {
+			loc := map[string]interface{}{
+				"@type":   "Place",
+				"name":    p.Name,
+				"address": map[string]interface{}{
+					"@type":           "PostalAddress",
+					"streetAddress":   p.Address,
+					"addressLocality": p.City,
+					"addressCountry":  "SE",
+				},
+			}
+			if p.Lat != 0 && p.Lng != 0 {
+				loc["geo"] = map[string]interface{}{
+					"@type":     "GeoCoordinates",
+					"latitude":  p.Lat,
+					"longitude": p.Lng,
+				}
+			}
+			event["location"] = loc
+		} else if s.Parish != "" {
+			event["location"] = map[string]interface{}{
+				"@type": "Place",
+				"name":  s.Parish,
 			}
 		}
 
