@@ -164,7 +164,7 @@
     <script>
         var parishes = [
             {{range .Groups}}{{range .Parishes}}
-            {name: "{{.ShortName}}", slug: "{{.Slug}}", lat: {{.Lat}}, lng: {{.Lng}}, address: "{{.Address}}"},
+            {name: "{{.ShortName}}", slug: "{{.Slug}}", lat: {{.Lat}}, lng: {{.Lng}}, address: "{{.Address}}", patriarchate: "{{.Patriarchate}}"},
             {{end}}{{end}}
         ];
 
@@ -173,6 +173,18 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
             maxZoom: 18
         }).addTo(map);
+
+        var patriarchateColors = {
+            'Ekumeniska patriarkatet': '#0d5eaf',
+            'Moskvapatriarkatet': '#d32f2f',
+            'Rumänska patriarkatet': '#ffc107',
+            'Serbiska patriarkatet': '#1a237e',
+            'Antiokias patriarkat': '#7b1fa2',
+            'Bulgariska patriarkatet': '#2e7d32',
+            'Georgiska patriarkatet': '#880e4f',
+            'Makedonisk-ortodoxa kyrkan': '#e65100',
+            'Ukrainska ortodoxa kyrkan (UOC)': '#0096c7',
+        };
 
         var bounds = [];
         var groups = {};
@@ -184,10 +196,18 @@
         });
         Object.values(groups).forEach(function(group) {
             var p = group[0];
+            var color = patriarchateColors[p.patriarchate] || '#888';
             var popup = group.map(function(p) {
                 return '<b><a href="/parish/' + p.slug + '">' + p.name + '</a></b><br>' + p.address;
             }).join('<hr style="margin:6px 0">');
-            var marker = L.marker([p.lat, p.lng]).addTo(map);
+            var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">' +
+                '<path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 21.9 12.5 41 12.5 41S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z" fill="' + color + '" stroke="#fff" stroke-width="1.5"/>' +
+                '<circle cx="12.5" cy="12.5" r="5" fill="#fff"/></svg>';
+            var icon = L.icon({
+                iconUrl: 'data:image/svg+xml;base64,' + btoa(svg),
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+            });
+            var marker = L.marker([p.lat, p.lng], {icon: icon}).addTo(map);
             marker.bindPopup(popup);
             bounds.push([p.lat, p.lng]);
         });
