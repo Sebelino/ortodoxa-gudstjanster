@@ -703,13 +703,20 @@
                 </div>`;
             }).join('');
 
-            // Övrigt: standalone section for services not tied to a parish
+            // Link to full parish list
+            filterOptions.innerHTML += `<div class="county-group">
+                <div class="county-header-row">
+                    <a href="/parishes" style="font-size:0.85rem;font-weight:600;color:var(--link);text-decoration:none;">Övriga församlingar &rsaquo;</a>
+                </div>
+            </div>`;
+
+            // Övriga händelser: standalone section for services not tied to a parish
             const miscChecked = includedParishes.has('Övrigt') ? 'checked' : '';
             filterOptions.innerHTML += `<div class="county-group misc-group">
                 <div class="county-header-row">
                     <label class="filter-option">
                         <input type="checkbox" ${miscChecked} onchange="toggleParish('Övrigt', this.checked)">
-                        <strong>Övrigt</strong>
+                        <strong>Övriga händelser</strong>
                     </label>
                 </div>
             </div>`;
