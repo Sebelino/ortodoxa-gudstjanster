@@ -11,7 +11,7 @@
       gtag('js', new Date());
       gtag('config', 'G-HWYRT0Y0BY');
     </script>
-    <title>{{.Name}} – Ortodoxa Gudstjänster</title>
+    <title>{{.Name}}{{if .City}}, {{.City}}{{end}} – Ortodoxa Gudstjänster</title>
     <meta name="description" content="Gudstjänsttider och information om {{.Name}} i {{.City}}. {{.Tradition}} församling{{if .Patriarchate}} ({{.Patriarchate}}){{end}}. Adress: {{.Address}}.">
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -19,10 +19,14 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://ortodoxagudstjanster.se/parish/{{.Slug}}">
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="place">
     <meta property="og:url" content="https://ortodoxagudstjanster.se/parish/{{.Slug}}">
-    <meta property="og:title" content="{{.Name}} – Gudstjänsttider">
+    <meta property="og:title" content="{{.Name}}{{if .City}}, {{.City}}{{end}} – Gudstjänsttider">
     <meta property="og:description" content="Gudstjänsttider och information om {{.Name}} i {{.City}}.">
+    <meta property="og:site_name" content="Ortodoxa Gudstjänster">
+    {{if and .Lat .Lng}}<meta name="geo.position" content="{{.Lat}};{{.Lng}}">
+    <meta name="ICBM" content="{{.Lat}}, {{.Lng}}">{{end}}
+    {{if .City}}<meta name="geo.placename" content="{{.City}}">{{end}}
     <style>
         {{template "theme-css" .}}
 
@@ -151,8 +155,15 @@
         "@type": "PostalAddress",
         "streetAddress": "{{.Address}}",
         "addressLocality": "{{.City}}",
+        "addressRegion": "{{.CountyDisplay}}",
         "addressCountry": "SE"
-      }
+      }{{if and .Lat .Lng}},
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": {{.Lat}},
+        "longitude": {{.Lng}}
+      }{{end}}{{if .WebsiteLinks}},
+      "sameAs": [{{range $i, $w := .WebsiteLinks}}{{if $i}},{{end}}"{{$w.URL}}"{{end}}]{{end}}
     }
     </script>
 </head>

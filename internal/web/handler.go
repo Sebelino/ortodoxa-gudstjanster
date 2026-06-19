@@ -816,30 +816,38 @@ func (h *Handler) handleRobots(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	var sb strings.Builder
+	today := time.Now().Format("2006-01-02")
 	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://ortodoxagudstjanster.se/</loc>
+    <lastmod>` + today + `</lastmod>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://ortodoxagudstjanster.se/parishes</loc>
+    <lastmod>` + today + `</lastmod>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://ortodoxagudstjanster.se/calendar</loc>
+    <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>`)
 	for _, p := range parishes {
 		fmt.Fprintf(&sb, `
   <url>
     <loc>https://ortodoxagudstjanster.se/parish/%s</loc>
+    <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>`, p.Slug)
 	}
 	sb.WriteString(`
   <url>
     <loc>https://ortodoxagudstjanster.se/feedback</loc>
+    <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 </urlset>`)
