@@ -140,7 +140,9 @@
         <div id="map"></div>
         <p style="text-align:right;margin:-0.5rem 0 0.75rem;font-size:0.8rem;"><a href="https://umap.openstreetmap.fr/sv/map/ortodoxi-i-sverige_1414550" target="_blank" rel="noopener" style="color:var(--link);">Visa fullständig karta</a></p>
 
-        {{range .}}
+        <p style="margin-bottom:1rem;font-size:0.9rem;color:var(--text-muted);">Det finns just nu {{.TotalCount}} k&auml;nda &ouml;stortodoxa f&ouml;rsamlingar i Sverige. Om du m&auml;rker att en f&ouml;rsamling saknas, <a href="/feedback" style="color:var(--link);">kontakta oss</a> g&auml;rna.</p>
+
+        {{range .Groups}}
         <div class="county-group">
             <div class="county-heading">{{.County}}</div>
             <div class="parish-list">
@@ -161,7 +163,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
         var parishes = [
-            {{range .}}{{range .Parishes}}
+            {{range .Groups}}{{range .Parishes}}
             {name: "{{.ShortName}}", slug: "{{.Slug}}", lat: {{.Lat}}, lng: {{.Lng}}, address: "{{.Address}}"},
             {{end}}{{end}}
         ];

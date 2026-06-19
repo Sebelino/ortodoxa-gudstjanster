@@ -900,6 +900,10 @@ func (h *Handler) handleParishesPage(w http.ResponseWriter, r *http.Request) {
 		County   string
 		Parishes []ParishInfo
 	}
+	type parishesPageData struct {
+		Groups     []countyGroup
+		TotalCount int
+	}
 
 	// Group parishes by county, sort within each group alphabetically.
 	groupMap := make(map[string][]ParishInfo)
@@ -914,7 +918,7 @@ func (h *Handler) handleParishesPage(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(groups, func(i, j int) bool { return groups[i].County < groups[j].County })
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl.Execute(w, groups)
+	tmpl.Execute(w, parishesPageData{Groups: groups, TotalCount: len(parishes)})
 }
 
 func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
