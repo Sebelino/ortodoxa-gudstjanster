@@ -164,9 +164,19 @@ func parseWithTheme(name string) (*template.Template, error) {
 	return template.ParseFS(templates, "templates/"+name, "templates/_theme.html")
 }
 
+func render404(w http.ResponseWriter) {
+	tmpl, err := parseWithTheme("404.html")
+	if err != nil {
+		http.Error(w, "404 page not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNotFound)
+	tmpl.Execute(w, nil)
+}
+
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		http.NotFound(w, r)
+		render404(w)
 		return
 	}
 
@@ -937,7 +947,7 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 	}
 	p, ok := parishBySlug[slug]
 	if !ok {
-		http.NotFound(w, r)
+		render404(w)
 		return
 	}
 
@@ -987,7 +997,7 @@ func (h *Handler) handleParish(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/event/")
 	if id == "" {
-		http.NotFound(w, r)
+		render404(w)
 		return
 	}
 
@@ -996,7 +1006,7 @@ func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
 
 	svc, err := h.fetcher.GetServiceByID(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		render404(w)
 		return
 	}
 
