@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -41,9 +42,20 @@ func (s *HeligeSergijScraper) Name() string {
 }
 
 func (s *HeligeSergijScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
-	text, err := fetchTelegramScheduleText(ctx)
-	if err != nil {
-		return nil, err
+	var text string
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		text, err = fetchTelegramScheduleText(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if text != "" {
+			break
+		}
+		if attempt < 3 {
+			log.Printf("Helige Sergij: no schedule posts found on attempt %d/3, retrying in 10s", attempt)
+			time.Sleep(10 * time.Second)
+		}
 	}
 	if text == "" {
 		return nil, fmt.Errorf("no schedule posts found on Telegram channel")

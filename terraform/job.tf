@@ -69,9 +69,13 @@ resource "google_cloud_run_v2_job" "ingest" {
   location = var.region
 
   template {
+    task_count  = 1
+    parallelism = 1
+
     template {
       service_account = google_service_account.ingest.email
       timeout         = "600s"
+      max_retries     = 0
 
       containers {
         image   = "${var.region}-docker.pkg.dev/${var.project_id}/${var.service_name}/${var.service_name}:${var.image_tag}"
