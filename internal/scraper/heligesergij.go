@@ -24,6 +24,7 @@ const (
 	heligeSergijParishSlug      = "helige-sergij"
 	heligeSergijURL             = "https://t.me/s/helige_sergij"
 	heligeSergijDefaultLocation = "Helige Sergij Ryska Ortodoxa Församling, Solkraftsvägen 16A, 135 70 Stockholm"
+	heligeSergijTextCacheKey    = "helige-sergij/latest-text"
 )
 
 // HeligeSergijScraper fetches the schedule for Helige Sergij from their Telegram channel.
@@ -58,7 +59,16 @@ func (s *HeligeSergijScraper) Fetch(ctx context.Context) ([]model.ChurchService,
 		}
 	}
 	if text == "" {
-		return nil, fmt.Errorf("no schedule posts found on Telegram channel")
+		if cached, ok := s.store.Get(heligeSergijTextCacheKey); ok && len(cached) > 0 {
+			log.Printf("Helige Sergij: Telegram unavailable, using cached schedule text")
+			text = string(cached)
+		} else {
+			return nil, fmt.Errorf("no schedule posts found on Telegram channel")
+		}
+	} else {
+		if err := s.store.Set(heligeSergijTextCacheKey, []byte(text)); err != nil {
+			log.Printf("Helige Sergij: failed to cache schedule text: %v", err)
+		}
 	}
 
 	hash := sha256.Sum256([]byte(text))
