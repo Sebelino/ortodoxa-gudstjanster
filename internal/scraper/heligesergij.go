@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -44,9 +45,10 @@ func (s *HeligeSergijScraper) Name() string {
 
 func (s *HeligeSergijScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
 	var text string
+	var rawHTML []byte
 	var err error
 	for attempt := 1; attempt <= 3; attempt++ {
-		text, err = fetchTelegramScheduleText(ctx)
+		text, rawHTML, err = fetchTelegramScheduleText(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -59,6 +61,15 @@ func (s *HeligeSergijScraper) Fetch(ctx context.Context) ([]model.ChurchService,
 		}
 	}
 	if text == "" {
+		// Save the raw HTML for diagnostics so we can inspect what Telegram returned.
+		if len(rawHTML) > 0 {
+			diagKey := "helige-sergij/debug/" + time.Now().UTC().Format("20060102-150405") + ".html"
+			if werr := s.store.SetRaw(diagKey, rawHTML); werr != nil {
+				log.Printf("Helige Sergij: failed to save diagnostic HTML: %v", werr)
+			} else {
+				log.Printf("Helige Sergij: saved diagnostic HTML to %s (%d bytes)", diagKey, len(rawHTML))
+			}
+		}
 		if cached, ok := s.store.Get(heligeSergijTextCacheKey); ok && len(cached) > 0 {
 			log.Printf("Helige Sergij: Telegram unavailable, using cached schedule text")
 			text = string(cached)
@@ -124,27 +135,33 @@ func (s *HeligeSergijScraper) entriesToServices(entries []vision.ScheduleEntry) 
 }
 
 // fetchTelegramScheduleText fetches the Telegram public channel page and returns
-// the combined text of posts that look like service schedule announcements.
-func fetchTelegramScheduleText(ctx context.Context) (string, error) {
+// the combined text of posts that look like service schedule announcements,
+// plus the raw HTML body for diagnostics.
+func fetchTelegramScheduleText(ctx context.Context) (text string, rawHTML []byte, err error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", heligeSergijURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("creating request: %w", err)
+		return "", nil, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; OrtodoxaGudstjanster/1.0)")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("fetching Telegram page: %w", err)
+		return "", nil, fmt.Errorf("fetching Telegram page: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status %d for %s", resp.StatusCode, heligeSergijURL)
+		return "", nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, heligeSergijURL)
 	}
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	rawHTML, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("parsing HTML: %w", err)
+		return "", nil, fmt.Errorf("reading body: %w", err)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(rawHTML)))
+	if err != nil {
+		return "", rawHTML, fmt.Errorf("parsing HTML: %w", err)
 	}
 
 	timePattern := regexp.MustCompile(`\d{1,2}[.:]\d{2}`)
@@ -152,8 +169,9 @@ func fetchTelegramScheduleText(ctx context.Context) (string, error) {
 	// Pin notifications start with the channel name followed by "pinned" in Russian or English
 	pinnedPattern := regexp.MustCompile(`(?i) (pinned|закрепил|закрепила) «`)
 
+	allElements := doc.Find(".tgme_widget_message_text")
 	var schedulePosts []string
-	doc.Find(".tgme_widget_message_text").Each(func(_ int, sel *goquery.Selection) {
+	allElements.Each(func(_ int, sel *goquery.Selection) {
 		text := extractHTMLText(sel)
 		if text == "" {
 			return
@@ -166,13 +184,15 @@ func fetchTelegramScheduleText(ctx context.Context) (string, error) {
 		}
 	})
 
+	log.Printf("Helige Sergij: page has %d message elements, %d matching schedule posts", allElements.Length(), len(schedulePosts))
+
 	// Use only the most recent 2 schedule posts to avoid sending stale data to OpenAI.
 	// Posts on the Telegram page are in chronological order so the last items are newest.
 	if len(schedulePosts) > 2 {
 		schedulePosts = schedulePosts[len(schedulePosts)-2:]
 	}
 
-	return strings.Join(schedulePosts, "\n\n---\n\n"), nil
+	return strings.Join(schedulePosts, "\n\n---\n\n"), rawHTML, nil
 }
 
 // extractHTMLText converts an HTML element's content to plain text,
