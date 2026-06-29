@@ -146,6 +146,180 @@
         }
 {{end}}
 
+{{define "layout-css"}}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.4;
+            font-size: 14px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
+            color: white;
+            padding: 1rem;
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .site-logo {
+            width: 44px;
+            height: 44px;
+            flex-shrink: 0;
+            border-radius: 6px;
+        }
+
+        .site-logo-link {
+            display: inline-flex;
+            flex-shrink: 0;
+            border-radius: 6px;
+            opacity: 0.9;
+        }
+
+        .site-logo-link:hover { opacity: 1; }
+
+        .header-text { text-align: left; }
+
+        header h1 { font-size: 1.4rem; font-weight: 600; margin: 0; }
+
+        .site-name { font-size: 1.2rem; font-weight: 600; color: white; margin: 0; }
+
+        .last-updated { font-size: 0.8rem; opacity: 0.8; margin-top: 0.25rem; }
+
+        .navbar {
+            background: var(--filter-bg);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .navbar-inner {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            height: 44px;
+        }
+
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0.1rem;
+            flex: 1;
+        }
+
+        .nav-link {
+            color: var(--link);
+            text-decoration: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .nav-link:hover { background: var(--filter-hover); }
+
+        .nav-feedback-btn {
+            color: var(--link);
+            background: transparent;
+            border: 1px solid var(--link);
+            text-decoration: none;
+            padding: 0.3rem 0.65rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .nav-feedback-btn:hover { background: var(--filter-hover); }
+
+        .navbar-end {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .site-footer {
+            background: var(--filter-bg);
+            border-top: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+
+        .site-footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.6rem 0.75rem;
+        }
+
+        .site-footer a:hover { color: var(--link); }
+
+        @media (max-width: 480px) {
+            .navbar-inner { padding: 0 0.75rem; }
+            .nav-link { padding: 0.25rem 0.4rem; font-size: 0.8rem; }
+            .nav-feedback-btn { font-size: 0.75rem; padding: 0.25rem 0.45rem; }
+        }
+{{end}}
+
+{{define "site-header"}}
+    <header>
+        <div class="header-inner">
+            <a href="/" class="site-logo-link" aria-label="Till startsidan">
+                <img src="/favicon.svg" class="site-logo" alt="">
+            </a>
+            <div class="header-text">
+                <span class="site-name">Ortodoxa Gudstjänster</span>
+            </div>
+        </div>
+    </header>
+{{end}}
+
+{{define "site-navbar"}}
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <div class="navbar-links">
+                <a href="/parishes" class="nav-link">Församlingar</a>
+                <a href="/about" class="nav-link">Om oss</a>
+            </div>
+            <div class="navbar-end">
+                <a href="/feedback" class="nav-feedback-btn">Rapportera fel/önskemål</a>
+                <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
+            </div>
+        </div>
+    </nav>
+{{end}}
+
+{{define "site-footer-html"}}
+    <footer class="site-footer">
+        <a href="https://github.com/Sebelino/ortodoxa-gudstjanster" target="_blank" rel="noopener">
+            <svg height="14" width="14" viewBox="0 0 16 16" style="fill: currentColor;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+            GitHub
+        </a>
+        <span>·</span>
+        <a href="/calendar">ICS-kalender</a>
+        <span>·</span>
+        <a href="/privacy">Integritetspolicy</a>
+    </footer>
+{{end}}
+
 {{define "theme-flash"}}<script>(function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>{{end}}
 
 {{define "theme-js"}}
