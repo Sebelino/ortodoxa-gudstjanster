@@ -155,7 +155,13 @@
             color: var(--text);
             line-height: 1.4;
             font-size: 14px;
+            -webkit-text-size-adjust: 100%;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
+
+        main { flex: 1; width: 100%; }
 
         header {
             background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
@@ -193,6 +199,10 @@
         .site-name { font-size: 1.2rem; font-weight: 600; color: white; margin: 0; }
 
         .last-updated { font-size: 0.8rem; opacity: 0.8; margin-top: 0.25rem; }
+
+        .page-title { font-size: 1.3rem; font-weight: 600; color: var(--parish-name); margin-bottom: 1rem; }
+
+        .page-subtitle { font-size: 0.9rem; color: var(--text-muted); margin-top: -0.5rem; margin-bottom: 1rem; }
 
         .navbar {
             background: var(--filter-bg);
