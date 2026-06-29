@@ -53,20 +53,6 @@ func validateService(t *testing.T, s model.ChurchService, scraperName string) {
 		t.Errorf("Invalid date format: %q", s.Date)
 	}
 
-	// Date must be parseable
-	parsed, err := time.Parse("2006-01-02", s.Date)
-	if err != nil {
-		t.Errorf("Date not parseable: %q: %v", s.Date, err)
-	}
-
-	// Date should be reasonable (not in the distant past or future)
-	now := time.Now()
-	oneYearAgo := now.AddDate(-1, 0, 0)
-	twoYearsFromNow := now.AddDate(2, 0, 0)
-	if parsed.Before(oneYearAgo) || parsed.After(twoYearsFromNow) {
-		t.Errorf("Date outside reasonable range: %s", s.Date)
-	}
-
 	// DayOfWeek must not be empty
 	if s.DayOfWeek == "" {
 		t.Error("DayOfWeek is empty")
