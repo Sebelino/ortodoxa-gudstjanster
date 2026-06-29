@@ -26,32 +26,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <style>
         {{template "theme-css" .}}
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.5;
-            font-size: 14px;
-        }
-
-        header {
-            background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
-            color: white;
-            padding: 1rem;
-            text-align: center;
-        }
-
-        header h1 {
-            font-size: 1.4rem;
-            font-weight: 600;
-        }
+        {{template "layout-css" .}}
 
         main {
             max-width: 700px;
@@ -127,16 +102,11 @@
     {{template "theme-flash" .}}
 </head>
 <body>
-    <header>
-        <h1>Ortodoxa f&ouml;rsamlingar</h1>
-    </header>
+    {{template "site-header" .}}
+    {{template "site-navbar" .}}
 
     <main>
-        <div class="breadcrumb">
-            <span><a href="/">Alla gudstj&auml;nster</a> &rsaquo; F&ouml;rsamlingar</span>
-            <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
-        </div>
-
+        <h1 class="page-title">Ortodoxa f&ouml;rsamlingar</h1>
         <div id="map"></div>
         <p style="text-align:right;margin:-0.5rem 0 0.75rem;font-size:0.8rem;"><a href="https://umap.openstreetmap.fr/sv/map/ortodoxi-i-sverige_1414550" target="_blank" rel="noopener" style="color:var(--link);">Visa fullständig karta</a></p>
 
@@ -214,6 +184,7 @@
 
         map.fitBounds(bounds, {padding: [30, 30]});
     </script>
+    {{template "site-footer-html" .}}
     {{template "theme-js" .}}
 </body>
 </html>

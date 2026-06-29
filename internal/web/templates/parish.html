@@ -29,38 +29,7 @@
     {{if .City}}<meta name="geo.placename" content="{{.City}}">{{end}}
     <style>
         {{template "theme-css" .}}
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.5;
-            font-size: 14px;
-        }
-
-        header {
-            background: linear-gradient(135deg, var(--header-from) 0%, var(--header-to) 100%);
-            color: white;
-            padding: 1rem;
-            text-align: center;
-        }
-
-        header h1 {
-            font-size: 1.4rem;
-            font-weight: 600;
-        }
-
-        header .subtitle {
-            font-size: 0.85rem;
-            opacity: 0.85;
-            margin-top: 0.25rem;
-        }
+        {{template "layout-css" .}}
 
         main {
             max-width: 700px;
@@ -168,17 +137,12 @@
     </script>
 </head>
 <body>
-    <header>
-        <h1>{{.Name}}</h1>
-        <div class="subtitle">{{if .Tradition}}{{.Tradition}}{{if .Patriarchate}} &middot; {{.Patriarchate}}{{end}}{{else}}{{.Patriarchate}}{{end}}</div>
-    </header>
+    {{template "site-header" .}}
+    {{template "site-navbar" .}}
 
     <main>
-        <div class="breadcrumb">
-            <span><a href="/">Alla gudstjänster</a> &rsaquo; <a href="/parishes">Församlingar</a> &rsaquo; {{.ShortName}}</span>
-            <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
-        </div>
-
+        <h1 class="page-title">{{.Name}}</h1>
+        {{if or .Tradition .Patriarchate}}<p class="page-subtitle">{{if .Tradition}}{{.Tradition}}{{if .Patriarchate}} &middot; {{.Patriarchate}}{{end}}{{else}}{{.Patriarchate}}{{end}}</p>{{end}}
         <div class="info-card">
             <div class="info-card-header">Information</div>
             <div class="info-card-body">
@@ -232,8 +196,8 @@
         </script>
         {{end}}
 
-        <p style="text-align:center;margin-top:1rem;font-size:0.85rem;"><a href="/feedback" style="color:var(--text-muted);">Rapportera fel</a></p>
     </main>
+    {{template "site-footer-html" .}}
     {{template "theme-js" .}}
 </body>
 </html>
