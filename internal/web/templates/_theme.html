@@ -239,6 +239,8 @@
             white-space: nowrap;
         }
 
+        .nav-feedback-short { display: none; }
+
         .nav-feedback-btn:hover { background: var(--filter-hover); }
 
         .navbar-end {
@@ -276,6 +278,8 @@
             .navbar-inner { padding: 0 0.75rem; }
             .nav-link { padding: 0.25rem 0.4rem; font-size: 0.8rem; }
             .nav-feedback-btn { font-size: 0.75rem; padding: 0.25rem 0.45rem; }
+            .nav-feedback-long { display: none; }
+            .nav-feedback-short { display: inline; }
         }
 {{end}}
 
@@ -296,11 +300,12 @@
     <nav class="navbar">
         <div class="navbar-inner">
             <div class="navbar-links">
+                <a href="/" class="nav-link">Gudstjänster</a>
                 <a href="/parishes" class="nav-link">Församlingar</a>
                 <a href="/about" class="nav-link">Om oss</a>
             </div>
             <div class="navbar-end">
-                <a href="/feedback" class="nav-feedback-btn">Rapportera fel/önskemål</a>
+                <a href="/feedback" class="nav-feedback-btn"><span class="nav-feedback-long">Rapportera fel/önskemål</span><span class="nav-feedback-short">Rapportera</span></a>
                 <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()"></button>
             </div>
         </div>
