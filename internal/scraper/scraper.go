@@ -84,6 +84,30 @@ type Scraper interface {
 	Fetch(ctx context.Context) ([]model.ChurchService, error)
 }
 
+// ScraperWithNotes is an optional interface scrapers can implement to report
+// diagnostic notes collected during Fetch (e.g. partial failures, fallbacks).
+// Notes are surfaced in ingestion alert emails when a count-decrease is detected.
+type ScraperWithNotes interface {
+	Scraper
+	FetchNotes() []string
+}
+
+// NoteCollector is an embeddable struct that implements ScraperWithNotes.
+// Embed it in a scraper struct, call resetNotes() at the top of Fetch,
+// and use note() to record key diagnostic events.
+type NoteCollector struct {
+	notes []string
+}
+
+func (n *NoteCollector) note(format string, args ...any) {
+	n.notes = append(n.notes, fmt.Sprintf(format, args...))
+}
+
+func (n *NoteCollector) resetNotes() { n.notes = nil }
+
+// FetchNotes returns diagnostic notes collected during the last Fetch call.
+func (n *NoteCollector) FetchNotes() []string { return n.notes }
+
 // Registry holds all registered scrapers and coordinates fetching.
 type Registry struct {
 	scrapers []Scraper

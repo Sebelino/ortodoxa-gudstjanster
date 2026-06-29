@@ -21,7 +21,7 @@ const (
 )
 
 // HeligaAnnaScraper scrapes the Heliga Anna av Novgorod schedule.
-type HeligaAnnaScraper struct{}
+type HeligaAnnaScraper struct{ NoteCollector }
 
 // NewHeligaAnnaScraper creates a new scraper for Heliga Anna av Novgorod.
 func NewHeligaAnnaScraper() *HeligaAnnaScraper {
@@ -33,6 +33,7 @@ func (s *HeligaAnnaScraper) Name() string {
 }
 
 func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
 	doc, err := fetchDocument(ctx, heligaAnnaURL)
 	if err != nil {
 		return nil, err
@@ -48,11 +49,13 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 	timeRegex := regexp.MustCompile(`kl\.?\s*(\d{1,2})[.:](\d{2})`)
 
 	// Find the Stockholm section - look for h3 with "Stockholm" and get its container
+	stockholmFound := false
 	doc.Find(".elementor-widget-text-editor").Each(func(i int, container *goquery.Selection) {
 		html, _ := container.Html()
 		if !strings.Contains(html, "<h3>Stockholm</h3>") {
 			return
 		}
+		stockholmFound = true
 
 		// Process each list item in this container
 		container.Find("li").Each(func(j int, li *goquery.Selection) {
@@ -134,6 +137,11 @@ func (s *HeligaAnnaScraper) Fetch(ctx context.Context) ([]model.ChurchService, e
 		})
 	})
 
+	if !stockholmFound {
+		s.note("Stockholm section not found on page — 0 services parsed")
+	} else {
+		s.note("found %d services", len(services))
+	}
 	return services, nil
 }
 

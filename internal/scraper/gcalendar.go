@@ -35,7 +35,7 @@ var locationMapping = []struct {
 }
 
 // GCalendarScraper fetches events from a public Google Calendar ICS feed.
-type GCalendarScraper struct{}
+type GCalendarScraper struct{ NoteCollector }
 
 func NewGCalendarScraper() *GCalendarScraper {
 	return &GCalendarScraper{}
@@ -46,6 +46,7 @@ func (s *GCalendarScraper) Name() string {
 }
 
 func (s *GCalendarScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
 	data, err := fetchURL(ctx, gcalendarURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ICS feed: %w", err)
@@ -62,6 +63,7 @@ func (s *GCalendarScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 	}
 
 	var services []model.ChurchService
+	skipped := 0
 	for _, ev := range events {
 		if ev.Cancelled {
 			continue
@@ -69,6 +71,7 @@ func (s *GCalendarScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 
 		parish, location, parishLang := matchLocation(ev.Location)
 		if parish == "" {
+			skipped++
 			continue
 		}
 
@@ -87,6 +90,11 @@ func (s *GCalendarScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 		services = append(services, svc)
 	}
 
+	if skipped > 0 {
+		s.note("parsed %d events → %d matched to known parishes, %d skipped (unknown location)", len(events), len(services), skipped)
+	} else {
+		s.note("parsed %d events → %d matched to known parishes", len(events), len(services))
+	}
 	return services, nil
 }
 

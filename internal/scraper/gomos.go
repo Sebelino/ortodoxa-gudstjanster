@@ -25,6 +25,7 @@ const (
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
 type GomosScraper struct {
+	NoteCollector
 	store        store.Store
 	vision       *vision.Client
 	uploadReader *store.BucketReader
@@ -50,12 +51,17 @@ func (s *GomosScraper) Name() string {
 }
 
 func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
+
 	// Collect images from all sources
 	var allImages []imageWithData
 
 	websiteImages, websiteErr := s.fetchWebsiteImages(ctx)
 	if websiteErr != nil {
 		log.Printf("Gomos: website failed: %v", websiteErr)
+		s.note("website fetch failed: %v", websiteErr)
+	} else {
+		s.note("website: fetched %d image(s)", len(websiteImages))
 	}
 	allImages = append(allImages, websiteImages...)
 
@@ -63,6 +69,9 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 		bucketImages, bucketErr := s.fetchBucketImages(ctx)
 		if bucketErr != nil {
 			log.Printf("Gomos: bucket failed: %v", bucketErr)
+			s.note("GCS upload bucket fetch failed: %v", bucketErr)
+		} else {
+			s.note("GCS upload bucket: fetched %d image(s)", len(bucketImages))
 		}
 		allImages = append(allImages, bucketImages...)
 	}
@@ -113,6 +122,7 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 		res, err := s.ocrImage(ctx, img.data, img.sourceRef)
 		if err != nil {
 			log.Printf("Gomos: OCR failed for %s: %v", img.sourceRef, err)
+			s.note("OCR failed for %s: %v", img.sourceRef, err)
 			continue
 		}
 		results = append(results, ocrResult{

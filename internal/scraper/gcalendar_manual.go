@@ -36,7 +36,7 @@ var (
 
 // GCalendarManualScraper fetches events from a user-curated Google Calendar
 // where the parish and language are embedded in each event's DESCRIPTION.
-type GCalendarManualScraper struct{}
+type GCalendarManualScraper struct{ NoteCollector }
 
 func NewGCalendarManualScraper() *GCalendarManualScraper {
 	return &GCalendarManualScraper{}
@@ -47,6 +47,7 @@ func (s *GCalendarManualScraper) Name() string {
 }
 
 func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
 	data, err := fetchURL(ctx, gcalendarManualURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ICS feed: %w", err)
@@ -63,6 +64,7 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 	}
 
 	var services []model.ChurchService
+	skipped := 0
 	for _, ev := range events {
 		if ev.Cancelled {
 			continue
@@ -74,6 +76,7 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 
 		parish := firstSubmatch(gcalManualParishRE, desc)
 		if parish == "" {
+			skipped++
 			continue
 		}
 		language := firstSubmatch(gcalManualLanguageRE, desc)
@@ -111,6 +114,11 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 		services = append(services, svc)
 	}
 
+	if skipped > 0 {
+		s.note("parsed %d events → %d with Församling field, %d skipped (no Församling in description)", len(events), len(services), skipped)
+	} else {
+		s.note("parsed %d events → %d services", len(events), len(services))
+	}
 	return services, nil
 }
 

@@ -19,7 +19,7 @@ const (
 )
 
 // RomanianScraper fetches events from the Romanian Orthodox church Sankt Göran's Google Calendar.
-type RomanianScraper struct{}
+type RomanianScraper struct{ NoteCollector }
 
 func NewRomanianScraper() *RomanianScraper {
 	return &RomanianScraper{}
@@ -30,6 +30,7 @@ func (s *RomanianScraper) Name() string {
 }
 
 func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
 	data, err := fetchURL(ctx, romanianICSURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ICS feed: %w", err)
@@ -71,5 +72,6 @@ func (s *RomanianScraper) Fetch(ctx context.Context) ([]model.ChurchService, err
 		services = append(services, svc)
 	}
 
+	s.note("parsed %d events → %d active services", len(events), len(services))
 	return services, nil
 }

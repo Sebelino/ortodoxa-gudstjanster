@@ -23,6 +23,7 @@ const (
 
 // SommarlagerScraper scrapes the Orthodox summer camp website.
 type SommarlagerScraper struct {
+	NoteCollector
 	store  store.Store
 	vision *vision.Client
 }
@@ -40,6 +41,8 @@ func (s *SommarlagerScraper) Name() string {
 }
 
 func (s *SommarlagerScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
+
 	// Fetch main page
 	mainDoc, err := fetchDocument(ctx, sommarlagerURL)
 	if err != nil {
@@ -54,14 +57,17 @@ func (s *SommarlagerScraper) Fetch(ctx context.Context) ([]model.ChurchService, 
 	regURL := findRegistrationLink(mainDoc)
 	if regURL != "" {
 		log.Printf("sommarlager: found registration link: %s", regURL)
+		s.note("registration link found: %s", regURL)
 		text, err := fetchPageText(ctx, regURL)
 		if err != nil {
 			log.Printf("sommarlager: failed to fetch registration page: %v", err)
+			s.note("registration page fetch failed: %v", err)
 		} else {
 			regText = text
 		}
 	} else {
 		log.Printf("sommarlager: no registration link found on main page")
+		s.note("no registration link found on main page")
 	}
 
 	combined := mainText
@@ -79,6 +85,7 @@ func (s *SommarlagerScraper) Fetch(ctx context.Context) ([]model.ChurchService, 
 	log.Printf("sommarlager: notice=%q", notice)
 	if s.store.GetJSON(cacheKey, &events) {
 		log.Printf("sommarlager: using cached result (%d events)", len(events))
+		s.note("cache hit: %d events", len(events))
 		return s.eventsToServices(events, notice), nil
 	}
 
@@ -94,6 +101,7 @@ func (s *SommarlagerScraper) Fetch(ctx context.Context) ([]model.ChurchService, 
 	}
 
 	log.Printf("sommarlager: extracted %d events", len(events))
+	s.note("AI extraction: %d events", len(events))
 	return s.eventsToServices(events, notice), nil
 }
 

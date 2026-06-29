@@ -26,7 +26,7 @@ var uppstandelseLocationMapping = []struct {
 	{"Runstavsgatan", "Stefan Dečanskis kyrka, Runstavsgatan 9, 415 08 Göteborg"},
 }
 
-type UppstandelseScraper struct{}
+type UppstandelseScraper struct{ NoteCollector }
 
 func NewUppstandelseScraper() *UppstandelseScraper {
 	return &UppstandelseScraper{}
@@ -37,6 +37,7 @@ func (s *UppstandelseScraper) Name() string {
 }
 
 func (s *UppstandelseScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
 	data, err := fetchURL(ctx, uppstandelseURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ICS feed: %w", err)
@@ -87,5 +88,6 @@ func (s *UppstandelseScraper) Fetch(ctx context.Context) ([]model.ChurchService,
 		services = append(services, svc)
 	}
 
+	s.note("parsed %d events → %d active services", len(events), len(services))
 	return services, nil
 }

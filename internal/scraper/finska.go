@@ -18,6 +18,7 @@ const (
 
 // FinskaScraper scrapes the Finnish Orthodox Congregation calendar.
 type FinskaScraper struct {
+	NoteCollector
 	url string
 }
 
@@ -34,6 +35,7 @@ func (s *FinskaScraper) Name() string {
 }
 
 func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
 	doc, err := fetchDocument(ctx, s.url)
 	if err != nil {
 		return nil, err
@@ -118,6 +120,7 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 		})
 	})
 
+	s.note("found %d services on calendar page", len(services))
 	return services, nil
 }
 

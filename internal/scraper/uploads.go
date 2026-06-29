@@ -22,6 +22,7 @@ const (
 // event information from each image. The parish is determined by the top-level
 // folder name, which must match a known parish slug.
 type UploadsScraper struct {
+	NoteCollector
 	store      store.Store
 	vision     *vision.Client
 	reader     *store.BucketReader
@@ -55,6 +56,7 @@ func (s *UploadsScraper) Name() string {
 }
 
 func (s *UploadsScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
 	if s.reader == nil {
 		log.Printf("Uploads scraper: no bucket reader configured, returning empty")
 		return nil, nil
@@ -67,6 +69,7 @@ func (s *UploadsScraper) Fetch(ctx context.Context) ([]model.ChurchService, erro
 
 	var allServices []model.ChurchService
 	imageCount := 0
+	failedImages := 0
 
 	for _, name := range names {
 		lower := strings.ToLower(name)
@@ -84,18 +87,23 @@ func (s *UploadsScraper) Fetch(ctx context.Context) ([]model.ChurchService, erro
 		parish, known := s.parishInfo[slug]
 		if !known {
 			log.Printf("Uploads: skipping %s (unknown parish slug %q)", name, slug)
+			s.note("skipped %s — unknown parish slug %q", name, slug)
 			continue
 		}
 
 		imageData, err := s.reader.ReadObject(ctx, name)
 		if err != nil {
 			log.Printf("Uploads: failed to read %s: %v", name, err)
+			s.note("failed to read %s: %v", name, err)
+			failedImages++
 			continue
 		}
 
 		services, err := s.processImage(ctx, imageData, name, &parish)
 		if err != nil {
 			log.Printf("Uploads: failed to process %s: %v", name, err)
+			s.note("failed to process %s: %v", name, err)
+			failedImages++
 			continue
 		}
 
@@ -103,6 +111,11 @@ func (s *UploadsScraper) Fetch(ctx context.Context) ([]model.ChurchService, erro
 		allServices = append(allServices, services...)
 	}
 
+	if failedImages > 0 {
+		s.note("processed %d images → %d services (%d images failed)", imageCount, len(allServices), failedImages)
+	} else {
+		s.note("processed %d images → %d services", imageCount, len(allServices))
+	}
 	log.Printf("Uploads: extracted %d services from %d images", len(allServices), imageCount)
 	return allServices, nil
 }

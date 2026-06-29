@@ -174,10 +174,17 @@ registry.Register(scraper.NewGCalendarScraper())
 		log.Printf("Running scraper: %s", scraperName)
 
 		services, err := s.Fetch(ctx)
+
+		// Collect diagnostic notes if the scraper supports them.
+		var fetchNotes []string
+		if sn, ok := s.(scraper.ScraperWithNotes); ok {
+			fetchNotes = sn.FetchNotes()
+		}
+
 		if err != nil {
 			log.Printf("ERROR: Scraper %s failed: %v", scraperName, err)
 			failedScrapers++
-			scraperErrors = append(scraperErrors, scraperFailure{name: scraperName, err: err})
+			scraperErrors = append(scraperErrors, scraperFailure{name: scraperName, err: err, notes: fetchNotes})
 			continue
 		}
 
@@ -204,11 +211,7 @@ registry.Register(scraper.NewGCalendarScraper())
 
 				// Send alert email if SMTP is configured
 				if smtpConfig != nil {
-					subject := fmt.Sprintf("Ingestion alert: %s service count decreased", scraperName)
-					body := fmt.Sprintf(
-						"Scraper: %s\r\nExisting future count: %d\r\nNew future count: %d\r\nAction: Skipped replacement (existing data preserved)\r\nRejected data: gs://%s/%s",
-						scraperName, existingCount, newCount, gcsBucket, gcsPath,
-					)
+					subject, body := buildCountDecreaseAlert(scraperName, existingCount, newCount, gcsBucket, gcsPath, services, fetchNotes)
 					if err := smtpConfig.Send(subject, body); err != nil {
 						log.Printf("ERROR: Failed to send alert email for %s: %v", scraperName, err)
 					} else {
@@ -281,6 +284,9 @@ registry.Register(scraper.NewGCalendarScraper())
 			var lines []string
 			for _, f := range scraperErrors {
 				lines = append(lines, fmt.Sprintf("- %s: %v", f.name, f.err))
+				for _, n := range f.notes {
+					lines = append(lines, fmt.Sprintf("    • %s", n))
+				}
 			}
 			body := "The following scrapers failed during ingestion:\r\n\r\n" + strings.Join(lines, "\r\n")
 			if err := smtpConfig.Send("Ingestion alert: scrapers failed", body); err != nil {
@@ -321,8 +327,9 @@ type acceptedResult struct {
 }
 
 type scraperFailure struct {
-	name string
-	err  error
+	name  string
+	err   error
+	notes []string
 }
 
 // titleCacheKey returns the GCS cache key for a service name's title.
@@ -611,6 +618,66 @@ func saveDiagnostics(gcsStore *store.GCSStore, scraperName string, services []mo
 	}
 
 	return path
+}
+
+// buildCountDecreaseAlert formats the subject and body for a service count regression alert.
+func buildCountDecreaseAlert(scraperName string, existingCount, newCount int, gcsBucket, gcsPath string, services []model.ChurchService, notes []string) (subject, body string) {
+	today := time.Now().Format("2006-01-02")
+
+	subject = fmt.Sprintf("Ingestion alert: %s – %d future events (was %d)", scraperName, newCount, existingCount)
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Scraper: %s\r\n", scraperName)
+	fmt.Fprintf(&sb, "Rule: new future count (%d) < 1/3 of stored count (%d) → replacement skipped\r\n", newCount, existingCount)
+	fmt.Fprintf(&sb, "Action: existing data preserved in Firestore\r\n")
+	fmt.Fprintf(&sb, "\r\n")
+
+	if len(services) == 0 {
+		fmt.Fprintf(&sb, "Fetched events: none — the scraper returned no events at all.\r\n")
+	} else {
+		sorted := make([]model.ChurchService, len(services))
+		copy(sorted, services)
+		sort.Slice(sorted, func(i, j int) bool { return sorted[i].Date < sorted[j].Date })
+
+		pastCount := len(services) - newCount
+		fmt.Fprintf(&sb, "Fetched events: %d total (%d future, %d past/today)\r\n", len(services), newCount, pastCount)
+		fmt.Fprintf(&sb, "Date range:     %s → %s\r\n", sorted[0].Date, sorted[len(sorted)-1].Date)
+		fmt.Fprintf(&sb, "\r\n")
+
+		shown := sorted
+		truncated := false
+		if len(shown) > 20 {
+			shown = shown[:20]
+			truncated = true
+		}
+		for _, svc := range shown {
+			timeStr := "     "
+			if svc.Time != nil {
+				timeStr = fmt.Sprintf("%-5s", *svc.Time)
+			}
+			marker := ""
+			if svc.Date >= today {
+				marker = "  ← future"
+			}
+			fmt.Fprintf(&sb, "  %s  %s  %s%s\r\n", svc.Date, timeStr, svc.ServiceName, marker)
+		}
+		if truncated {
+			fmt.Fprintf(&sb, "  … and %d more (see diagnostics)\r\n", len(services)-20)
+		}
+	}
+
+	if len(notes) > 0 {
+		fmt.Fprintf(&sb, "\r\n")
+		fmt.Fprintf(&sb, "Scraper diagnostics:\r\n")
+		for _, n := range notes {
+			fmt.Fprintf(&sb, "  - %s\r\n", n)
+		}
+	}
+
+	fmt.Fprintf(&sb, "\r\n")
+	fmt.Fprintf(&sb, "Diagnostics file: gs://%s/%s\r\n", gcsBucket, gcsPath)
+
+	return subject, sb.String()
 }
 
 // resolveParishFields fills in missing Parish, ParishSlug, and ParishLanguage using

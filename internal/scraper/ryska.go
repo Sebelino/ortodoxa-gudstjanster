@@ -86,6 +86,7 @@ const (
 
 // RyskaScraper scrapes the Russian Orthodox Church schedule.
 type RyskaScraper struct {
+	NoteCollector
 	store  store.Store
 	vision *vision.Client
 }
@@ -103,9 +104,16 @@ func (s *RyskaScraper) Name() string {
 }
 
 func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
+	s.resetNotes()
+
 	content, err := ExtractRyskaScheduleText(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if content == "" {
+		s.note("Chrome rendered page but no schedule section (GUDSTJÄNSTKUNGÖRELSE) found")
+	} else {
+		s.note("Chrome rendered page: schedule text %d chars", len(content))
 	}
 
 	// Compute checksum for caching
@@ -115,6 +123,7 @@ func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 	// Check store for cached result
 	var entries []vision.ScheduleEntry
 	if s.store.GetJSON(cacheKey, &entries) {
+		s.note("cache hit: %d entries", len(entries))
 		return s.entriesToServices(entries), nil
 	}
 
@@ -123,6 +132,7 @@ func (s *RyskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 	if err != nil {
 		return nil, fmt.Errorf("extracting schedule: %w", err)
 	}
+	s.note("AI extraction: %d entries", len(entries))
 
 	// Cache result
 	if err := s.store.SetJSON(cacheKey, entries); err != nil {
