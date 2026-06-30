@@ -186,6 +186,10 @@
             white-space: nowrap;
         }
 
+        .service-row .col-time {
+            padding-left: 1.5rem;
+        }
+
         .col-name {
             font-weight: 500;
         }
@@ -195,6 +199,18 @@
             color: var(--text-muted);
             font-size: 0.85rem;
             text-align: right;
+        }
+
+        .parish-group-header td {
+            padding: 0.35rem 0.75rem 0.1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--parish-name);
+        }
+
+        .parish-group-header:not(.first) td {
+            border-top: 1px solid var(--border);
+            padding-top: 0.45rem;
         }
 
         .parish-link {
@@ -867,27 +883,53 @@
 
             let rowId = 0;
             Object.keys(grouped).forEach(date => {
-                const group = grouped[date];
+                const dayData = grouped[date];
+
+                // Group services by parish within this day, preserving time order
+                const parishOrder = [];
+                const parishServiceMap = {};
+                dayData.services.forEach(service => {
+                    const parish = getParishGroup(service);
+                    if (!parishServiceMap[parish]) {
+                        parishServiceMap[parish] = [];
+                        parishOrder.push(parish);
+                    }
+                    parishServiceMap[parish].push(service);
+                });
+
                 html += `
                     <div class="date-group">
                         <div class="date-header">
                             <span>${formatDate(date)}</span>
-                            <span class="day-name">${group.dayOfWeek}</span>
+                            <span class="day-name">${dayData.dayOfWeek}</span>
                         </div>
                         <table class="service-table">
                             <tbody>
-                                ${group.services.map(service => {
-                                    const id = rowId++;
-                                    const details = buildDetails(service);
+                                ${parishOrder.map((parish, gi) => {
+                                    const services = parishServiceMap[parish];
+                                    const p = parishByName[parish];
+                                    const displayName = parish === 'Övrigt' ? 'Övriga händelser' : (p ? p.short_name : parish);
+                                    const headerContent = (p && p.slug)
+                                        ? `<a href="/parish/${p.slug}" onclick="event.stopPropagation()" class="parish-link">${escapeHtml(displayName)}</a>`
+                                        : escapeHtml(displayName);
+                                    const rows = services.map(service => {
+                                        const id = rowId++;
+                                        const details = buildDetails(service);
+                                        return `
+                                            <tr class="service-row" onclick="toggleDetails(${id})">
+                                                <td class="col-time">${formatTime(service)}</td>
+                                                <td class="col-name">${escapeHtml(service.title || service.service_name)}</td>
+                                            </tr>
+                                            <tr class="service-details" id="details-${id}">
+                                                <td colspan="2">${details}</td>
+                                            </tr>
+                                        `;
+                                    }).join('');
                                     return `
-                                        <tr class="service-row" onclick="toggleDetails(${id})">
-                                            <td class="col-time">${formatTime(service)}</td>
-                                            <td class="col-name">${escapeHtml(service.title || service.service_name)}</td>
-                                            <td class="col-source">${parishSourceCell(service)}</td>
+                                        <tr class="parish-group-header${gi === 0 ? ' first' : ''}">
+                                            <td colspan="2">${headerContent}</td>
                                         </tr>
-                                        <tr class="service-details" id="details-${id}">
-                                            <td colspan="3">${details}</td>
-                                        </tr>
+                                        ${rows}
                                     `;
                                 }).join('')}
                             </tbody>
