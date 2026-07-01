@@ -220,6 +220,19 @@ registry.Register(scraper.NewGCalendarScraper())
 				}
 
 				continue
+			} else if newCount == 0 && existingCount == 0 && len(fetchNotes) > 0 {
+				// All fetched events are past-dated and the scraper ran in degraded mode
+				// (e.g. website down, using stale backup). The count-decrease check above
+				// won't fire here because existingCount is also 0, so this is a blind spot.
+				log.Printf("WARNING: Scraper %s returned %d events but none are future-dated (degraded mode)", scraperName, len(services))
+				if smtpConfig != nil {
+					subject, body := buildStaleFallbackAlert(scraperName, services, fetchNotes)
+					if err := smtpConfig.Send(subject, body); err != nil {
+						log.Printf("ERROR: Failed to send stale fallback alert for %s: %v", scraperName, err)
+					} else {
+						log.Printf("Stale fallback alert sent for %s", scraperName)
+					}
+				}
 			}
 
 			accepted = append(accepted, acceptedResult{scraperName: scraperName, services: services})
@@ -676,6 +689,27 @@ func buildCountDecreaseAlert(scraperName string, existingCount, newCount int, gc
 
 	fmt.Fprintf(&sb, "\r\n")
 	fmt.Fprintf(&sb, "Diagnostics file: gs://%s/%s\r\n", gcsBucket, gcsPath)
+
+	return subject, sb.String()
+}
+
+// buildStaleFallbackAlert formats a warning email for when a scraper returns only
+// past-dated events while running in degraded mode (e.g. website down, using backup).
+func buildStaleFallbackAlert(scraperName string, services []model.ChurchService, notes []string) (subject, body string) {
+	subject = fmt.Sprintf("Ingestion warning: %s – all %d fetched events are past-dated (degraded mode)", scraperName, len(services))
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Scraper: %s\r\n", scraperName)
+	fmt.Fprintf(&sb, "Warning: scraper returned %d events but none are future-dated.\r\n", len(services))
+	fmt.Fprintf(&sb, "This usually means the website is down and a stale backup is being used.\r\n")
+	fmt.Fprintf(&sb, "No data was changed in Firestore.\r\n")
+
+	if len(notes) > 0 {
+		fmt.Fprintf(&sb, "\r\nScraper diagnostics:\r\n")
+		for _, n := range notes {
+			fmt.Fprintf(&sb, "  - %s\r\n", n)
+		}
+	}
 
 	return subject, sb.String()
 }
