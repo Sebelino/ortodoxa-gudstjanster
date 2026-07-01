@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -89,7 +90,24 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 		return nil, err
 	}
 
-	return s.deduplicate(services), nil
+	deduped := s.deduplicate(services)
+
+	// If the website failed and all resulting events are past-dated, the backup
+	// data is stale. Return an error so the existing scraper-failure alert fires.
+	if websiteErr != nil && len(deduped) > 0 {
+		today := time.Now().Format("2006-01-02")
+		futureCount := 0
+		for _, svc := range deduped {
+			if svc.Date >= today {
+				futureCount++
+			}
+		}
+		if futureCount == 0 {
+			return nil, fmt.Errorf("website failed (%v) and backup data is stale (%d events, all past-dated)", websiteErr, len(deduped))
+		}
+	}
+
+	return deduped, nil
 }
 
 // imageWithData pairs downloaded image bytes with source metadata.
