@@ -14,6 +14,8 @@ import (
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
+const browserUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
 // stockholm is the Europe/Stockholm timezone, loaded once at init.
 var stockholm *time.Location
 
@@ -31,6 +33,7 @@ func fetchURL(ctx context.Context, url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
+	req.Header.Set("User-Agent", browserUserAgent)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -56,6 +59,7 @@ func fetchDocument(ctx context.Context, url string) (*goquery.Document, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
+	req.Header.Set("User-Agent", browserUserAgent)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
