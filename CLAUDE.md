@@ -10,7 +10,7 @@ A Go web service that serves church service calendar data from multiple Orthodox
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ Ingestion (every 6 hours)                                │
+│ Ingestion (6x daily, every 3h during daytime)            │
 │ Cloud Scheduler → Cloud Run Job → Scrape → Firestore     │
 └──────────────────────────────────────────────────────────┘
                                           ↓
@@ -22,7 +22,7 @@ A Go web service that serves church service calendar data from multiple Orthodox
 
 - **Web Service** (`cmd/server`): Serves the calendar UI and API, reads from Firestore
 - **Ingestion Job** (`cmd/ingest`): Runs all scrapers, stores results in Firestore
-- **Cloud Scheduler**: Triggers ingestion every 6 hours (`0 */6 * * *`)
+- **Cloud Scheduler**: Triggers ingestion every 3 hours during daytime (`0 6,9,12,15,18,21 * * *`)
 
 ## Development Setup
 

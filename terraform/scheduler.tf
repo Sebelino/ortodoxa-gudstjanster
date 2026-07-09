@@ -19,12 +19,12 @@ resource "google_cloud_run_v2_job_iam_member" "scheduler_invoker" {
   member   = "serviceAccount:${google_service_account.scheduler.email}"
 }
 
-# Cloud Scheduler job to trigger ingestion every 6 hours
+# Cloud Scheduler job to trigger ingestion every 3 hours during daytime
 # Note: Cloud Scheduler is not available in europe-north1, using europe-west1 instead
 resource "google_cloud_scheduler_job" "ingest" {
   name        = "${var.service_name}-ingest-schedule"
-  description = "Triggers the ingestion job every 6 hours"
-  schedule    = "0 */6 * * *"
+  description = "Triggers the ingestion job every 3 hours during daytime"
+  schedule    = "0 6,9,12,15,18,21 * * *"
   time_zone   = "Europe/Stockholm"
   region      = "europe-west1"
 
