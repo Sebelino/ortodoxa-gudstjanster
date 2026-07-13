@@ -81,7 +81,7 @@ const (
 	ryskaSourceName = "Kristi Förklarings Ortodoxa Församling"
 	ryskaParishSlug = "kristi-forklaring"
 	ryskaURL        = "https://www.ryskaortodoxakyrkan.se/gudstjänst"
-	ryskaLocation   = "Kristi Förklarings Ortodoxa Församling, Birger Jarlsgatan 98, 114 20 Stockholm"
+	ryskaLocation   = "Birger Jarlsgatan 98, 114 20 Stockholm"
 )
 
 // RyskaScraper scrapes the Russian Orthodox Church schedule.

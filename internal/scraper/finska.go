@@ -127,7 +127,7 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 // normalizeFinskaLocation maps known location variants to a canonical address format.
 func normalizeFinskaLocation(loc string) string {
 	if strings.Contains(loc, "Nikolai") || strings.Contains(loc, "Bellmansgatan") {
-		return "Helige Nikolai, Bellmansgatan 13, 118 47 Stockholm"
+		return "Bellmansgatan 13, 118 47 Stockholm"
 	}
 	return loc
 }

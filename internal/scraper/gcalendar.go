@@ -26,10 +26,10 @@ var locationMapping = []struct {
 	location       string
 	parishLanguage string
 }{
-	{"Petruskyrkan", parishHeligaAnna, "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden", "Svenska"},
-	{"Heliga Annas Ortodoxa", parishHeligaAnna, "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden", "Svenska"},
-	{"Sankt Ignatios Folkhögskola", parishStIgnatios, "Sankt Ignatios Folkhögskola, Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
-	{"Sankt Ignatios andliga akademi", parishStIgnatios, "Sankt Ignatios andliga akademi, Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
+	{"Petruskyrkan", parishHeligaAnna, "Kyrkvägen 27, 182 74 Stocksund, Sweden", "Svenska"},
+	{"Heliga Annas Ortodoxa", parishHeligaAnna, "Kyrkvägen 27, 182 74 Stocksund, Sweden", "Svenska"},
+	{"Sankt Ignatios Folkhögskola", parishStIgnatios, "Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
+	{"Sankt Ignatios andliga akademi", parishStIgnatios, "Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
 	// Catch-all for Södertälje addresses not matching above
 	{"Södertälje", parishStIgnatios, "Nygatan 2, 151 72 Södertälje", "Svenska, grekiska, serbiska"},
 }

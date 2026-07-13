@@ -24,7 +24,7 @@ const (
 	heligeSergijSourceName      = "Helige Sergij rysk-ortodoxa församling"
 	heligeSergijParishSlug      = "helige-sergij"
 	heligeSergijURL             = "https://t.me/s/helige_sergij"
-	heligeSergijDefaultLocation = "Helige Sergij Ryska Ortodoxa Församling, Solkraftsvägen 16A, 135 70 Stockholm"
+	heligeSergijDefaultLocation = "Solkraftsvägen 16A, 135 70 Stockholm"
 	heligeSergijTextCacheKey    = "helige-sergij/latest-text"
 )
 

@@ -17,7 +17,7 @@ const (
 	heligaAnnaSourceName = "Heliga Anna av Novgorod"
 	heligaAnnaParishSlug = "heliga-anna"
 	heligaAnnaURL        = "https://heligaanna.nu/gudstjanster/"
-	heligaAnnaLocation   = "Heliga Anna, Kyrkvägen 27, 182 74 Stocksund, Sweden"
+	heligaAnnaLocation   = "Kyrkvägen 27, 182 74 Stocksund, Sweden"
 )
 
 // HeligaAnnaScraper scrapes the Heliga Anna av Novgorod schedule.
