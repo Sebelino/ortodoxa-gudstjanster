@@ -504,9 +504,6 @@ func generateICS(services []model.ChurchService) string {
 		if s.Title != "" {
 			summaryText = s.Title
 		}
-		if summaryText == "Morgongudstjänst" || summaryText == "Aftongudstjänst" || summaryText == "Kvällsgudstjänst" {
-			summaryText = "Gudstjänst"
-		}
 		summary := escapeICS(summaryText)
 		sb.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", summary))
 
