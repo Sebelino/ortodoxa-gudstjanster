@@ -298,10 +298,10 @@ TRANSLATION RULES:
 
 Clergy titles — use these official Swedish forms:
 - Archbishop / Αρχιεπίσκοπος / Ärkebishop → "Hans Eminens Ärkebiskop [Name]"
-- Metropolitan / Μητροπολίτης → "Hans Eminens [Name]"
-- Bishop / Επίσκοπος → "Hans Högvördighet [Name]"
+- Metropolitan / Μητροπολίτης (Σεβ. Μητροπολίτης) → "Hans Eminens Ärkebiskop [Name]" (the Swedish metropolis uses "Ärkebiskop" as the Swedish title for the Metropolitan)
+- Bishop / Επίσκοπος (Θεοφιλ. Επίσκοπος) → "Hans Nåd [Name]"
 - Archimandrite / Αρχιμανδρίτης → "Arkimandrit [Name]" (no honorific prefix needed)
-- NEVER use "hans nåd", "ledd av", or "metropolitiska" — these are wrong
+- NEVER use "ledd av" or "metropolitiska" — these are wrong
 - Always use "med" (not "ledd av") when a clergyman presides: "med Hans Eminens Ärkebiskop X"
 
 Name transliteration:
@@ -316,14 +316,14 @@ Capitalization:
 - Service names: capitalize only the first word and proper nouns
   Correct: "Gudomlig Liturgi", "Stora kompletoriet", "Akathist till Guds moder", "Stora sena kvällsgudstjänsten"
   Wrong:   "gudomlig liturgi", "Stora Kompletoriet"
-- Honorifics: capitalize "Hans Eminens", "Hans Högvördighet", "Ärkebiskop" when used as a title
+- Honorifics: capitalize "Hans Eminens", "Hans Nåd", "Ärkebiskop", "Biskop" when used as a title
 - "Guds moder" — both words capitalized (it is a proper title)
 
 Service name examples:
-- "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Högvördighet Bartholomaios av Elaia")
+- "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Nåd Bartholomaios av Elaia")
 - "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Hierarchical Synlitourgon" → "Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Gudomlig Liturgi, med Hans Eminens Cleopas av Sverige")
 - "Divine Liturgy" / "Θεία Λειτουργία" → "Gudomlig Liturgi"
-- "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Cleopas av Sverige")
+- "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
 - "Sermon" / "Homily" / "Κήρυγμα" / "Ομιλία" / "Divine Proclamation" / "Gudomligt förkunnande" → "Predikan" (always use "Predikan", never "Gudomligt förkunnande"; include the preacher: "Predikan av Arkimandrit Bartholomaios")
 - "Memorial service for founders" / "Κτητορικόν Μνημόσυνον" → "Stiftarnas minnesgudstjänst"
 - "Memorial service" / "Μνημόσυνο" / "Panachida" → "Minnesgudstjänst"
@@ -336,10 +336,21 @@ Service name examples:
 - "Service of the Holy Passion" → "De tolv evangelieläsningarna"
 - "Royal Hours" → "Kungliga tidebönerna"
 - "Royal Hours and Vespers of the Apokathelosis (Descent from the Cross)" → "Kungliga tidebönerna och vesper för avtagandet från korset"
-- "Orthros" / "Όρθρος" → "Orthros"
+- "Orthros" / "Όρθρος" → "Morgongudstjänst"
 - "Vespers" / "Εσπερινός" → "Vesper"
 - "Hours" / "Ώρες" → "Tidebönerna"
 - Do NOT transliterate unknown Greek liturgical terms — map them to the nearest known Swedish equivalent above
+
+Greek saint titles and occasions:
+- Female great martyrs: "ΑΓΙΑΣ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" → "Den heliga storemartyrinna [Name]" (NEVER "storsjälen" — that is not a recognized Orthodox Swedish term)
+- Male great martyrs: "ΑΓΙΟΥ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" / "Holy Great Martyr [Name]" → "Den helige storemartyr [Name]"
+- Sunday ordinals in the post-Pentecost Matthew/Luke lectionary cycle: Greek ordinal + evangelist name → "[Swedish ordinal] söndagen i [evangelist]"
+  Examples: "Β΄ ΜΑΤΘΑΙΟΥ" → "Andra söndagen i Matteus", "Ε΄ ΜΑΤΘΑΙΟΥ" → "Femte söndagen i Matteus", "Η΄ ΜΑΤΘΑΙΟΥ" → "Åttonde söndagen i Matteus"
+  Similarly: ΛΟΥΚΑ → "Lukas", ΜΑΡΚΟΥ → "Markus", ΙΩΑΝΝΟΥ → "Johannes"
+- "Σύναξις" (Synaxis) → "synaxis" (NOT "samling" or "gathering"): "Σύναξις των Αγίων Δώδεκα Αποστόλων" → "De tolv apostlarnas synaxis"
+- "Γενέθλιον του Προδρόμου" / "Nativity of the Forerunner" → "Johannes Döparens födelse" (always include "Johannes")
+- Greek saint names appear in genitive case — always convert to nominative form: ΜΑΡΙΝΗΣ → "Marina" (NOT "Marinis"), ΠΑΡΑΣΚΕΥΗΣ → "Paraskevi", ΓΕΩΡΓΙΟΥ → "Georgios", ΔΗΜΗΤΡΙΟΥ → "Dimitrios", etc.
+- Ecumenical councils: "ΑΓΙΩΝ ΠΑΤΕΡΩΝ [ordinal] ΟΙΚΟΥΜΕΝΙΚΗΣ ΣΥΝΟΔΟΥ" → "De heliga fäderna vid det [ordinal] ekumeniska rådet" (use "rådet" or "konciliet", NEVER "fädernas")
 
 Input JSON:
 %s
@@ -448,7 +459,7 @@ Examples:
 - "Akathist till Guds moder - Andra hälsningen, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Akathist"
 - "Stora bönetimmarna och vesper med basiliusliturgi" → "Bönetimmar"
 - "Kungliga tidebönerna och vesper för avtagandet från korset" → "Kungliga tidebönerna"
-- "Morgongudstjänst (Orthros/Matins)" → "Orthros"
+- "Morgongudstjänst" → "Morgongudstjänst"
 - "Stora kompletoriet med den heliga Andreasakanonen" → "Kompletoriet"
 - "Vesper" → "Vesper"
 - "Trefaldighetsafton" → "Trefaldighetsafton"
