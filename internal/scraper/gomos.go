@@ -124,7 +124,10 @@ type ocrResult struct {
 	sourceURL string
 }
 
-// ocrCacheEntry is the JSON structure stored in the cache.
+// ocrCacheEntry is returned by ocrImage: language of the source image plus
+// entries already translated to Swedish. The cache (gomos-ocr/v3/) stores the
+// raw OCR result (vision.RawScheduleResult) so that translation can be
+// invalidated and re-run independently by clearing the translate cache.
 type ocrCacheEntry struct {
 	Language string                 `json:"language"`
 	Entries  []vision.ScheduleEntry `json:"entries"`
@@ -187,62 +190,68 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 }
 
 // ocrImage extracts schedule entries from an image, returning Swedish entries.
-// Results are cached by image checksum under gomos-ocr/v1/.
+// The raw OCR result is cached by image checksum under gomos-ocr/v3/ as a
+// vision.RawScheduleResult. Translation is always done via translateEntries,
+// which has its own cache (translate/v2/). This separation means translations
+// can be re-run by clearing only the translate cache, without re-running OCR.
 func (s *GomosScraper) ocrImage(ctx context.Context, imageData []byte, sourceRef string) (*ocrCacheEntry, error) {
 	checksum := s.computeChecksum(imageData)
-	cacheKey := "gomos-ocr/v2/" + checksum
+	cacheKey := "gomos-ocr/v3/" + checksum
 
-	var cached ocrCacheEntry
-	if s.store.GetJSON(cacheKey, &cached) {
+	// Check OCR cache for raw (untranslated) result.
+	var raw vision.RawScheduleResult
+	if s.store.GetJSON(cacheKey, &raw) {
 		log.Printf("Gomos: OCR cache hit for %s (checksum %s)", sourceRef, checksum[:12])
-		return &cached, nil
+	} else {
+		log.Printf("Gomos: OCR cache miss for %s (checksum %s), calling API", sourceRef, checksum[:12])
+
+		var rawResponse string
+		var err error
+		rawPtr, resp, err := s.vision.ExtractScheduleRaw(ctx, imageData)
+		if err != nil {
+			return nil, fmt.Errorf("OCR for %s: %w", sourceRef, err)
+		}
+		raw = *rawPtr
+		rawResponse = resp
+
+		// Persist raw API response for diagnostics
+		if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
+			log.Printf("Gomos: failed to persist OCR response: %v", werr)
+		}
+
+		// Persist source image
+		imageExt := s.imageExtension(sourceRef)
+		if werr := s.store.SetRaw(cacheKey+imageExt, imageData); werr != nil {
+			log.Printf("Gomos: failed to persist source image: %v", werr)
+		}
+
+		// Cache raw result so future runs skip the expensive OCR API call.
+		if data, merr := json.Marshal(raw); merr == nil {
+			if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
+				log.Printf("Gomos: failed to cache OCR result: %v", werr)
+			}
+		}
 	}
 
-	log.Printf("Gomos: OCR cache miss for %s (checksum %s), calling API", sourceRef, checksum[:12])
-
-	// Raw OCR in original language
-	raw, rawResponse, err := s.vision.ExtractScheduleRaw(ctx, imageData)
-	if err != nil {
-		return nil, fmt.Errorf("OCR for %s: %w", sourceRef, err)
-	}
-
-	// Persist raw API response for diagnostics
-	if werr := s.store.SetRaw(cacheKey+".response.txt", []byte(rawResponse)); werr != nil {
-		log.Printf("Gomos: failed to persist OCR response: %v", werr)
-	}
-
-	// Persist source image
-	imageExt := s.imageExtension(sourceRef)
-	if werr := s.store.SetRaw(cacheKey+imageExt, imageData); werr != nil {
-		log.Printf("Gomos: failed to persist source image: %v", werr)
-	}
-
-	// Convert to Swedish entries
+	// Translate to Swedish — always via translateEntries so the translate cache
+	// can be cleared independently to re-run translation with an updated prompt.
 	var entries []vision.ScheduleEntry
 	lang := strings.ToLower(raw.Language)
 	if lang == "swedish" || lang == "svenska" {
 		entries = rawEntriesToSwedish(raw.Entries)
 	} else {
+		var err error
 		entries, err = s.translateEntries(ctx, raw.Entries)
 		if err != nil {
 			return nil, fmt.Errorf("translation for %s: %w", sourceRef, err)
 		}
 	}
 
-	result := &ocrCacheEntry{
+	log.Printf("Gomos: OCR extracted %d entries (%s) for %s", len(entries), raw.Language, sourceRef)
+	return &ocrCacheEntry{
 		Language: raw.Language,
 		Entries:  entries,
-	}
-
-	// Cache the result
-	if data, merr := json.Marshal(result); merr == nil {
-		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
-			log.Printf("Gomos: failed to cache OCR result: %v", werr)
-		}
-	}
-
-	log.Printf("Gomos: OCR extracted %d entries (%s) for %s", len(entries), raw.Language, sourceRef)
-	return result, nil
+	}, nil
 }
 
 // scheduleMonthFromEntries returns the most common year-month (YYYY-MM) among entries.
