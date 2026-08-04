@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -290,6 +291,8 @@ func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.Ra
 	var cached []vision.ScheduleEntry
 	if s.store.GetJSON(cacheKey, &cached) {
 		log.Printf("Gomos: translate cache hit")
+		fixSundayOrdinals(cached)
+		fixArchbishopTitle(cached)
 		return cached, nil
 	}
 
@@ -297,6 +300,9 @@ func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.Ra
 	if err != nil {
 		return nil, fmt.Errorf("translating entries: %w", err)
 	}
+
+	fixSundayOrdinals(translated)
+	fixArchbishopTitle(translated)
 
 	// Persist structured result
 	if data, merr := json.Marshal(translated); merr == nil {
@@ -312,6 +318,108 @@ func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.Ra
 
 	return translated, nil
 }
+
+var swedishSundayOrdinals = []string{
+	"Första", "Andra", "Tredje", "Fjärde", "Femte", "Sjätte", "Sjunde", "Åttonde", "Nionde", "Tionde",
+	"Elfte", "Tolfte", "Trettonde", "Fjortonde", "Femtonde", "Sextonde", "Sjuttonde", "Artonde", "Nittonde", "Tjugonde",
+}
+
+var sundayOrdinalRe = regexp.MustCompile(`^(\p{Lu}\p{Ll}+) söndagen i (Matteus|Lukas)$`)
+
+func sundayOrdinalNumber(word string) int {
+	for i, w := range swedishSundayOrdinals {
+		if strings.EqualFold(w, word) {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+func sundayOrdinalWord(n int) string {
+	if n < 1 || n > len(swedishSundayOrdinals) {
+		return ""
+	}
+	return swedishSundayOrdinals[n-1]
+}
+
+// fixSundayOrdinals recomputes "[ordinal] söndagen i [evangelist]" occasions using
+// the earliest dated entry in each evangelist group as a trusted anchor, and calendar
+// week arithmetic (always exact, since consecutive Sundays are exactly 7 days apart)
+// for the rest. OCR/translation occasionally misreads Greek compound numerals (e.g.
+// ΙΓ' as ΙΒ'), which trusting the AI's own numeral transcription can't reliably catch —
+// dates are read far more reliably than these fine numeral suffixes, so we prefer them.
+func fixSundayOrdinals(entries []vision.ScheduleEntry) {
+	type anchor struct {
+		date time.Time
+		num  int
+	}
+	anchors := make(map[string]anchor)
+	for _, e := range entries {
+		m := sundayOrdinalRe.FindStringSubmatch(e.Occasion)
+		if m == nil {
+			continue
+		}
+		num := sundayOrdinalNumber(m[1])
+		if num == 0 {
+			continue
+		}
+		d, err := time.Parse("2006-01-02", e.Date)
+		if err != nil {
+			continue
+		}
+		evangelist := m[2]
+		if a, ok := anchors[evangelist]; !ok || d.Before(a.date) {
+			anchors[evangelist] = anchor{date: d, num: num}
+		}
+	}
+
+	for i := range entries {
+		m := sundayOrdinalRe.FindStringSubmatch(entries[i].Occasion)
+		if m == nil {
+			continue
+		}
+		evangelist := m[2]
+		a := anchors[evangelist]
+		d, err := time.Parse("2006-01-02", entries[i].Date)
+		if err != nil {
+			continue
+		}
+		weeksApart := int(d.Sub(a.date).Hours()) / (24 * 7)
+		word := sundayOrdinalWord(a.num + weeksApart)
+		if word == "" {
+			continue
+		}
+		corrected := word + " söndagen i " + evangelist
+		if corrected != entries[i].Occasion {
+			log.Printf("Gomos: correcting Sunday ordinal %q -> %q for %s", entries[i].Occasion, corrected, entries[i].Date)
+			entries[i].Occasion = corrected
+		}
+	}
+}
+
+// Cleopas is the Archbishop of Sweden. Across translation runs from April to August 2026,
+// the model has repeatedly mistransliterated his name as "Kleopas" (the natural Greek→Swedish
+// K-transliteration) regardless of what the prompt says at the time — it has done this even
+// when the prompt's own examples spelled it correctly. The regex only matches when the
+// captured name is already a recognized variant of his name, so it corrects known
+// mistransliterations and honorific-class slips (e.g. "Nåd" instead of "Eminens Ärkebiskop")
+// without blindly overwriting a name it hasn't verified.
+var cleopasHonorificRe = regexp.MustCompile(`Hans (?:Eminens|Nåd|Högvördighet)(?: Ärkebiskop)? (?:Cleopas|Kleopas) av Sverige`)
+
+// fixArchbishopTitle corrects known mistransliterations and honorific-class errors for
+// Archbishop Cleopas and Bishop Bartholomaios — both known, fixed facts that the translation
+// model occasionally garbles.
+func fixArchbishopTitle(entries []vision.ScheduleEntry) {
+	for i := range entries {
+		entries[i].ServiceName = cleopasHonorificRe.ReplaceAllString(entries[i].ServiceName, "Hans Eminens Ärkebiskop Cleopas av Sverige")
+		entries[i].ServiceName = bartholomaiosHonorificRe.ReplaceAllString(entries[i].ServiceName, "Hans Nåd Bartholomaios av Elaia")
+	}
+}
+
+// Bartholomaios is the (titular) Bishop of Elaia. Symmetric with Cleopas above: only
+// recognized name variants (including the Latinized forms the prompt already warns
+// against) get corrected, not any arbitrary name styled "av Elaia".
+var bartholomaiosHonorificRe = regexp.MustCompile(`Hans (?:Eminens|Nåd|Högvördighet)(?: Biskop| Ärkebiskop)? (?:Bartholomaios|Bartholomeus|Bartholomew) av Elaia`)
 
 // langPriority returns a priority for the given language string (lower = preferred).
 // Swedish = 0, English = 1, anything else (e.g. Greek) = 2.
