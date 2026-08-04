@@ -314,7 +314,7 @@ Swedish compound words:
 
 Capitalization:
 - Service names: capitalize only the first word and proper nouns
-  Correct: "Gudomlig Liturgi", "Stora kompletoriet", "Akathist till Guds moder", "Stora sena kvällsgudstjänsten"
+  Correct: "Gudomlig Liturgi", "Stora kompletoriet", "Akatist till Guds moder", "Stora sena kvällsgudstjänsten"
   Wrong:   "gudomlig liturgi", "Stora Kompletoriet"
 - Honorifics: capitalize "Hans Eminens", "Hans Nåd", "Ärkebiskop", "Biskop" when used as a title
 - "Guds moder" — both words capitalized (it is a proper title)
@@ -331,7 +331,9 @@ Service name examples:
 - "Great Vespers" / "Μέγας Εσπερινός" → "Stora aftongudstjänsten"
 - "Great Compline" / "Μέγα Απόδειπνο" → "Stora kompletoriet"
 - "Great Compline with the Canon of St. Andrew" → "Stora kompletoriet med den heliga Andreasakanonen"
-- "Akathist to the Theotokos - Fourth Salutation" → "Akathist till Guds moder - Fjärde hälsningen"
+- "Akathist to the Theotokos - Fourth Salutation" → "Akatist till Guds moder - Fjärde hälsningen"
+- "Ακολουθία Παρακλήσεως" / "Paraklesis" / "Service of Paraklesis to the Theotokos" → "Paraklesis till Guds moder" (do NOT prefix with "Akoluthia" — "Paraklesis" already implies it is a service; "Ακολουθία" here just means "service/office" and is redundant in Swedish)
+- "Μικρή Παράκληση" / "Small Paraklesis" → "Lilla Paraklesis till Guds moder"; "Μεγάλη Παράκληση" / "Great Paraklesis" → "Stora Paraklesis till Guds moder"
 - "Lamentations Service (Epitaphios)" / "Ακολουθία Επιταφίου" → "Sorgeropens gudstjänst (Epitaphios)"
 - "Service of the Holy Passion" → "De tolv evangelieläsningarna"
 - "Royal Hours" → "Kungliga tidebönerna"
@@ -456,7 +458,7 @@ Examples:
 - "Liturgi" → "Gudomlig Liturgi"
 - "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Gudomlig Liturgi"
 - "Hierarkisk gemensam gudstjänst, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Gemensam Liturgi"
-- "Akathist till Guds moder - Andra hälsningen, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Akathist"
+- "Akatist till Guds moder - Andra hälsningen, med Hans Eminens Ärkebiskop Cleopas av Sverige" → "Akatist"
 - "Stora bönetimmarna och vesper med basiliusliturgi" → "Bönetimmar"
 - "Kungliga tidebönerna och vesper för avtagandet från korset" → "Kungliga tidebönerna"
 - "Morgongudstjänst" → "Morgongudstjänst"
