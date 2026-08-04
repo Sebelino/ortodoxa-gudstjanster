@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -168,7 +169,9 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 		groups[month].items = append(groups[month].items, r)
 	}
 
-	// Step 3: For each month group, prefer Swedish > English > other (Greek fallback)
+	// Step 3: For each month group, prefer Swedish > English > other (Greek fallback).
+	// Among same-priority candidates, prefer the one with more entries — a partial
+	// OCR read of one photo should not silently win over a complete read of another.
 	var allServices []model.ChurchService
 	for _, month := range order {
 		g := groups[month]
@@ -176,7 +179,8 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 		chosen := g.items[0]
 		chosenPriority := langPriority(chosen.language)
 		for _, item := range g.items[1:] {
-			if p := langPriority(item.language); p < chosenPriority {
+			p := langPriority(item.language)
+			if p < chosenPriority || (p == chosenPriority && len(item.entries) > len(chosen.entries)) {
 				chosen = item
 				chosenPriority = p
 			}
@@ -438,11 +442,46 @@ func (s *GomosScraper) extractImageURLs(ctx context.Context, postURL string) ([]
 			return
 		}
 		if strings.Contains(src, ".jpg") || strings.Contains(src, ".png") || strings.Contains(src, ".jpeg") {
+			// WordPress sets src to a resized display copy and lists the full
+			// range of sizes (including the full-resolution original) in
+			// srcset. A compressed/resized copy is more likely to lose fine
+			// detail — like the numeral suffixes on Greek ordinals — under
+			// OCR, so prefer the largest available variant when present.
+			if best := largestSrcsetURL(sel); best != "" {
+				src = best
+			}
 			urls = append(urls, src)
 		}
 	})
 
 	return urls, nil
+}
+
+// largestSrcsetURL returns the URL of the widest image in an img tag's srcset
+// attribute (format: "url1 100w, url2 200w, ..."), or "" if absent/unparseable.
+func largestSrcsetURL(sel *goquery.Selection) string {
+	srcset, exists := sel.Attr("srcset")
+	if !exists {
+		return ""
+	}
+
+	var bestURL string
+	bestWidth := -1
+	for _, candidate := range strings.Split(srcset, ",") {
+		fields := strings.Fields(strings.TrimSpace(candidate))
+		if len(fields) != 2 || !strings.HasSuffix(fields[1], "w") {
+			continue
+		}
+		width, err := strconv.Atoi(strings.TrimSuffix(fields[1], "w"))
+		if err != nil {
+			continue
+		}
+		if width > bestWidth {
+			bestWidth = width
+			bestURL = fields[0]
+		}
+	}
+	return bestURL
 }
 
 func (s *GomosScraper) downloadImage(ctx context.Context, imageURL string) ([]byte, error) {
