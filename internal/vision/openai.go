@@ -104,6 +104,7 @@ Return a JSON object with these fields:
 
 Only include entries that have both a date/day and a time specified. Note that NOTERING/NOTE entries also have times — the time typically appears right-aligned at the end of the last line of wrapped text (e.g., after a closing parenthesis).
 IMPORTANT: Double-check that you have not skipped any date sections or services. The output should cover the ENTIRE schedule from first date to last date. Count the number of date headers you found and verify none were skipped. Verify that no entry has time 00:00 unless it genuinely says midnight.
+IMPORTANT: Greek occasion headers often use alphabetic (acrophonic) ordinal numerals, e.g. "Θ' ΜΑΤΘΑΙΟΥ" (9th Sunday of Matthew), "Ι' ΜΑΤΘΑΙΟΥ" (10th), "ΙΑ' ΜΑΤΘΑΙΟΥ" (11th), "ΙΒ' ΜΑΤΘΑΙΟΥ" (12th), "ΙΓ' ΜΑΤΘΑΙΟΥ" (13th). Β (beta) and Γ (gamma) are easy to misread in these compounds — look carefully and verify each Ι-prefixed ordinal letter-by-letter against the image before transcribing it; consecutive Sunday entries should form a consistent increasing sequence.
 Return ONLY the JSON object, no other text.`, currentYear)
 
 	reqBody := map[string]interface{}{
@@ -296,6 +297,11 @@ Today is %s.
 
 TRANSLATION RULES:
 
+FIXED STRING OVERRIDE (highest priority — apply before any other rule below):
+- Whenever an input occasion contains "ΦΑΝΟΥΡΙΟΥ" (in any form, e.g. "ΑΓ. ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ ΦΑΝΟΥΡΙΟΥ"), output the occasion as EXACTLY the literal string: Den helige storemartyr Fanourios
+  Copy that string character for character. Saint Fanourios is historically and unambiguously male. Do not reason about gender from the abbreviation "ΑΓ." or from anything else — this override wins regardless. Do not output "heliga", "storemartyrinna", "storemartyrinnan", "Phanourios", "Frånuris", or brackets around the name.
+- Whenever you write the Archbishop's name, spell it EXACTLY "Cleopas" — with a C, never "Kleopas" with a K. This is the established spelling used throughout this site, overriding the K-transliteration you would otherwise default to for a Greek name like this (compare Konstantin, Kyrillos).
+
 Clergy titles — use these official Swedish forms:
 - Archbishop / Αρχιεπίσκοπος / Ärkebishop → "Hans Eminens Ärkebiskop [Name]"
 - Metropolitan / Μητροπολίτης (Σεβ. Μητροπολίτης) → "Hans Eminens Ärkebiskop [Name]" (the Swedish metropolis uses "Ärkebiskop" as the Swedish title for the Metropolitan)
@@ -320,8 +326,8 @@ Capitalization:
 - "Guds moder" — both words capitalized (it is a proper title)
 
 Service name examples:
-- "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Nåd Bartholomaios av Elaia")
-- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Hierarchical Synlitourgon" → "Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Gudomlig Liturgi, med Hans Eminens Cleopas av Sverige")
+- "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" / abbreviated "Αρχ. Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Nåd Bartholomaios av Elaia"). The abbreviation "Αρχ." here is short for "Αρχιερατική" (Hierarchical) — do NOT confuse it with "Αρχιμανδρίτου" (Archimandrite); never prefix the service name itself with "Arkimandrit"
+- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Hierarchical Synlitourgon" → "Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
 - "Divine Liturgy" / "Θεία Λειτουργία" → "Gudomlig Liturgi"
 - "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
 - "Sermon" / "Homily" / "Κήρυγμα" / "Ομιλία" / "Divine Proclamation" / "Gudomligt förkunnande" → "Predikan" (always use "Predikan", never "Gudomligt förkunnande"; include the preacher: "Predikan av Arkimandrit Bartholomaios")
@@ -346,11 +352,18 @@ Service name examples:
 Greek saint titles and occasions:
 - Female great martyrs: "ΑΓΙΑΣ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" → "Den heliga storemartyrinna [Name]" (NEVER "storsjälen" — that is not a recognized Orthodox Swedish term)
 - Male great martyrs: "ΑΓΙΟΥ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" / "Holy Great Martyr [Name]" → "Den helige storemartyr [Name]"
+  Abbreviated "ΑΓ." is gender-ambiguous by itself; resolve it from the name. Exact example: "ΑΓ. ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ ΦΑΝΟΥΡΙΟΥ" → "Den helige storemartyr Fanourios" (Fanourios is male — output exactly this string, no brackets, no "heliga")
 - Sunday ordinals in the post-Pentecost Matthew/Luke lectionary cycle: Greek ordinal + evangelist name → "[Swedish ordinal] söndagen i [evangelist]"
-  Examples: "Β΄ ΜΑΤΘΑΙΟΥ" → "Andra söndagen i Matteus", "Ε΄ ΜΑΤΘΑΙΟΥ" → "Femte söndagen i Matteus", "Η΄ ΜΑΤΘΑΙΟΥ" → "Åttonde söndagen i Matteus"
+  Greek alphabetic ordinals: Α΄=1(Första), Β΄=2(Andra), Γ΄=3(Tredje), Δ΄=4(Fjärde), Ε΄=5(Femte), ΣΤ΄=6(Sjätte), Ζ΄=7(Sjunde), Η΄=8(Åttonde), Θ΄=9(Nionde), Ι΄=10(Tionde), ΙΑ΄=11(Elfte), ΙΒ΄=12(Tolfte), ΙΓ΄=13(Trettonde), ΙΔ΄=14(Fjortonde), ΙΕ΄=15(Femtonde), ΙΣΤ΄=16(Sextonde), ΙΖ΄=17(Sjuttonde)
+  Examples: "Β΄ ΜΑΤΘΑΙΟΥ" → "Andra söndagen i Matteus", "Θ΄ ΜΑΤΘΑΙΟΥ" → "Nionde söndagen i Matteus", "ΙΑ΄ ΜΑΤΘΑΙΟΥ" → "Elfte söndagen i Matteus", "ΙΓ΄ ΜΑΤΘΑΙΟΥ" → "Trettonde söndagen i Matteus"
   Similarly: ΛΟΥΚΑ → "Lukas", ΜΑΡΚΟΥ → "Markus", ΙΩΑΝΝΟΥ → "Johannes"
 - "Σύναξις" (Synaxis) → "synaxis" (NOT "samling" or "gathering"): "Σύναξις των Αγίων Δώδεκα Αποστόλων" → "De tolv apostlarnas synaxis"
 - "Γενέθλιον του Προδρόμου" / "Nativity of the Forerunner" → "Johannes Döparens födelse" (always include "Johannes")
+- "Μεταμόρφωσις (του Σωτήρος)" / "Transfiguration (of the Savior)" → "Kristi Förklaring" (NEVER "Förvandling" — that is not the established Swedish Orthodox term; the Russian parish in Stockholm is itself named after this feast, "Kristi Förklarings Ortodoxa Församling")
+  Example: "Η ΜΕΤΑΜΟΡΦΩΣΙΣ ΤΟΥ ΣΩΤΗΡΟΣ ΧΡΙΣΤΟΥ" → "Kristi Förklaring"; "Εσπερινός της Μεταμορφώσεως" → "Vesper för Kristi Förklaring"
+- "Αποτομή (της Τιμίας Κεφαλής) του Προδρόμου/Ιωάννου Προδρόμου" / "Beheading of the Forerunner" → "Johannes Döparens halshuggning" (do NOT translate word-for-word as "avskärande av huvudet")
+- "Απόδοσις (της εορτής) [feast]" / "Leave-taking/Apodosis (of the feast) of [feast]" → "Avslutningen av högtiden [feast]" (do NOT translate literally as "återgivande"/"återinförsel" — those mean "restoration"/"reintroduction" and are wrong here)
+  Example: "ΑΠΟΔΟΣΙΣ ΤΗΣ ΕΟΡΤΗΣ ΤΗΣ ΚΟΙΜΗΣΕΩΣ ΤΗΣ Υ. ΘΕΟΤΟΚΟΥ" → "Avslutningen av högtiden för Guds moders insomnande"
 - Greek saint names appear in genitive case — always convert to nominative form: ΜΑΡΙΝΗΣ → "Marina" (NOT "Marinis"), ΠΑΡΑΣΚΕΥΗΣ → "Paraskevi", ΓΕΩΡΓΙΟΥ → "Georgios", ΔΗΜΗΤΡΙΟΥ → "Dimitrios", etc.
 - Ecumenical councils: "ΑΓΙΩΝ ΠΑΤΕΡΩΝ [ordinal] ΟΙΚΟΥΜΕΝΙΚΗΣ ΣΥΝΟΔΟΥ" → "De heliga fäderna vid det [ordinal] ekumeniska rådet" (use "rådet" or "konciliet", NEVER "fädernas")
 
