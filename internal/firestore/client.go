@@ -296,6 +296,9 @@ func serviceToMap(svc model.ChurchService, scraperName string, batchID string) m
 	if svc.EndTime != nil {
 		m["end_time"] = svc.EndTime.Format(time.RFC3339)
 	}
+	if svc.Correction != nil {
+		m["correction"] = *svc.Correction
+	}
 	return m
 }
 
@@ -357,6 +360,9 @@ func mapToService(m map[string]interface{}) (model.ChurchService, error) {
 	if v, ok := m["event_language"].(string); ok {
 		svc.EventLanguage = &v
 	}
+	if v, ok := m["correction"].(string); ok {
+		svc.Correction = &v
+	}
 	if v, ok := m["start_time"].(string); ok {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			svc.StartTime = &t
@@ -369,6 +375,29 @@ func mapToService(m map[string]interface{}) (model.ChurchService, error) {
 	}
 
 	return svc, nil
+}
+
+const correctionsCollection = "corrections"
+
+// GetCorrections retrieves all corrections from Firestore.
+func (c *Client) GetCorrections(ctx context.Context) ([]model.Correction, error) {
+	var corrections []model.Correction
+	iter := c.client.Collection(correctionsCollection).Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("iterating corrections: %w", err)
+		}
+		var corr model.Correction
+		if err := doc.DataTo(&corr); err != nil {
+			return nil, fmt.Errorf("parsing correction %s: %w", doc.Ref.ID, err)
+		}
+		corrections = append(corrections, corr)
+	}
+	return corrections, nil
 }
 
 const parishCollection = "parishes"

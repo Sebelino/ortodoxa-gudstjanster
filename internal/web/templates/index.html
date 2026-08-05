@@ -1035,6 +1035,9 @@
             if (service.notes) {
                 details += `<div class="detail-item"><span class="detail-label">Notering:</span> ${escapeHtml(service.notes)}</div>`;
             }
+            if (service.correction) {
+                details += `<div class="detail-item"><span class="detail-label">Korrigering:</span> ${escapeHtml(service.correction)}</div>`;
+            }
             if (service.source_url) {
                 details += `<div class="detail-item"><span class="detail-label">Källa:</span> <a href="${escapeHtml(service.source_url)}" target="_blank" rel="noopener">${escapeHtml(service.source)}</a></div>`;
             } else if (service.source) {

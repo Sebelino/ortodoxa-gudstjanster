@@ -22,4 +22,5 @@ type ChurchService struct {
 	Language       *string    `json:"language,omitempty"`
 	ParishLanguage *string    `json:"parish_language,omitempty"`
 	EventLanguage  *string    `json:"event_language,omitempty"`
+	Correction     *string    `json:"correction,omitempty"`
 }

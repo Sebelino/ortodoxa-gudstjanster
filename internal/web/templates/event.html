@@ -158,6 +158,12 @@
                     <div class="info-value">{{.Notes}}</div>
                 </div>
                 {{end}}
+                {{if .Correction}}
+                <div class="info-row">
+                    <div class="info-label">Korrigering</div>
+                    <div class="info-value">{{.Correction}}</div>
+                </div>
+                {{end}}
                 <div class="info-row">
                     <div class="info-label">Källa</div>
                     <div class="info-value">{{if .SourceURL}}<a href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Source}}</a>{{else}}{{.Source}}{{end}}</div>

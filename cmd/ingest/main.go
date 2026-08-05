@@ -226,6 +226,15 @@ registry.Register(scraper.NewGCalendarScraper())
 		}
 	}
 
+	// Apply corrections from Firestore
+	corrections, corrErr := fsClient.GetCorrections(ctx)
+	if corrErr != nil {
+		log.Printf("WARNING: failed to load corrections: %v", corrErr)
+	} else if len(corrections) > 0 {
+		applied := applyCorrections(accepted, corrections)
+		log.Printf("Corrections: %d loaded, %d applied", len(corrections), applied)
+	}
+
 	// Title generation: collect unique service names, look up cache, call AI for uncached
 	titleMap := generateTitles(ctx, accepted, visionClient, gcsStore)
 
@@ -714,6 +723,38 @@ func resolveParishFields(svc *model.ChurchService, scraperName string, slugToPar
 	}
 
 	return unknown
+}
+
+// applyCorrections matches corrections to scraped services and overrides fields.
+// Corrections match on parish_slug + date + time.
+func applyCorrections(accepted []acceptedResult, corrections []model.Correction) int {
+	type corrKey struct{ slug, date, time string }
+	lookup := make(map[corrKey]model.Correction)
+	for _, c := range corrections {
+		lookup[corrKey{c.ParishSlug, c.Date, c.OriginalTime}] = c
+	}
+
+	applied := 0
+	for _, result := range accepted {
+		for i := range result.services {
+			svc := &result.services[i]
+			timeStr := ""
+			if svc.Time != nil {
+				timeStr = *svc.Time
+			}
+			corr, ok := lookup[corrKey{svc.ParishSlug, svc.Date, timeStr}]
+			if !ok {
+				continue
+			}
+			if corr.Time != "" {
+				svc.Time = &corr.Time
+			}
+			svc.Correction = &corr.Reason
+			applied++
+			log.Printf("Applied correction to %s %s %s: %s", svc.ParishSlug, svc.Date, timeStr, corr.Reason)
+		}
+	}
+	return applied
 }
 
 // buildParishLanguage joins primary and secondary languages into a single display string.

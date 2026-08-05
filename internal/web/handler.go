@@ -1094,6 +1094,7 @@ func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
 		Notes       string
 		Source      string
 		SourceURL   string
+		Correction  string
 	}{
 		ServiceName: svc.ServiceName,
 		Title:       svc.Title,
@@ -1117,6 +1118,9 @@ func (h *Handler) handleEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	if svc.Notes != nil {
 		data.Notes = *svc.Notes
+	}
+	if svc.Correction != nil {
+		data.Correction = *svc.Correction
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
