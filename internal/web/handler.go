@@ -22,6 +22,9 @@ import (
 //go:embed templates/*
 var templates embed.FS
 
+//go:embed static/*
+var static embed.FS
+
 // ServiceFetcher is an interface for fetching church services.
 type ServiceFetcher interface {
 	GetAllServices(ctx context.Context) ([]model.ChurchService, error)
@@ -143,6 +146,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/sw.js", h.handleServiceWorker)
 	mux.HandleFunc("/calendar", h.handleCalendar)
 	mux.HandleFunc("/about", h.handleAbout)
+	mux.HandleFunc("/byzantine-time", h.handleByzantineTime)
+	mux.HandleFunc("/eagle.png", h.handleEagle)
 	mux.HandleFunc("/privacy", h.handlePrivacy)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
 	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
@@ -1216,6 +1221,27 @@ func (h *Handler) handleAbout(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmpl.Execute(w, nil)
+}
+
+func (h *Handler) handleByzantineTime(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := parseWithTheme("byzantine.html")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl.Execute(w, nil)
+}
+
+func (h *Handler) handleEagle(w http.ResponseWriter, r *http.Request) {
+	data, err := static.ReadFile("static/eagle.png")
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(data)
 }
 
 func (h *Handler) handlePrivacy(w http.ResponseWriter, r *http.Request) {

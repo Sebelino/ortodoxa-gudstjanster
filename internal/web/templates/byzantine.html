@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bysantinsk tid – Ortodoxa Gudstjänster</title>
+    <meta name="description" content="Bysantinsk klocka med liturgiska tider baserat på solens gång.">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        {{template "theme-css" .}}
+        {{template "layout-css" .}}
+
+        main {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .byz-card {
+            background: var(--surface);
+            border-radius: 6px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            margin-bottom: 1rem;
+        }
+
+        .byz-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .byz-prayer {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .clock-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto 1rem;
+        }
+
+        @media (min-width: 500px) {
+            .clock-container {
+                width: 400px;
+                height: 400px;
+            }
+        }
+
+        .clock-container canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .byz-year {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin: 0.75rem 0;
+        }
+
+        .byz-year strong {
+            display: block;
+            font-size: 1.2rem;
+            color: var(--text);
+            margin-bottom: 0.15rem;
+        }
+
+        .byz-info {
+            font-size: 0.85rem;
+            color: var(--text-label);
+            line-height: 1.6;
+        }
+
+        .byz-info-row {
+            display: flex;
+            justify-content: space-between;
+            max-width: 300px;
+            margin: 0 auto;
+            padding: 0.15rem 0;
+        }
+
+        .byz-info-label {
+            color: var(--text-label);
+        }
+
+        .byz-info-value {
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .byz-hour-length {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-top: 0.75rem;
+            color: var(--text);
+        }
+
+        .cta {
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .cta a {
+            display: inline-block;
+            background: var(--btn);
+            color: white;
+            padding: 0.5rem 1.25rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .cta a:hover {
+            background: var(--btn-hover);
+        }
+    </style>
+    {{template "theme-flash" .}}
+</head>
+<body>
+    {{template "site-header" .}}
+    {{template "site-navbar" .}}
+
+    <main>
+        <div class="byz-card">
+            <div class="byz-title">BYSANTINSK TID</div>
+            <div class="byz-prayer" id="current-prayer">Laddar…</div>
+
+            <div class="clock-container">
+                <canvas id="byz-clock" width="800" height="800"></canvas>
+            </div>
+
+            <div class="byz-year" id="byz-year"></div>
+
+            <div class="byz-info" id="byz-info"></div>
+
+            <div class="byz-hour-length" id="byz-hour-length"></div>
+        </div>
+
+        <div class="cta">
+            <a href="/">Tillbaka till alla gudstjänster</a>
+        </div>
+    </main>
+    {{template "site-footer-html" .}}
+    {{template "theme-js" .}}
+
+    <script>
+    (function() {
+        // Stockholm coordinates
+        const LAT = 59.3293;
+        const LNG = 18.0686;
+
+        // Calculate sunrise and sunset using a simplified solar calculation
+        function sunTimes(date, lat, lng) {
+            const rad = Math.PI / 180;
+            const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
+
+            // Solar declination
+            const declination = -23.45 * Math.cos(rad * 360 / 365 * (dayOfYear + 10));
+
+            // Equation of time (minutes)
+            const B = rad * 360 / 365 * (dayOfYear - 81);
+            const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+
+            // Hour angle
+            const cosH = (Math.sin(-0.833 * rad) - Math.sin(lat * rad) * Math.sin(declination * rad))
+                       / (Math.cos(lat * rad) * Math.cos(declination * rad));
+
+            if (cosH > 1) return { sunrise: 6, sunset: 18 }; // polar night approximation
+            if (cosH < -1) return { sunrise: 0, sunset: 24 }; // midnight sun approximation
+
+            const H = Math.acos(cosH) / rad;
+
+            // Solar noon in hours (UTC)
+            const solarNoon = 12 - lng / 15 - eot / 60;
+
+            // Get timezone offset in hours
+            const tzOffset = -date.getTimezoneOffset() / 60;
+
+            const sunrise = solarNoon - H / 15 + tzOffset;
+            const sunset = solarNoon + H / 15 + tzOffset;
+
+            return { sunrise, sunset, eot, solarNoon: solarNoon + tzOffset };
+        }
+
+        // Byzantine hour: 12 hours from sunrise (day) and 12 hours from sunset (night)
+        function byzantineTime(now, sunrise, sunset) {
+            const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+
+            let isDay, hourInPeriod, hourLength;
+
+            if (currentHour >= sunrise && currentHour < sunset) {
+                // Daytime
+                isDay = true;
+                const dayLength = sunset - sunrise;
+                hourLength = dayLength / 12;
+                hourInPeriod = (currentHour - sunrise) / hourLength;
+            } else {
+                // Nighttime
+                isDay = false;
+                let nightLength;
+                if (currentHour >= sunset) {
+                    nightLength = 24 - sunset + sunrise;
+                    hourInPeriod = (currentHour - sunset) / (nightLength / 12);
+                } else {
+                    nightLength = 24 - sunset + sunrise;
+                    hourInPeriod = (currentHour + 24 - sunset) / (nightLength / 12);
+                }
+                hourLength = nightLength / 12;
+            }
+
+            const byzHour = Math.floor(hourInPeriod) + 1; // 1-12
+            const byzMinute = Math.floor((hourInPeriod - Math.floor(hourInPeriod)) * 60);
+            const byzSecond = Math.floor(((hourInPeriod - Math.floor(hourInPeriod)) * 60 - byzMinute) * 60);
+
+            return { byzHour, byzMinute, byzSecond, isDay, hourLength, hourInPeriod };
+        }
+
+        // Liturgical hour labels
+        // Day quadrants (from sunrise): 1st Hour (1-3), 3rd Hour (4-6), 6th Hour (7-9), 9th Hour (10-12)
+        // Night quadrants (from sunset): Vespers (1-3), Compline (4-6), Nocturnes (7-9), Matins (10-12)
+        function liturgicalHour(byzHour, isDay) {
+            if (isDay) {
+                if (byzHour <= 3) return { name: 'Första timmen', quarter: 0 };
+                if (byzHour <= 6) return { name: 'Tredje timmen', quarter: 1 };
+                if (byzHour <= 9) return { name: 'Sjätte timmen', quarter: 2 };
+                return { name: 'Nionde timmen', quarter: 3 };
+            } else {
+                if (byzHour <= 3) return { name: 'Vesper', quarter: 0 };
+                if (byzHour <= 6) return { name: 'Kompletorium', quarter: 1 };
+                if (byzHour <= 9) return { name: 'Nattgudstjänst', quarter: 2 };
+                return { name: 'Morgongudstjänst', quarter: 3 };
+            }
+        }
+
+        // Watch labels for the quadrants
+        const dayLabels = ['1:A TIMMEN', '3:E TIMMEN', '6:E TIMMEN', '9:E TIMMEN'];
+        const nightLabels = ['VESPER', 'KOMPLETORIUM', 'NATTGUDSTJÄNST', 'MORGON\u00ADGUDSTJÄNST'];
+        const watchLabels = ['I VAKT', 'II VAKT', 'III VAKT', 'IV VAKT'];
+
+        // Byzantine year: years since creation of the world (5509 BC before Sep 1, 5508 after)
+        function byzantineYear(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth(); // 0-based
+            // Byzantine new year is September 1
+            if (month >= 8) { // Sep or later
+                return year + 5509;
+            }
+            return year + 5508;
+        }
+
+        function formatTime(h, m, s) {
+            return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        }
+
+        function decimalToHMS(decimal) {
+            const totalSeconds = Math.floor(decimal * 3600);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            return { h, m, s };
+        }
+
+        // Detect dark mode
+        function isDark() {
+            const theme = document.documentElement.getAttribute('data-theme');
+            if (theme === 'dark') return true;
+            if (theme === 'light') return false;
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+
+        function drawClock() {
+            const canvas = document.getElementById('byz-clock');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const r = w * 0.42;
+
+            const now = new Date();
+            const sun = sunTimes(now, LAT, LNG);
+            const byz = byzantineTime(now, sun.sunrise, sun.sunset);
+            const lit = liturgicalHour(byz.byzHour, byz.isDay);
+
+            const dark = isDark();
+            const textColor = dark ? '#e2e8f0' : '#333';
+            const mutedColor = dark ? '#94a3b8' : '#666';
+            const lineColor = dark ? '#334155' : '#ccc';
+            const bgColor = dark ? '#1e293b' : '#ffffff';
+            const dayBg = dark ? '#1e3a5f' : '#e8e8e8';
+            const nightBg = dark ? '#0f172a' : '#d0d0d0';
+            const accentColor = dark ? '#f87171' : '#e07070';
+            const handColor = dark ? '#e2e8f0' : '#222';
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw quadrant backgrounds
+            // Top-right = night (Vespers/Compline), Bottom-right = night (Nocturnes/Matins)
+            // Bottom-left = day (1st/3rd Hour), Top-left = day (6th/9th Hour)
+            for (let q = 0; q < 4; q++) {
+                const startAngle = -Math.PI / 2 + q * Math.PI / 2;
+                const endAngle = startAngle + Math.PI / 2;
+
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, r * 1.08, startAngle, endAngle);
+                ctx.closePath();
+                const isDayQuadrant = (q === 2 || q === 3); // bottom-left and top-left
+                ctx.fillStyle = isDayQuadrant ? dayBg : nightBg;
+                ctx.fill();
+            }
+
+            // Draw quadrant dividing lines
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - r * 1.08);
+            ctx.lineTo(cx, cy + r * 1.08);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx - r * 1.08, cy);
+            ctx.lineTo(cx + r * 1.08, cy);
+            ctx.stroke();
+
+            // Quadrant labels (outside the clock)
+            ctx.font = 'bold ' + (w * 0.028) + 'px sans-serif';
+            ctx.fillStyle = textColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Top: 9th Hour (left), Vespers (right)
+            ctx.fillText(dayLabels[3], cx - r * 0.55, cy - r * 1.18);
+            ctx.fillText(nightLabels[0], cx + r * 0.55, cy - r * 1.18);
+            // Bottom: 1st Hour (left), Matins (right)
+            ctx.fillText(dayLabels[0], cx - r * 0.55, cy + r * 1.25);
+            ctx.fillText(nightLabels[3], cx + r * 0.55, cy + r * 1.25);
+            // Left: 3rd Hour (rotated)
+            ctx.save();
+            ctx.translate(cx - r * 1.22, cy);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText(dayLabels[1], 0, 0);
+            ctx.restore();
+            // Right: Nocturnes (rotated) -- shorter label variant
+            ctx.save();
+            ctx.translate(cx + r * 1.22, cy);
+            ctx.rotate(Math.PI / 2);
+            ctx.fillText(nightLabels[2], 0, 0);
+            ctx.restore();
+            // Left side secondary labels (6th Hour, Compline)
+            ctx.font = 'bold ' + (w * 0.022) + 'px sans-serif';
+            ctx.fillText(dayLabels[2], cx - r * 1.18, cy - r * 0.7);
+            ctx.save();
+            ctx.translate(cx + r * 1.18, cy - r * 0.55);
+            ctx.rotate(Math.PI / 2);
+            ctx.fillText(nightLabels[1], 0, 0);
+            ctx.restore();
+
+            // Watch labels (smaller, inside quadrant edges)
+            ctx.font = (w * 0.018) + 'px sans-serif';
+            ctx.fillStyle = mutedColor;
+            const watchPositions = [
+                { text: watchLabels[3], x: cx - r * 0.28, y: cy - r * 1.02 },
+                { text: watchLabels[0], x: cx + r * 0.28, y: cy - r * 1.02 },
+                { text: watchLabels[0], x: cx - r * 0.28, y: cy + r * 1.1 },
+                { text: watchLabels[3], x: cx + r * 0.28, y: cy + r * 1.1 },
+                { text: watchLabels[2], x: cx - r * 1.04, y: cy - r * 0.28, rot: -Math.PI/2 },
+                { text: watchLabels[1], x: cx - r * 1.04, y: cy + r * 0.28, rot: -Math.PI/2 },
+                { text: watchLabels[1], x: cx + r * 1.04, y: cy - r * 0.28, rot: Math.PI/2 },
+                { text: watchLabels[2], x: cx + r * 1.04, y: cy + r * 0.28, rot: Math.PI/2 },
+            ];
+            for (const wp of watchPositions) {
+                ctx.save();
+                if (wp.rot) {
+                    ctx.translate(wp.x, wp.y);
+                    ctx.rotate(wp.rot);
+                    ctx.fillText(wp.text, 0, 0);
+                } else {
+                    ctx.fillText(wp.text, wp.x, wp.y);
+                }
+                ctx.restore();
+            }
+
+            // Draw outer circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw 24 hour numbers around the clock face
+            // Position 0 (top) = 12, clockwise: 1,2,3,4,5,6(right),7,8,9,10,11,12(bottom),1,2,3,4,5,6(left),7,8,9,10,11
+            // Numbers: [12,1,2,3,4,5,6,7,8,9,10,11,12,1,2,3,4,5,6,7,8,9,10,11]
+            const numbers = [12,1,2,3,4,5,6,7,8,9,10,11,12,1,2,3,4,5,6,7,8,9,10,11];
+            const numR = r * 0.85;
+            const circleR = w * 0.028;
+
+            for (let i = 0; i < 24; i++) {
+                const angle = (i / 24) * Math.PI * 2 - Math.PI / 2;
+                const num = numbers[i];
+                const nx = cx + Math.cos(angle) * numR;
+                const ny = cy + Math.sin(angle) * numR;
+
+                // Tick marks
+                const tickOuterR = r * 0.98;
+                const tickInnerR = r * 0.94;
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(angle) * tickInnerR, cy + Math.sin(angle) * tickInnerR);
+                ctx.lineTo(cx + Math.cos(angle) * tickOuterR, cy + Math.sin(angle) * tickOuterR);
+                ctx.strokeStyle = lineColor;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Highlight canonical hours (3, 6, 9, 12)
+                const isCanonical = (num % 3 === 0);
+
+                if (isCanonical) {
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, circleR, 0, Math.PI * 2);
+                    ctx.fillStyle = accentColor;
+                    ctx.fill();
+                    ctx.font = 'bold ' + (w * 0.028) + 'px sans-serif';
+                    ctx.fillStyle = '#fff';
+                } else {
+                    ctx.font = (w * 0.022) + 'px sans-serif';
+                    ctx.fillStyle = mutedColor;
+                }
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(num, nx, ny);
+            }
+
+            // Draw eagle in center (behind hands)
+            if (eagleImg.complete && eagleImg.naturalWidth > 0) {
+                const eagleSize = r * 0.9;
+                const aspect = eagleImg.naturalHeight / eagleImg.naturalWidth;
+                const ew = eagleSize;
+                const eh = eagleSize * aspect;
+                ctx.globalAlpha = dark ? 0.4 : 0.25;
+                ctx.drawImage(eagleImg, cx - ew / 2, cy - eh / 2, ew, eh);
+                ctx.globalAlpha = 1.0;
+            }
+
+            // The hand position: during the day, hour 1 starts at bottom (position 12 = 12/24),
+            // going clockwise through the left half. During night, hour 1 starts at top (position 0),
+            // going clockwise through the right half.
+            // Day hours 1-12 map to positions 12-23 (bottom half, left side)
+            // Night hours 1-12 map to positions 0-11 (top half, right side)
+            let handPosition;
+            if (byz.isDay) {
+                handPosition = 12 + byz.hourInPeriod; // positions 12-24
+            } else {
+                handPosition = byz.hourInPeriod; // positions 0-12
+            }
+
+            // Draw hour hand
+            const hourAngle = (handPosition / 24) * Math.PI * 2 - Math.PI / 2;
+            const hourHandLen = r * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(hourAngle) * hourHandLen, cy + Math.sin(hourAngle) * hourHandLen);
+            ctx.strokeStyle = handColor;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Draw minute hand
+            const minuteFraction = (byz.byzMinute + byz.byzSecond / 60) / 60;
+            const minuteAngle = minuteFraction * Math.PI * 2 - Math.PI / 2;
+            const minuteHandLen = r * 0.7;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(minuteAngle) * minuteHandLen, cy + Math.sin(minuteAngle) * minuteHandLen);
+            ctx.strokeStyle = handColor;
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Center dot
+            ctx.beginPath();
+            ctx.arc(cx, cy, w * 0.015, 0, Math.PI * 2);
+            ctx.fillStyle = handColor;
+            ctx.fill();
+
+            // Update text elements
+            document.getElementById('current-prayer').textContent =
+                'Nuvarande bön: ' + lit.name;
+
+            const byzYear = byzantineYear(now);
+            document.getElementById('byz-year').innerHTML =
+                '<strong>ÅR ' + byzYear + '</strong>FRÅN VÄRLDENS SKAPELSE';
+
+            const sr = decimalToHMS(sun.sunrise);
+            const ss = decimalToHMS(sun.sunset);
+            const dayLen = sun.sunset - sun.sunrise;
+            const nightLen = 24 - dayLen;
+            const dayHourLen = (dayLen / 12 * 60).toFixed(1);
+            const nightHourLen = (nightLen / 12 * 60).toFixed(1);
+
+            document.getElementById('byz-info').innerHTML =
+                '<div class="byz-info-row"><span class="byz-info-label">Bysantinsk tid:</span><span class="byz-info-value">' +
+                    formatTime(byz.byzHour, byz.byzMinute, byz.byzSecond) + (byz.isDay ? ' (dag)' : ' (natt)') + '</span></div>' +
+                '<div class="byz-info-row"><span class="byz-info-label">Soluppgång:</span><span class="byz-info-value">' +
+                    formatTime(sr.h, sr.m, sr.s) + '</span></div>' +
+                '<div class="byz-info-row"><span class="byz-info-label">Solnedgång:</span><span class="byz-info-value">' +
+                    formatTime(ss.h, ss.m, ss.s) + '</span></div>';
+
+            document.getElementById('byz-hour-length').textContent =
+                (byz.isDay ? 'Dagtimme' : 'Nattimme') + ': ' +
+                (byz.isDay ? dayHourLen : nightHourLen) + ' minuter';
+        }
+
+        // Pre-load eagle image
+        const eagleImg = new Image();
+        eagleImg.src = '/eagle.png';
+        eagleImg.onload = function() { drawClock(); };
+
+        drawClock();
+        setInterval(drawClock, 1000);
+
+        // Redraw on theme change
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawClock);
+    })();
+    </script>
+</body>
+</html>
