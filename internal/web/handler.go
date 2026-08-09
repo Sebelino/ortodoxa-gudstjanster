@@ -148,6 +148,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/about", h.handleAbout)
 	mux.HandleFunc("/byzantine-time", h.handleByzantineTime)
 	mux.HandleFunc("/eagle.png", h.handleEagle)
+	mux.HandleFunc("/static/", h.handleStatic)
 	mux.HandleFunc("/privacy", h.handlePrivacy)
 	mux.HandleFunc("/robots.txt", h.handleRobots)
 	mux.HandleFunc("/sitemap.xml", h.handleSitemap)
@@ -1240,6 +1241,28 @@ func (h *Handler) handleEagle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(data)
+}
+
+var staticContentTypes = map[string]string{
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".svg":  "image/svg+xml",
+}
+
+func (h *Handler) handleStatic(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/")
+	data, err := static.ReadFile(name)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	ext := name[strings.LastIndex(name, "."):]
+	if ct, ok := staticContentTypes[ext]; ok {
+		w.Header().Set("Content-Type", ct)
+	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(data)
 }
