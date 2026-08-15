@@ -1425,3 +1425,83 @@ Text:
 
 	return entries, nil
 }
+
+// IsScheduleImage uses a cheap AI call to determine whether an image contains
+// a church service schedule (dates and times). Returns true if the image looks
+// like a schedule, false otherwise.
+func (c *Client) IsScheduleImage(ctx context.Context, imageData []byte) (bool, error) {
+	imageBase64 := base64.StdEncoding.EncodeToString(imageData)
+
+	mediaType := "image/jpeg"
+	if len(imageData) > 8 && string(imageData[0:8]) == "\x89PNG\r\n\x1a\n" {
+		mediaType = "image/png"
+	}
+
+	reqBody := map[string]interface{}{
+		"model": "gpt-4o-mini",
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": "Does this image contain a church service schedule with dates and times? Answer ONLY 'yes' or 'no'.",
+					},
+					{
+						"type": "image_url",
+						"image_url": map[string]string{
+							"url":    fmt.Sprintf("data:%s;base64,%s", mediaType, imageBase64),
+							"detail": "low",
+						},
+					},
+				},
+			},
+		},
+		"max_tokens": 5,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return false, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", openaiAPIURL, bytes.NewReader(jsonData))
+	if err != nil {
+		return false, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.doRequest(req, "IsScheduleImage", "gpt-4o-mini")
+	if err != nil {
+		return false, fmt.Errorf("API call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return false, fmt.Errorf("parsing response: %w", err)
+	}
+
+	if len(apiResp.Choices) == 0 {
+		return false, fmt.Errorf("no choices in response")
+	}
+
+	answer := strings.ToLower(strings.TrimSpace(apiResp.Choices[0].Message.Content))
+	return strings.Contains(answer, "yes"), nil
+}

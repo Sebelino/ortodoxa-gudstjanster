@@ -233,8 +233,9 @@ func (s *UkrainskaScraper) fetchPost(ctx context.Context, postNum int) (*telegra
 	return post, nil
 }
 
-// findScheduleImages scans the most recent posts for schedule announcements
-// and returns the images from the most recent schedule post.
+// findScheduleImages scans the most recent posts for images and uses AI to
+// determine which ones are schedule images. Results are cached by image
+// checksum so the same image is never classified twice.
 func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost int) ([][]byte, string, error) {
 	start := latestPost
 	end := latestPost - ukrainskaScanCount
@@ -248,38 +249,68 @@ func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost in
 			continue
 		}
 
-		// Look for schedule posts: "розклад богослужінь" (schedule of services)
-		if !strings.Contains(strings.ToLower(post.text), "розклад") {
-			continue
-		}
-
 		if len(post.imageURLs) == 0 {
 			continue
 		}
 
-		log.Printf("Ukrainska: found schedule post %d with %d image(s): %s",
-			postNum, len(post.imageURLs), post.text[:min(80, len(post.text))])
-		s.note("schedule post %d (%s): %d image(s)", postNum, post.datetime, len(post.imageURLs))
-
-		sourceURL := fmt.Sprintf("%s/%d", ukrainskaChannelURL, postNum)
-
-		var images [][]byte
+		// Download and classify each image in this post.
+		var scheduleImages [][]byte
 		for _, imgURL := range post.imageURLs {
 			data, err := fetchURL(ctx, imgURL)
 			if err != nil {
-				log.Printf("Ukrainska: failed to download image: %v", err)
-				s.note("image download failed: %v", err)
+				log.Printf("Ukrainska: failed to download image from post %d: %v", postNum, err)
 				continue
 			}
-			images = append(images, data)
+
+			isSchedule, err := s.isScheduleImage(ctx, data)
+			if err != nil {
+				log.Printf("Ukrainska: classification failed for post %d image: %v", postNum, err)
+				continue
+			}
+			if isSchedule {
+				scheduleImages = append(scheduleImages, data)
+			}
 		}
 
-		if len(images) > 0 {
-			return images, sourceURL, nil
+		if len(scheduleImages) > 0 {
+			sourceURL := fmt.Sprintf("%s/%d", ukrainskaChannelURL, postNum)
+			log.Printf("Ukrainska: found %d schedule image(s) in post %d (%s)",
+				len(scheduleImages), postNum, post.datetime)
+			s.note("schedule post %d (%s): %d schedule image(s)", postNum, post.datetime, len(scheduleImages))
+			return scheduleImages, sourceURL, nil
 		}
 	}
 
-	return nil, "", fmt.Errorf("no schedule post found in last %d posts", ukrainskaScanCount)
+	return nil, "", fmt.Errorf("no schedule images found in last %d posts", ukrainskaScanCount)
+}
+
+// isScheduleImage checks whether an image is a church service schedule, with
+// caching by image checksum to avoid redundant AI calls across ingestion runs.
+func (s *UkrainskaScraper) isScheduleImage(ctx context.Context, imageData []byte) (bool, error) {
+	checksum := computeChecksum(imageData)
+	cacheKey := "ukrainska-classify/v1/" + checksum
+
+	var cached bool
+	if s.store.GetJSON(cacheKey, &cached) {
+		log.Printf("Ukrainska: classification cache hit (checksum %s): %v", checksum[:12], cached)
+		return cached, nil
+	}
+
+	result, err := s.vision.IsScheduleImage(ctx, imageData)
+	if err != nil {
+		return false, err
+	}
+
+	log.Printf("Ukrainska: classified image (checksum %s): schedule=%v", checksum[:12], result)
+
+	// Cache the result.
+	if data, merr := json.Marshal(result); merr == nil {
+		if werr := s.store.SetRaw(cacheKey+".json", data); werr != nil {
+			log.Printf("Ukrainska: failed to cache classification: %v", werr)
+		}
+	}
+
+	return result, nil
 }
 
 // ocrImage extracts schedule entries from an image using the Vision API, with caching.
