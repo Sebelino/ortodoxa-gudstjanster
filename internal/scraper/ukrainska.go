@@ -23,7 +23,7 @@ const (
 	ukrainskaChannelURL = "https://t.me/ukrcerkva_stockholm"
 	ukrainskaLocation   = "Nynäsvägen 3C, 136 47 Haninge"
 	// Number of recent posts to scan for schedule images.
-	ukrainskaScanCount = 30
+	ukrainskaScanCount = 100
 )
 
 // UkrainskaScraper scrapes the Ukrainian Orthodox Church schedule from their
@@ -89,8 +89,11 @@ func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 	return deduped, nil
 }
 
-// findLatestPost uses binary search on Telegram embed pages to find the latest
-// post number in the channel.
+// findLatestPost finds the latest post number in the channel.
+//
+// Telegram channels can have large gaps in post numbering (deleted messages),
+// so a naive binary search fails. Instead we probe exponentially to find a
+// confirmed-valid post, then scan forward in chunks to find the frontier.
 func (s *UkrainskaScraper) findLatestPost(ctx context.Context) (int, error) {
 	isValid := func(n int) (bool, error) {
 		url := fmt.Sprintf("%s/%d?embed=1", ukrainskaChannelURL, n)
@@ -101,35 +104,86 @@ func (s *UkrainskaScraper) findLatestPost(ctx context.Context) (int, error) {
 		return !strings.Contains(string(data), "tgme_widget_message_error"), nil
 	}
 
-	// Find an upper bound.
-	hi := 1000
-	for {
-		valid, err := isValid(hi)
-		if err != nil {
-			return 0, fmt.Errorf("probing post %d: %w", hi, err)
+	// anyValidInRange checks if at least one post exists in [lo, hi].
+	anyValidInRange := func(lo, hi int) (int, bool, error) {
+		// Sample up to 10 evenly-spaced posts in the range.
+		span := hi - lo + 1
+		step := span / 10
+		if step < 1 {
+			step = 1
 		}
-		if !valid {
-			break
+		for n := lo; n <= hi; n += step {
+			valid, err := isValid(n)
+			if err != nil {
+				return 0, false, err
+			}
+			if valid {
+				return n, true, nil
+			}
 		}
-		hi *= 2
+		return 0, false, nil
 	}
 
-	// Binary search.
-	lo := hi / 2
-	for hi-lo > 1 {
-		mid := (lo + hi) / 2
-		valid, err := isValid(mid)
+	// Phase 1: Find a valid post by probing exponentially.
+	probe := 100
+	lastValid := 0
+	for {
+		valid, err := isValid(probe)
 		if err != nil {
-			return 0, fmt.Errorf("probing post %d: %w", mid, err)
+			return 0, fmt.Errorf("probing post %d: %w", probe, err)
 		}
 		if valid {
-			lo = mid
-		} else {
-			hi = mid
+			lastValid = probe
+			probe *= 2
+			continue
+		}
+		// The probe failed — but there might be valid posts beyond a gap.
+		// Check if any post exists in [lastValid+1, probe].
+		if lastValid > 0 {
+			found, ok, err := anyValidInRange(lastValid+1, probe)
+			if err != nil {
+				return 0, err
+			}
+			if ok {
+				lastValid = found
+				probe = found * 2
+				continue
+			}
+		}
+		break
+	}
+
+	if lastValid == 0 {
+		return 0, fmt.Errorf("no valid posts found")
+	}
+
+	// Phase 2: From lastValid, scan forward in chunks of 100 to find the frontier.
+	// Keep going as long as we find at least one valid post in each chunk.
+	frontier := lastValid
+	for {
+		chunkStart := frontier + 1
+		chunkEnd := frontier + 100
+		_, ok, err := anyValidInRange(chunkStart, chunkEnd)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			break
+		}
+		// Find the highest valid post in this chunk by scanning backwards.
+		for n := chunkEnd; n >= chunkStart; n-- {
+			valid, err := isValid(n)
+			if err != nil {
+				return 0, err
+			}
+			if valid {
+				frontier = n
+				break
+			}
 		}
 	}
 
-	return lo, nil
+	return frontier, nil
 }
 
 // telegramPost holds parsed data from a Telegram embed page.
