@@ -144,6 +144,7 @@ registry.Register(scraper.NewGCalendarScraper())
 	registry.Register(scraper.NewGCalendarManualScraper())
 	registry.Register(scraper.NewUppstandelseScraper())
 	registry.Register(scraper.NewRomanianScraper())
+	registry.Register(scraper.NewUkrainskaScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewSommarlagerScraper(gcsStore, visionClient))
 	if uploadReader != nil {
 		uploadParishes := map[string]scraper.UploadParishInfo{
