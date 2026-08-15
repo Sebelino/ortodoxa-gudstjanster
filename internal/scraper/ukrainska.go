@@ -54,6 +54,7 @@ func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 	if err != nil {
 		return nil, fmt.Errorf("finding latest post: %w", err)
 	}
+	log.Printf("Ukrainska: latest post: %d", latestPost)
 	s.note("latest post: %d", latestPost)
 
 	// Step 2: Scan recent posts for schedule images.
@@ -219,16 +220,23 @@ func (s *UkrainskaScraper) fetchPost(ctx context.Context, postNum int) (*telegra
 		post.text = sel.Text()
 	})
 
-	// Extract image URLs from background-image styles.
-	html, _ := doc.Html()
-	for _, match := range tgImageRe.FindAllStringSubmatch(html, -1) {
-		post.imageURLs = append(post.imageURLs, match[1])
-	}
+	// Extract image URLs from background-image styles on photo elements.
+	doc.Find("[style]").Each(func(_ int, sel *goquery.Selection) {
+		style, exists := sel.Attr("style")
+		if !exists {
+			return
+		}
+		for _, match := range tgImageRe.FindAllStringSubmatch(style, -1) {
+			post.imageURLs = append(post.imageURLs, match[1])
+		}
+	})
 
 	// Extract datetime.
-	if match := tgDateRe.FindStringSubmatch(html); len(match) > 1 {
-		post.datetime = match[1]
-	}
+	doc.Find("time[datetime]").Each(func(_ int, sel *goquery.Selection) {
+		if dt, exists := sel.Attr("datetime"); exists && post.datetime == "" {
+			post.datetime = dt
+		}
+	})
 
 	return post, nil
 }
@@ -243,15 +251,22 @@ func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost in
 		end = 1
 	}
 
+	log.Printf("Ukrainska: scanning posts %d to %d for schedule images", start, end)
+
+	postsChecked := 0
+	postsWithImages := 0
 	for postNum := start; postNum >= end; postNum-- {
 		post, err := s.fetchPost(ctx, postNum)
 		if err != nil {
 			continue
 		}
+		postsChecked++
 
 		if len(post.imageURLs) == 0 {
 			continue
 		}
+		postsWithImages++
+		log.Printf("Ukrainska: post %d has %d image(s)", postNum, len(post.imageURLs))
 
 		// Download and classify each image in this post.
 		var scheduleImages [][]byte
@@ -281,6 +296,7 @@ func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost in
 		}
 	}
 
+	log.Printf("Ukrainska: checked %d valid posts, %d had images, none contained schedules", postsChecked, postsWithImages)
 	return nil, "", fmt.Errorf("no schedule images found in last %d posts", ukrainskaScanCount)
 }
 
