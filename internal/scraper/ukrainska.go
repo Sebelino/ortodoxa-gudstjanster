@@ -57,12 +57,15 @@ func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 	log.Printf("Ukrainska: latest post: %d", latestPost)
 	s.note("latest post: %d", latestPost)
 
-	// Step 2: Scan recent posts for schedule images.
-	images, sourceURL, err := s.findScheduleImages(ctx, latestPost)
+	// Step 2: Scan recent posts for schedule images. The channel mixes full
+	// monthly schedules with shorter weekly reminder posts covering the same
+	// slots, so we scan the whole window and merge everything found rather
+	// than stopping at the first match — otherwise a recent reminder post
+	// can permanently shadow a fuller, older schedule post.
+	images, err := s.findScheduleImages(ctx, latestPost)
 	if err != nil {
 		return nil, fmt.Errorf("finding schedule images: %w", err)
 	}
-	s.note("found %d schedule image(s)", len(images))
 
 	if len(images) == 0 {
 		return nil, fmt.Errorf("no schedule images found in recent posts")
@@ -71,13 +74,13 @@ func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 	// Step 3: OCR each image and collect services.
 	var allServices []model.ChurchService
 	for i, img := range images {
-		entries, err := s.ocrImage(ctx, img, fmt.Sprintf("image-%d", i))
+		entries, err := s.ocrImage(ctx, img.data, fmt.Sprintf("image-%d", i))
 		if err != nil {
 			log.Printf("Ukrainska: OCR failed for image %d: %v", i, err)
 			s.note("OCR failed for image %d: %v", i, err)
 			continue
 		}
-		services := s.convertToServices(entries, sourceURL)
+		services := s.convertToServices(entries, img.sourceURL)
 		allServices = append(allServices, services...)
 	}
 
@@ -245,10 +248,23 @@ func (s *UkrainskaScraper) fetchPost(ctx context.Context, postNum int) (*telegra
 	return post, nil
 }
 
+// scheduleImage is a schedule image found in the channel, tagged with the
+// post it came from so extracted entries can be attributed to a source URL.
+type scheduleImage struct {
+	data      []byte
+	sourceURL string
+}
+
 // findScheduleImages scans the most recent posts for images and uses AI to
 // determine which ones are schedule images. Results are cached by image
 // checksum so the same image is never classified twice.
-func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost int) ([][]byte, string, error) {
+//
+// The channel posts both full monthly schedules and shorter weekly reminder
+// posts covering a subset of the same slots. We scan the entire window and
+// return every schedule image found (not just the first), since stopping
+// early can permanently shadow a fuller, older schedule behind a more recent
+// but partial reminder post. Callers deduplicate the resulting entries.
+func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost int) ([]scheduleImage, error) {
 	start := latestPost
 	end := latestPost - ukrainskaScanCount
 	if end < 1 {
@@ -257,8 +273,10 @@ func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost in
 
 	log.Printf("Ukrainska: scanning posts %d to %d for schedule images", start, end)
 
+	var found []scheduleImage
 	postsChecked := 0
 	postsWithImages := 0
+	postsWithSchedules := 0
 	for postNum := start; postNum >= end; postNum-- {
 		post, err := s.fetchPost(ctx, postNum)
 		if err != nil {
@@ -272,8 +290,8 @@ func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost in
 		postsWithImages++
 		log.Printf("Ukrainska: post %d has %d image(s)", postNum, len(post.imageURLs))
 
-		// Download and classify each image in this post.
-		var scheduleImages [][]byte
+		sourceURL := fmt.Sprintf("%s/%d", ukrainskaChannelURL, postNum)
+		postHadSchedule := false
 		for _, imgURL := range post.imageURLs {
 			data, err := fetchURL(ctx, imgURL)
 			if err != nil {
@@ -287,21 +305,24 @@ func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost in
 				continue
 			}
 			if isSchedule {
-				scheduleImages = append(scheduleImages, data)
+				found = append(found, scheduleImage{data: data, sourceURL: sourceURL})
+				postHadSchedule = true
 			}
 		}
-
-		if len(scheduleImages) > 0 {
-			sourceURL := fmt.Sprintf("%s/%d", ukrainskaChannelURL, postNum)
-			log.Printf("Ukrainska: found %d schedule image(s) in post %d (%s)",
-				len(scheduleImages), postNum, post.datetime)
-			s.note("schedule post %d (%s): %d schedule image(s)", postNum, post.datetime, len(scheduleImages))
-			return scheduleImages, sourceURL, nil
+		if postHadSchedule {
+			postsWithSchedules++
+			log.Printf("Ukrainska: post %d (%s) contains schedule image(s)", postNum, post.datetime)
 		}
 	}
 
-	log.Printf("Ukrainska: checked %d valid posts, %d had images, none contained schedules", postsChecked, postsWithImages)
-	return nil, "", fmt.Errorf("no schedule images found in last %d posts", ukrainskaScanCount)
+	log.Printf("Ukrainska: checked %d valid posts, %d had images, %d posts had schedule images, %d schedule image(s) total",
+		postsChecked, postsWithImages, postsWithSchedules, len(found))
+	s.note("scanned %d posts: %d schedule post(s), %d schedule image(s) total", postsChecked, postsWithSchedules, len(found))
+
+	if len(found) == 0 {
+		return nil, fmt.Errorf("no schedule images found in last %d posts", ukrainskaScanCount)
+	}
+	return found, nil
 }
 
 // isScheduleImage checks whether an image is a church service schedule, with
@@ -470,26 +491,40 @@ func (s *UkrainskaScraper) convertToServices(entries []vision.ScheduleEntry, sou
 	return services
 }
 
+// deduplicate collapses services onto the same (date, time) slot. Different
+// posts often describe the same service with different levels of detail
+// (e.g. a terse weekly reminder vs. a fuller monthly schedule), so slots are
+// merged by date+time rather than by exact name text, keeping the more
+// detailed of the two descriptions.
 func (s *UkrainskaScraper) deduplicate(services []model.ChurchService) []model.ChurchService {
 	if len(services) == 0 {
 		return services
 	}
 
-	seen := make(map[string]bool)
-	var result []model.ChurchService
+	best := make(map[string]model.ChurchService)
+	var order []string
 
 	for _, svc := range services {
 		timeStr := ""
 		if svc.Time != nil {
 			timeStr = *svc.Time
 		}
-		normalizedName := strings.ToLower(strings.Join(strings.Fields(svc.ServiceName), " "))
-		key := fmt.Sprintf("%s|%s|%s", svc.Date, timeStr, normalizedName)
+		key := fmt.Sprintf("%s|%s", svc.Date, timeStr)
 
-		if !seen[key] {
-			seen[key] = true
-			result = append(result, svc)
+		existing, ok := best[key]
+		if !ok {
+			best[key] = svc
+			order = append(order, key)
+			continue
 		}
+		if len(svc.ServiceName) > len(existing.ServiceName) {
+			best[key] = svc
+		}
+	}
+
+	result := make([]model.ChurchService, 0, len(order))
+	for _, key := range order {
+		result = append(result, best[key])
 	}
 
 	return result
