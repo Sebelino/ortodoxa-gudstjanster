@@ -338,6 +338,114 @@
 
 {{define "theme-flash"}}<script>(function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>{{end}}
 
+{{define "a2hs-css"}}
+        .a2hs-banner {
+            position: fixed;
+            left: 0.75rem;
+            right: 0.75rem;
+            bottom: 0.75rem;
+            max-width: 480px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px var(--shadow-hover);
+            padding: 0.75rem 2.25rem 0.75rem 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            z-index: 1000;
+            animation: a2hs-slide-up 0.25s ease-out;
+        }
+
+        .a2hs-banner[hidden] { display: none; }
+
+        @keyframes a2hs-slide-up {
+            from { transform: translateY(12px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .a2hs-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .a2hs-text {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+            font-size: 0.8rem;
+            color: var(--text);
+        }
+
+        .a2hs-text strong { font-size: 0.85rem; }
+
+        .a2hs-text span { color: var(--text-muted); }
+
+        .a2hs-share-icon {
+            vertical-align: -2px;
+            color: var(--link);
+        }
+
+        .a2hs-close {
+            position: absolute;
+            top: 0.35rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0.25rem;
+        }
+
+        @media (hover: hover) {
+            .a2hs-close:hover { color: var(--text); }
+        }
+{{end}}
+
+{{define "a2hs-banner"}}
+    <div id="a2hs-banner" class="a2hs-banner" hidden>
+        <button class="a2hs-close" id="a2hs-close" aria-label="Stäng">&times;</button>
+        <img src="/apple-touch-icon.png" alt="" class="a2hs-icon">
+        <div class="a2hs-text">
+            <strong>Lägg till på hemskärmen</strong>
+            <span>Tryck på <svg class="a2hs-share-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M8 7l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg> och sedan "Lägg till på hemskärmen"</span>
+        </div>
+    </div>
+{{end}}
+
+{{define "a2hs-js"}}
+    <script>
+        (function() {
+            var STORAGE_KEY = 'a2hsDismissed';
+            var ua = window.navigator.userAgent;
+            var isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+            var isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+            var isStandalone = window.navigator.standalone === true ||
+                window.matchMedia('(display-mode: standalone)').matches;
+
+            // Home screen web apps run in storage isolated from Safari, so a
+            // dismissal here can't carry over to ordinary Safari browsing
+            // (or vice versa) — each context tracks its own dismissal.
+            if (!isSafari || isStandalone || localStorage.getItem(STORAGE_KEY)) return;
+
+            var banner = document.getElementById('a2hs-banner');
+            var closeBtn = document.getElementById('a2hs-close');
+            if (!banner || !closeBtn) return;
+
+            banner.hidden = false;
+            closeBtn.addEventListener('click', function() {
+                banner.hidden = true;
+                localStorage.setItem(STORAGE_KEY, '1');
+            });
+        })();
+    </script>
+{{end}}
+
 {{define "theme-js"}}
     <script>
         const ICON_MOON = `<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;

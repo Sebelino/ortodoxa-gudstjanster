@@ -33,6 +33,7 @@
     <style>
         {{template "theme-css" .}}
         {{template "layout-css" .}}
+        {{template "a2hs-css" .}}
 
         .ics-help {
             color: var(--link);
@@ -500,6 +501,7 @@
     </main>
 
     {{template "site-footer-html" .}}
+    {{template "a2hs-banner" .}}
 
     <script>
         let allServices = [];
@@ -1110,5 +1112,6 @@
         updateOnlineStatus();
     </script>
     {{template "theme-js" .}}
+    {{template "a2hs-js" .}}
 </body>
 </html>
