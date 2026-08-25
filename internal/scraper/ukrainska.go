@@ -138,18 +138,22 @@ func (s *UkrainskaScraper) findLatestPost(ctx context.Context) (int, error) {
 			probe *= 2
 			continue
 		}
-		// The probe failed — but there might be valid posts beyond a gap.
-		// Check if any post exists in [lastValid+1, probe].
-		if lastValid > 0 {
-			found, ok, err := anyValidInRange(lastValid+1, probe)
-			if err != nil {
-				return 0, err
-			}
-			if ok {
-				lastValid = found
-				probe = found * 2
-				continue
-			}
+		// The probe failed — either a genuine gap, or the specific post we
+		// hit is transiently unavailable (Telegram intermittently serves an
+		// error page for a post that does in fact exist). Either way, check
+		// for any valid post in [lastValid+1, probe] before giving up; this
+		// also covers the very first probe (lastValid still 0), which
+		// previously had no fallback and made the whole lookup fail
+		// whenever post 100 specifically didn't respond as valid.
+		lo := lastValid + 1
+		found, ok, err := anyValidInRange(lo, probe)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			lastValid = found
+			probe = found * 2
+			continue
 		}
 		break
 	}
@@ -196,8 +200,8 @@ type telegramPost struct {
 }
 
 var (
-	tgImageRe   = regexp.MustCompile(`background-image:url\('(https://cdn[^']+)'\)`)
-	tgDateRe    = regexp.MustCompile(`datetime="([^"]+)"`)
+	tgImageRe = regexp.MustCompile(`background-image:url\('(https://cdn[^']+)'\)`)
+	tgDateRe  = regexp.MustCompile(`datetime="([^"]+)"`)
 )
 
 // fetchPost fetches and parses a single Telegram channel post embed.
