@@ -339,7 +339,7 @@
 {{define "theme-flash"}}<script>(function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>{{end}}
 
 {{define "a2hs-css"}}
-        .a2hs-banner {
+        .a2hs-banner, .gplay-banner {
             position: fixed;
             left: 0.75rem;
             right: 0.75rem;
@@ -358,21 +358,21 @@
             animation: a2hs-slide-up 0.25s ease-out;
         }
 
-        .a2hs-banner[hidden] { display: none; }
+        .a2hs-banner[hidden], .gplay-banner[hidden] { display: none; }
 
         @keyframes a2hs-slide-up {
             from { transform: translateY(12px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
 
-        .a2hs-icon {
+        .a2hs-icon, .gplay-icon {
             width: 36px;
             height: 36px;
             border-radius: 8px;
             flex-shrink: 0;
         }
 
-        .a2hs-text {
+        .a2hs-text, .gplay-text {
             display: flex;
             flex-direction: column;
             gap: 0.15rem;
@@ -380,16 +380,16 @@
             color: var(--text);
         }
 
-        .a2hs-text strong { font-size: 0.85rem; }
+        .a2hs-text strong, .gplay-text strong { font-size: 0.85rem; }
 
-        .a2hs-text span { color: var(--text-muted); }
+        .a2hs-text span, .gplay-text span { color: var(--text-muted); }
 
         .a2hs-share-icon {
             vertical-align: -2px;
             color: var(--link);
         }
 
-        .a2hs-close {
+        .a2hs-close, .gplay-close {
             position: absolute;
             top: 0.35rem;
             right: 0.5rem;
@@ -403,7 +403,15 @@
         }
 
         @media (hover: hover) {
-            .a2hs-close:hover { color: var(--text); }
+            .a2hs-close:hover, .gplay-close:hover { color: var(--text); }
+        }
+
+        .gplay-badge {
+            display: inline-block;
+            color: var(--link);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.8rem;
         }
 {{end}}
 
@@ -416,6 +424,40 @@
             <span>Tryck på <svg class="a2hs-share-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M8 7l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg> och sedan "Lägg till på hemskärmen"</span>
         </div>
     </div>
+{{end}}
+
+{{define "gplay-banner"}}
+    <div id="gplay-banner" class="gplay-banner" hidden>
+        <button class="gplay-close" id="gplay-close" aria-label="Stäng">&times;</button>
+        <img src="/apple-touch-icon.png" alt="" class="gplay-icon">
+        <div class="gplay-text">
+            <strong>Finns som app</strong>
+            <span>Hämta appen från <a href="https://play.google.com/store/apps/details?id=se.ortodoxagudstjanster.twa" class="gplay-badge" target="_blank" rel="noopener">Google Play</a></span>
+        </div>
+    </div>
+{{end}}
+
+{{define "gplay-js"}}
+    <script>
+        (function() {
+            var STORAGE_KEY = 'gplayDismissed';
+            var ua = window.navigator.userAgent;
+            var isAndroid = /Android/.test(ua);
+            var isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+            if (!isAndroid || isStandalone || localStorage.getItem(STORAGE_KEY)) return;
+
+            var banner = document.getElementById('gplay-banner');
+            var closeBtn = document.getElementById('gplay-close');
+            if (!banner || !closeBtn) return;
+
+            banner.hidden = false;
+            closeBtn.addEventListener('click', function() {
+                banner.hidden = true;
+                localStorage.setItem(STORAGE_KEY, '1');
+            });
+        })();
+    </script>
 {{end}}
 
 {{define "a2hs-js"}}
