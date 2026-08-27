@@ -20,6 +20,7 @@ type ParishInfo struct {
 	SecondaryLanguages []string // additional languages used at this parish
 	Tradition          string
 	Patriarchate       string
+	Description        string
 	MapQuery           string
 	Lat                float64
 	Lng                float64
@@ -50,6 +51,7 @@ func SetParishes(umapParishes []umap.Parish) {
 			SecondaryLanguages: p.SecondaryLanguages,
 			Tradition:          p.Tradition,
 			Patriarchate:       p.Patriarchate,
+			Description:        p.Description,
 			MapQuery:           mapQuery(p),
 			Lat:                p.Lat,
 			Lng:                p.Lng,

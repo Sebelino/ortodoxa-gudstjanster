@@ -184,6 +184,14 @@
             </div>
         </div>
 
+        {{if .Description}}
+        <div class="info-card">
+            <div class="info-card-body">
+                <p style="margin:0; font-size:0.9rem; color:var(--text-muted);">{{.Description}}</p>
+            </div>
+        </div>
+        {{end}}
+
         {{if .HasCalendar}}
         <div class="cta">
             <a href="/" id="parish-main-link" data-parish="{{.Name}}">Se kommande gudstj&auml;nster</a>
