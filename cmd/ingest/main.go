@@ -147,6 +147,7 @@ registry.Register(scraper.NewGCalendarScraper())
 	registry.Register(scraper.NewUkrainskaScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewSommarlagerScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewSigfridScraper())
+	registry.Register(scraper.NewRumanskaLinkopingScraper())
 	if uploadReader != nil {
 		uploadParishes := map[string]scraper.UploadParishInfo{
 			"helige-giorgis": {
