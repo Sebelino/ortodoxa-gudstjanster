@@ -22,6 +22,8 @@ func NewSigfridScraper() *SigfridScraper {
 	return &SigfridScraper{}
 }
 
+func (s *SigfridScraper) AllowDecrease() bool { return true }
+
 func (s *SigfridScraper) Name() string {
 	return sigfridSourceName
 }

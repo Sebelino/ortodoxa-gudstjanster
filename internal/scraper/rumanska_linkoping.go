@@ -22,6 +22,8 @@ func NewRumanskaLinkopingScraper() *RumanskaLinkopingScraper {
 	return &RumanskaLinkopingScraper{}
 }
 
+func (s *RumanskaLinkopingScraper) AllowDecrease() bool { return true }
+
 func (s *RumanskaLinkopingScraper) Name() string {
 	return rumanskaLkpSourceName
 }

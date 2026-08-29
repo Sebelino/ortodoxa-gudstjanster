@@ -194,7 +194,13 @@ registry.Register(scraper.NewGCalendarScraper())
 		log.Printf("Scraper %s fetched %d services", scraperName, len(services))
 
 		if len(services) > 0 {
-			// Compare future service counts to detect regressions
+			// Compare future service counts to detect regressions.
+			// Scrapers that implement AllowDecreaser skip this check
+			// (e.g. user-curated Google Calendar scrapers).
+			allowDecrease := false
+			if ad, ok := s.(scraper.AllowDecreaser); ok {
+				allowDecrease = ad.AllowDecrease()
+			}
 			newCount := 0
 			for _, svc := range services {
 				if svc.Date >= today {
@@ -205,7 +211,7 @@ registry.Register(scraper.NewGCalendarScraper())
 			if err != nil {
 				log.Printf("WARNING: Failed to count existing services for %s: %v", scraperName, err)
 				// Proceed with replacement if we can't count
-			} else if newCount*3 < existingCount {
+			} else if !allowDecrease && newCount*3 < existingCount {
 				log.Printf("WARNING: Scraper %s returned significantly fewer future services (%d) than currently stored (%d). Skipping replacement.",
 					scraperName, newCount, existingCount)
 

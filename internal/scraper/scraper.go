@@ -96,6 +96,14 @@ type ScraperWithNotes interface {
 	FetchNotes() []string
 }
 
+// AllowDecreaser is an optional interface scrapers can implement to skip the
+// regression protection check. Scrapers backed by user-curated calendars
+// (e.g. Google Calendar) should return true so that event deletions are
+// reflected immediately.
+type AllowDecreaser interface {
+	AllowDecrease() bool
+}
+
 // NoteCollector is an embeddable struct that implements ScraperWithNotes.
 // Embed it in a scraper struct, call resetNotes() at the top of Fetch,
 // and use note() to record key diagnostic events.

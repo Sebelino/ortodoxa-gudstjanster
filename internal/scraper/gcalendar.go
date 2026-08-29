@@ -41,6 +41,8 @@ func NewGCalendarScraper() *GCalendarScraper {
 	return &GCalendarScraper{}
 }
 
+func (s *GCalendarScraper) AllowDecrease() bool { return true }
+
 func (s *GCalendarScraper) Name() string {
 	return gcalendarSourceName
 }
