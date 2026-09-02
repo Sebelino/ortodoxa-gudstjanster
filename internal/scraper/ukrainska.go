@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -501,6 +502,22 @@ func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost in
 	if len(found) == 0 {
 		return nil, fmt.Errorf("no schedule images found (checked posts %d to %d, plus previously known)", newStart, latestPost)
 	}
+
+	// Carried-over images come from ranging over state.Posts, a map, whose
+	// iteration order Go deliberately randomizes — left as-is, that would
+	// reorder the output on every run even when nothing actually changed,
+	// which defeats change-detection elsewhere (e.g. alert deduplication in
+	// the ingestion job, which hashes the fetched services). Sort into a
+	// stable order so output only changes when the underlying data does.
+	sort.Slice(found, func(i, j int) bool {
+		a, errA := strconv.Atoi(found[i].postKey)
+		b, errB := strconv.Atoi(found[j].postKey)
+		if errA != nil || errB != nil || a != b {
+			return a < b
+		}
+		return found[i].checksum < found[j].checksum
+	})
+
 	return found, nil
 }
 
@@ -707,11 +724,19 @@ func (s *UkrainskaScraper) deduplicate(services []model.ChurchService) []model.C
 			order = append(order, key)
 			continue
 		}
-		if len(svc.ServiceName) > len(existing.ServiceName) {
+		// Prefer the more detailed name; break an exact-length tie on
+		// SourceURL so the winner doesn't depend on input order (which two
+		// posts describing the same slot get iterated in can otherwise
+		// vary between runs — see findScheduleImages).
+		switch {
+		case len(svc.ServiceName) > len(existing.ServiceName):
+			best[key] = svc
+		case len(svc.ServiceName) == len(existing.ServiceName) && svc.SourceURL < existing.SourceURL:
 			best[key] = svc
 		}
 	}
 
+	sort.Strings(order)
 	result := make([]model.ChurchService, 0, len(order))
 	for _, key := range order {
 		result = append(result, best[key])
