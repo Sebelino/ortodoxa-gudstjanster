@@ -218,13 +218,20 @@ registry.Register(scraper.NewGCalendarScraper())
 				// Save rejected data to GCS for diagnostics
 				gcsPath := saveDiagnostics(gcsStore, scraperName, services)
 
-				// Send alert email if SMTP is configured
+				// Send alert email if SMTP is configured and this isn't a
+				// repeat of the same rejection we already alerted on
+				// recently (e.g. a source that simply hasn't posted
+				// anything new since last time).
 				if smtpConfig != nil {
-					subject, body := buildCountDecreaseAlert(scraperName, existingCount, newCount, gcsBucket, gcsPath, services, fetchNotes)
-					if err := smtpConfig.Send(subject, body); err != nil {
-						log.Printf("ERROR: Failed to send alert email for %s: %v", scraperName, err)
+					if shouldSendCountDecreaseAlert(gcsStore, scraperName, services) {
+						subject, body := buildCountDecreaseAlert(scraperName, existingCount, newCount, gcsBucket, gcsPath, services, fetchNotes)
+						if err := smtpConfig.Send(subject, body); err != nil {
+							log.Printf("ERROR: Failed to send alert email for %s: %v", scraperName, err)
+						} else {
+							log.Printf("Alert email sent for %s", scraperName)
+						}
 					} else {
-						log.Printf("Alert email sent for %s", scraperName)
+						log.Printf("Alert email skipped for %s: unchanged since last alert (within cooldown)", scraperName)
 					}
 				}
 
@@ -616,12 +623,60 @@ func fillConsecutiveEndTimes(services []model.ChurchService) {
 	}
 }
 
+// safeScraperName sanitizes a scraper name for use as a path segment.
+func safeScraperName(scraperName string) string {
+	return strings.ReplaceAll(strings.ToLower(scraperName), " ", "-")
+}
+
+// countDecreaseAlertCooldown bounds how often a count-decrease alert repeats
+// for a scraper whose rejected data hasn't changed since the last one sent —
+// otherwise an unchanged source (e.g. nothing new posted) re-alerts every
+// ingestion cycle indefinitely instead of only when something's new.
+const countDecreaseAlertCooldown = 24 * time.Hour
+
+// lastCountDecreaseAlert is what's persisted per scraper to dedupe repeat
+// count-decrease alerts (see shouldSendCountDecreaseAlert).
+type lastCountDecreaseAlert struct {
+	Checksum string    `json:"checksum"`
+	SentAt   time.Time `json:"sent_at"`
+}
+
+func countDecreaseAlertDedupKey(scraperName string) string {
+	return fmt.Sprintf("diagnostics/%s/last-alert.json", safeScraperName(scraperName))
+}
+
+// shouldSendCountDecreaseAlert reports whether a count-decrease alert should
+// actually be emailed: yes if the rejected data differs from what the last
+// alert for this scraper carried, or if the cooldown has elapsed since then
+// (so a persistently broken/stale source still gets an occasional reminder,
+// not silence forever). When it returns true, it also persists the new
+// checksum so the next call can compare against it.
+func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService) bool {
+	checksum := ""
+	if data, err := json.Marshal(services); err == nil {
+		sum := sha256.Sum256(data)
+		checksum = hex.EncodeToString(sum[:])
+	} else {
+		log.Printf("WARNING: failed to checksum rejected data for %s: %v", scraperName, err)
+	}
+
+	key := countDecreaseAlertDedupKey(scraperName)
+	var last lastCountDecreaseAlert
+	if gcsStore.GetJSON(key, &last) && last.Checksum == checksum && time.Since(last.SentAt) < countDecreaseAlertCooldown {
+		return false
+	}
+
+	record := lastCountDecreaseAlert{Checksum: checksum, SentAt: time.Now().UTC()}
+	if err := gcsStore.SetJSON(key, record); err != nil {
+		log.Printf("WARNING: failed to save alert dedup record for %s: %v", scraperName, err)
+	}
+	return true
+}
+
 // saveDiagnostics serializes rejected services to GCS and returns the object path.
 func saveDiagnostics(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService) string {
 	timestamp := time.Now().UTC().Format("20060102-150405")
-	// Sanitize scraper name for use in path
-	safeName := strings.ReplaceAll(strings.ToLower(scraperName), " ", "-")
-	path := fmt.Sprintf("diagnostics/%s/%s.json", safeName, timestamp)
+	path := fmt.Sprintf("diagnostics/%s/%s.json", safeScraperName(scraperName), timestamp)
 
 	data, err := json.MarshalIndent(services, "", "  ")
 	if err != nil {
