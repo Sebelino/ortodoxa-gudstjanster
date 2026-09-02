@@ -218,10 +218,11 @@ registry.Register(scraper.NewGCalendarScraper())
 				// Save rejected data to GCS for diagnostics
 				gcsPath := saveDiagnostics(gcsStore, scraperName, services)
 
-				// Send alert email if SMTP is configured and this isn't a
-				// repeat of the same rejection we already alerted on
-				// recently (e.g. a source that simply hasn't posted
-				// anything new since last time).
+				// Send alert email if SMTP is configured and this isn't the
+				// same rejection already alerted on before (e.g. a source
+				// that simply hasn't posted anything new since last time) —
+				// only the first occurrence of a given rejection is worth
+				// a human's attention.
 				if smtpConfig != nil {
 					if shouldSendCountDecreaseAlert(gcsStore, scraperName, services) {
 						subject, body := buildCountDecreaseAlert(scraperName, existingCount, newCount, gcsBucket, gcsPath, services, fetchNotes)
@@ -231,7 +232,7 @@ registry.Register(scraper.NewGCalendarScraper())
 							log.Printf("Alert email sent for %s", scraperName)
 						}
 					} else {
-						log.Printf("Alert email skipped for %s: unchanged since last alert (within cooldown)", scraperName)
+						log.Printf("Alert email skipped for %s: rejection unchanged since last alert", scraperName)
 					}
 				}
 
@@ -628,29 +629,30 @@ func safeScraperName(scraperName string) string {
 	return strings.ReplaceAll(strings.ToLower(scraperName), " ", "-")
 }
 
-// countDecreaseAlertCooldown bounds how often a count-decrease alert repeats
-// for a scraper whose rejected data hasn't changed since the last one sent —
-// otherwise an unchanged source (e.g. nothing new posted) re-alerts every
-// ingestion cycle indefinitely instead of only when something's new.
-const countDecreaseAlertCooldown = 24 * time.Hour
-
 // lastCountDecreaseAlert is what's persisted per scraper to dedupe repeat
-// count-decrease alerts (see shouldSendCountDecreaseAlert).
+// count-decrease alerts (see shouldSendCountDecreaseAlert). SentAt is purely
+// informational (visible to anyone inspecting the file directly) — it plays
+// no part in the dedup decision itself.
 type lastCountDecreaseAlert struct {
 	Checksum string    `json:"checksum"`
 	SentAt   time.Time `json:"sent_at"`
 }
 
 func countDecreaseAlertDedupKey(scraperName string) string {
-	return fmt.Sprintf("diagnostics/%s/last-alert.json", safeScraperName(scraperName))
+	// No ".json" suffix here — GetJSON/SetJSON already append one.
+	return fmt.Sprintf("diagnostics/%s/last-alert", safeScraperName(scraperName))
 }
 
 // shouldSendCountDecreaseAlert reports whether a count-decrease alert should
-// actually be emailed: yes if the rejected data differs from what the last
-// alert for this scraper carried, or if the cooldown has elapsed since then
-// (so a persistently broken/stale source still gets an occasional reminder,
-// not silence forever). When it returns true, it also persists the new
-// checksum so the next call can compare against it.
+// actually be emailed. The goal is to alert only when something changes —
+// a scraper starting to reject data it wasn't rejecting before, or a
+// rejection changing shape — not to re-notify for an unchanged, already-known
+// rejection on every ingestion cycle (e.g. a source that simply hasn't
+// posted anything new). There's deliberately no time-based fallback either:
+// an ongoing, unchanged rejection doesn't get a periodic reminder — it was
+// already reported once, and re-alerting on it wouldn't mean anything new
+// is wrong. When it returns true, it also persists the new checksum so the
+// next call can compare against it.
 func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService) bool {
 	checksum := ""
 	if data, err := json.Marshal(services); err == nil {
@@ -662,7 +664,7 @@ func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, 
 
 	key := countDecreaseAlertDedupKey(scraperName)
 	var last lastCountDecreaseAlert
-	if gcsStore.GetJSON(key, &last) && last.Checksum == checksum && time.Since(last.SentAt) < countDecreaseAlertCooldown {
+	if gcsStore.GetJSON(key, &last) && last.Checksum == checksum {
 		return false
 	}
 
