@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -22,8 +24,16 @@ const (
 	ukrainskaParishSlug = "ukrainska-ortodoxa-stockholm"
 	ukrainskaChannelURL = "https://t.me/ukrcerkva_stockholm"
 	ukrainskaLocation   = "Nynäsvägen 3C, 136 47 Haninge"
-	// Number of recent posts to scan for schedule images.
+	// Trailing window used only to seed scanning the very first time this
+	// scraper runs (no persisted state yet). After that, scanning is
+	// incremental — see findScheduleImages.
 	ukrainskaScanCount = 100
+	// Safety cap on how far back a single run will catch up if ingestion
+	// hasn't run in a long time, so a large gap in scan history can't turn
+	// into one run fetching thousands of posts.
+	ukrainskaMaxCatchUpPosts = 1000
+	// Persisted scan state cache key (see ukrainskaScanState).
+	ukrainskaScanStateKey = "ukrainska/scan-state/v1"
 )
 
 // UkrainskaScraper scrapes the Ukrainian Orthodox Church schedule from their
@@ -49,32 +59,47 @@ func (s *UkrainskaScraper) Name() string {
 func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error) {
 	s.resetNotes()
 
-	// Step 1: Find the latest post number via binary search.
-	latestPost, err := s.findLatestPost(ctx)
+	state := s.loadScanState()
+
+	// Step 1: Find the latest post number. Seeded from the last scan's
+	// frontier when we have one, so this is normally a cheap check of a
+	// post we already know is close to current, rather than a blind
+	// exponential search starting at a fixed post number every run.
+	latestPost, err := s.findLatestPost(ctx, state.HighestScannedPost)
 	if err != nil {
 		return nil, fmt.Errorf("finding latest post: %w", err)
 	}
 	log.Printf("Ukrainska: latest post: %d", latestPost)
 	s.note("latest post: %d", latestPost)
 
-	// Step 2: Scan recent posts for schedule images. The channel mixes full
-	// monthly schedules with shorter weekly reminder posts covering the same
-	// slots, so we scan the whole window and merge everything found rather
-	// than stopping at the first match — otherwise a recent reminder post
-	// can permanently shadow a fuller, older schedule post.
-	images, err := s.findScheduleImages(ctx, latestPost)
+	// Step 2: Scan for schedule images. Only posts newer than the last scan
+	// are actually fetched; previously found schedule images are carried
+	// forward from persisted state until their own dates are in the past —
+	// so a schedule doesn't silently disappear just because newer,
+	// unrelated posts have pushed it past a fixed trailing window.
+	images, err := s.findScheduleImages(ctx, latestPost, &state)
+	// Save scan progress even on failure below — findScheduleImages may
+	// have already recorded newly-checked posts (schedule or not) in
+	// state, and losing that would mean re-fetching them all again next
+	// run for no benefit.
+	if saveErr := s.saveScanState(state); saveErr != nil {
+		log.Printf("Ukrainska: failed to save scan state: %v", saveErr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("finding schedule images: %w", err)
 	}
 
-	if len(images) == 0 {
-		return nil, fmt.Errorf("no schedule images found in recent posts")
-	}
-
-	// Step 3: OCR each image and collect services.
+	// Step 3: OCR each image and collect services. A schedule image with no
+	// remaining future dates is still returned here (harmless — the
+	// ingestion pipeline's own count-decrease guard already handles that
+	// gracefully) rather than dropped from state immediately: state is
+	// pruned by age instead (see pruneOldPosts below), not by whether an
+	// image currently has future dates, so a run is never left with
+	// nothing to report just because the one schedule known about happens
+	// to have run its course since the last update.
 	var allServices []model.ChurchService
 	for i, img := range images {
-		entries, err := s.ocrImage(ctx, img.data, fmt.Sprintf("image-%d", i))
+		entries, err := s.ocrImage(ctx, img, fmt.Sprintf("image-%d", i))
 		if err != nil {
 			log.Printf("Ukrainska: OCR failed for image %d: %v", i, err)
 			s.note("OCR failed for image %d: %v", i, err)
@@ -82,6 +107,14 @@ func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 		}
 		services := s.convertToServices(entries, img.sourceURL)
 		allServices = append(allServices, services...)
+	}
+
+	prunedCount := pruneOldPosts(&state)
+	if prunedCount > 0 {
+		s.note("dropped %d post record(s) older than the retention window", prunedCount)
+	}
+	if err := s.saveScanState(state); err != nil {
+		log.Printf("Ukrainska: failed to save scan state: %v", err)
 	}
 
 	if len(allServices) == 0 {
@@ -98,7 +131,16 @@ func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 // Telegram channels can have large gaps in post numbering (deleted messages),
 // so a naive binary search fails. Instead we probe exponentially to find a
 // confirmed-valid post, then scan forward in chunks to find the frontier.
-func (s *UkrainskaScraper) findLatestPost(ctx context.Context) (int, error) {
+//
+// hint, when nonzero, is the highest post number confirmed valid on a
+// previous run. If it's still valid — which it almost always is, since
+// posts are rarely deleted — Phase 1 below is skipped entirely and we jump
+// straight to Phase 2's forward scan from there, normally making this a
+// single request instead of a full search from scratch. Doubling up from a
+// stale hint instead (rather than skipping straight to Phase 2) would risk
+// overshooting far past the real frontier, so a hint that doesn't check out
+// is discarded rather than used as a starting point for that search.
+func (s *UkrainskaScraper) findLatestPost(ctx context.Context, hint int) (int, error) {
 	isValid := func(n int) (bool, error) {
 		url := fmt.Sprintf("%s/%d?embed=1", ukrainskaChannelURL, n)
 		data, err := fetchURL(ctx, url)
@@ -128,37 +170,46 @@ func (s *UkrainskaScraper) findLatestPost(ctx context.Context) (int, error) {
 		return 0, false, nil
 	}
 
-	// Phase 1: Find a valid post by probing exponentially.
-	probe := 100
 	lastValid := 0
-	for {
-		valid, err := isValid(probe)
-		if err != nil {
-			return 0, fmt.Errorf("probing post %d: %w", probe, err)
+	if hint > 0 {
+		if valid, err := isValid(hint); err == nil && valid {
+			lastValid = hint
 		}
-		if valid {
-			lastValid = probe
-			probe *= 2
-			continue
+	}
+
+	if lastValid == 0 {
+		// Phase 1: Find a valid post by probing exponentially.
+		probe := 100
+		for {
+			valid, err := isValid(probe)
+			if err != nil {
+				return 0, fmt.Errorf("probing post %d: %w", probe, err)
+			}
+			if valid {
+				lastValid = probe
+				probe *= 2
+				continue
+			}
+			// The probe failed — either a genuine gap, or the specific post
+			// we hit is transiently unavailable (Telegram intermittently
+			// serves an error page for a post that does in fact exist).
+			// Either way, check for any valid post in [lastValid+1, probe]
+			// before giving up; this also covers the very first probe
+			// (lastValid still 0), which previously had no fallback and
+			// made the whole lookup fail whenever post 100 specifically
+			// didn't respond as valid.
+			lo := lastValid + 1
+			found, ok, err := anyValidInRange(lo, probe)
+			if err != nil {
+				return 0, err
+			}
+			if ok {
+				lastValid = found
+				probe = found * 2
+				continue
+			}
+			break
 		}
-		// The probe failed — either a genuine gap, or the specific post we
-		// hit is transiently unavailable (Telegram intermittently serves an
-		// error page for a post that does in fact exist). Either way, check
-		// for any valid post in [lastValid+1, probe] before giving up; this
-		// also covers the very first probe (lastValid still 0), which
-		// previously had no fallback and made the whole lookup fail
-		// whenever post 100 specifically didn't respond as valid.
-		lo := lastValid + 1
-		found, ok, err := anyValidInRange(lo, probe)
-		if err != nil {
-			return 0, err
-		}
-		if ok {
-			lastValid = found
-			probe = found * 2
-			continue
-		}
-		break
 	}
 
 	if lastValid == 0 {
@@ -194,6 +245,12 @@ func (s *UkrainskaScraper) findLatestPost(ctx context.Context) (int, error) {
 	return frontier, nil
 }
 
+// errPostNotFound marks a post as confirmed deleted/never existed (Telegram
+// served its error-marker page), as opposed to a transient fetch failure.
+// Only posts confirmed this way are permanently retired from future scans —
+// see findScheduleImages.
+var errPostNotFound = errors.New("post does not exist")
+
 // telegramPost holds parsed data from a Telegram embed page.
 type telegramPost struct {
 	number    int
@@ -217,7 +274,7 @@ func (s *UkrainskaScraper) fetchPost(ctx context.Context, postNum int) (*telegra
 
 	// Check if this is an error page.
 	if doc.Find(".tgme_widget_message_error").Length() > 0 {
-		return nil, fmt.Errorf("post %d does not exist", postNum)
+		return nil, fmt.Errorf("post %d: %w", postNum, errPostNotFound)
 	}
 
 	post := &telegramPost{number: postNum}
@@ -248,79 +305,201 @@ func (s *UkrainskaScraper) fetchPost(ctx context.Context, postNum int) (*telegra
 	return post, nil
 }
 
-// scheduleImage is a schedule image found in the channel, tagged with the
-// post it came from so extracted entries can be attributed to a source URL.
-type scheduleImage struct {
-	data      []byte
-	sourceURL string
+// ukrainskaImageRef identifies one schedule image found in a post, kept in
+// persisted state so it doesn't need to be re-downloaded or re-classified
+// on later runs.
+type ukrainskaImageRef struct {
+	Checksum string `json:"checksum"`
+	URL      string `json:"url"`
 }
 
-// findScheduleImages scans the most recent posts for images and uses AI to
-// determine which ones are schedule images. Results are cached by image
-// checksum so the same image is never classified twice.
-//
-// The channel posts both full monthly schedules and shorter weekly reminder
-// posts covering a subset of the same slots. We scan the entire window and
-// return every schedule image found (not just the first), since stopping
-// early can permanently shadow a fuller, older schedule behind a more recent
-// but partial reminder post. Callers deduplicate the resulting entries.
-func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost int) ([]scheduleImage, error) {
-	start := latestPost
-	end := latestPost - ukrainskaScanCount
-	if end < 1 {
-		end = 1
+// ukrainskaPostRecord is what's remembered about a single scanned post. An
+// empty ScheduleImages means the post was checked and had no schedule
+// images — that's still worth remembering, so the post is never re-fetched.
+type ukrainskaPostRecord struct {
+	ScheduleImages []ukrainskaImageRef `json:"schedule_images,omitempty"`
+}
+
+// ukrainskaScanState is persisted across runs (see loadScanState /
+// saveScanState) so each run only needs to fetch posts newer than the last
+// scan, and previously found schedule images aren't lost just because
+// they've scrolled past a fixed trailing window. Entries are only dropped
+// once they're far behind the current scan frontier (see pruneOldPosts),
+// not the moment their dates run out — a schedule with no remaining future
+// dates is still valid output (the ingestion pipeline's own regression
+// guard handles that), so evicting it early would leave a run with nothing
+// to report at all once nothing new has been posted since.
+type ukrainskaScanState struct {
+	HighestScannedPost int                            `json:"highest_scanned_post"`
+	Posts              map[string]ukrainskaPostRecord `json:"posts"`
+}
+
+func (s *UkrainskaScraper) loadScanState() ukrainskaScanState {
+	var state ukrainskaScanState
+	if s.store.GetJSON(ukrainskaScanStateKey, &state) && state.Posts != nil {
+		return state
+	}
+	return ukrainskaScanState{Posts: make(map[string]ukrainskaPostRecord)}
+}
+
+func (s *UkrainskaScraper) saveScanState(state ukrainskaScanState) error {
+	return s.store.SetJSON(ukrainskaScanStateKey, state)
+}
+
+// pruneOldPosts drops post records far behind the current scan frontier,
+// purely to keep persisted state from growing forever — not because their
+// content might be stale (which is harmless to keep around; see
+// ukrainskaScanState). By the time a post falls this far behind, any
+// schedule it held is certain to have long since been superseded in
+// practice. Returns the number of records dropped.
+func pruneOldPosts(state *ukrainskaScanState) int {
+	cutoff := state.HighestScannedPost - ukrainskaMaxCatchUpPosts
+	if cutoff <= 0 {
+		return 0
+	}
+	dropped := 0
+	for postKey := range state.Posts {
+		postNum, err := strconv.Atoi(postKey)
+		if err != nil || postNum < cutoff {
+			delete(state.Posts, postKey)
+			dropped++
+		}
+	}
+	return dropped
+}
+
+// scheduleImage is a schedule image to OCR, tagged with enough to attribute
+// extracted entries to a source URL and to update persisted scan state.
+// data is only populated for images just downloaded this run — images
+// carried forward from previous runs rely on the OCR cache instead (see
+// ocrImage), falling back to a fresh download via url only on a cache miss.
+type scheduleImage struct {
+	checksum  string
+	url       string
+	data      []byte
+	sourceURL string
+	postKey   string
+}
+
+// findScheduleImages returns every currently-relevant schedule image: newly
+// discovered ones from posts not yet in scan state, plus previously found
+// ones carried forward from state. Only posts newer than
+// state.HighestScannedPost (or, on a cold start, the trailing
+// ukrainskaScanCount posts) are actually fetched — everything else is
+// served from persisted state, so a steady-state run only does a handful of
+// requests instead of re-scanning the whole window every time.
+func (s *UkrainskaScraper) findScheduleImages(ctx context.Context, latestPost int, state *ukrainskaScanState) ([]scheduleImage, error) {
+	newStart := state.HighestScannedPost + 1
+	if state.HighestScannedPost == 0 {
+		newStart = latestPost - ukrainskaScanCount + 1
+	}
+	if newStart < latestPost-ukrainskaMaxCatchUpPosts+1 {
+		newStart = latestPost - ukrainskaMaxCatchUpPosts + 1
+	}
+	if newStart < 1 {
+		newStart = 1
 	}
 
-	log.Printf("Ukrainska: scanning posts %d to %d for schedule images", start, end)
+	log.Printf("Ukrainska: scanning new posts %d to %d", newStart, latestPost)
 
 	var found []scheduleImage
+	newPostKeys := make(map[string]bool)
 	postsChecked := 0
 	postsWithImages := 0
 	postsWithSchedules := 0
-	for postNum := start; postNum >= end; postNum-- {
+	// The high-water mark only advances past a post once we've recorded a
+	// definitive result for it (found, or confirmed deleted). A transient
+	// fetch failure stops it from advancing further, so that post — and
+	// everything after it this run — gets retried from scratch next time,
+	// instead of silently never being looked at again.
+	highWaterMark := newStart - 1
+	for postNum := newStart; postNum <= latestPost; postNum++ {
 		post, err := s.fetchPost(ctx, postNum)
 		if err != nil {
+			if !errors.Is(err, errPostNotFound) {
+				break
+			}
+			// Confirmed deleted/never existed — remember so it's never
+			// retried, but there's nothing to scan.
+			postKey := strconv.Itoa(postNum)
+			newPostKeys[postKey] = true
+			state.Posts[postKey] = ukrainskaPostRecord{}
+			highWaterMark = postNum
 			continue
 		}
 		postsChecked++
 
-		if len(post.imageURLs) == 0 {
+		postKey := strconv.Itoa(postNum)
+		newPostKeys[postKey] = true
+		highWaterMark = postNum
+		var record ukrainskaPostRecord
+
+		if len(post.imageURLs) > 0 {
+			postsWithImages++
+			sourceURL := fmt.Sprintf("%s/%d", ukrainskaChannelURL, postNum)
+			for _, imgURL := range post.imageURLs {
+				data, err := fetchURL(ctx, imgURL)
+				if err != nil {
+					log.Printf("Ukrainska: failed to download image from post %d: %v", postNum, err)
+					continue
+				}
+
+				isSchedule, err := s.isScheduleImage(ctx, data)
+				if err != nil {
+					log.Printf("Ukrainska: classification failed for post %d image: %v", postNum, err)
+					continue
+				}
+				if isSchedule {
+					checksum := computeChecksum(data)
+					record.ScheduleImages = append(record.ScheduleImages, ukrainskaImageRef{Checksum: checksum, URL: imgURL})
+					found = append(found, scheduleImage{
+						checksum:  checksum,
+						url:       imgURL,
+						data:      data,
+						sourceURL: sourceURL,
+						postKey:   postKey,
+					})
+				}
+			}
+			if len(record.ScheduleImages) > 0 {
+				postsWithSchedules++
+				log.Printf("Ukrainska: post %d (%s) contains schedule image(s)", postNum, post.datetime)
+			}
+		}
+		state.Posts[postKey] = record
+	}
+	state.HighestScannedPost = highWaterMark
+
+	log.Printf("Ukrainska: checked %d new post(s) (%d to %d), %d had images, %d had schedule images",
+		postsChecked, newStart, latestPost, postsWithImages, postsWithSchedules)
+
+	// Carry forward previously found schedule images from posts we didn't
+	// just re-scan.
+	carriedOver := 0
+	for postKey, rec := range state.Posts {
+		if newPostKeys[postKey] {
 			continue
 		}
-		postsWithImages++
-		log.Printf("Ukrainska: post %d has %d image(s)", postNum, len(post.imageURLs))
-
-		sourceURL := fmt.Sprintf("%s/%d", ukrainskaChannelURL, postNum)
-		postHadSchedule := false
-		for _, imgURL := range post.imageURLs {
-			data, err := fetchURL(ctx, imgURL)
+		for _, ref := range rec.ScheduleImages {
+			postNum, err := strconv.Atoi(postKey)
 			if err != nil {
-				log.Printf("Ukrainska: failed to download image from post %d: %v", postNum, err)
 				continue
 			}
-
-			isSchedule, err := s.isScheduleImage(ctx, data)
-			if err != nil {
-				log.Printf("Ukrainska: classification failed for post %d image: %v", postNum, err)
-				continue
-			}
-			if isSchedule {
-				found = append(found, scheduleImage{data: data, sourceURL: sourceURL})
-				postHadSchedule = true
-			}
-		}
-		if postHadSchedule {
-			postsWithSchedules++
-			log.Printf("Ukrainska: post %d (%s) contains schedule image(s)", postNum, post.datetime)
+			found = append(found, scheduleImage{
+				checksum:  ref.Checksum,
+				url:       ref.URL,
+				sourceURL: fmt.Sprintf("%s/%d", ukrainskaChannelURL, postNum),
+				postKey:   postKey,
+			})
+			carriedOver++
 		}
 	}
 
-	log.Printf("Ukrainska: checked %d valid posts, %d had images, %d posts had schedule images, %d schedule image(s) total",
-		postsChecked, postsWithImages, postsWithSchedules, len(found))
-	s.note("scanned %d posts: %d schedule post(s), %d schedule image(s) total", postsChecked, postsWithSchedules, len(found))
+	s.note("scanned %d new post(s): %d schedule post(s) found; %d schedule image(s) carried over from earlier runs",
+		postsChecked, postsWithSchedules, carriedOver)
 
 	if len(found) == 0 {
-		return nil, fmt.Errorf("no schedule images found in last %d posts", ukrainskaScanCount)
+		return nil, fmt.Errorf("no schedule images found (checked posts %d to %d, plus previously known)", newStart, latestPost)
 	}
 	return found, nil
 }
@@ -354,17 +533,28 @@ func (s *UkrainskaScraper) isScheduleImage(ctx context.Context, imageData []byte
 	return result, nil
 }
 
-// ocrImage extracts schedule entries from an image using the Vision API, with caching.
-func (s *UkrainskaScraper) ocrImage(ctx context.Context, imageData []byte, sourceRef string) ([]vision.ScheduleEntry, error) {
-	checksum := computeChecksum(imageData)
-	cacheKey := "ukrainska-ocr/v1/" + checksum
+// ocrImage extracts schedule entries from an image using the Vision API,
+// with caching by image checksum. For images carried forward from earlier
+// runs (img.data is nil), this normally hits the OCR cache directly without
+// any download; on a cache miss it falls back to re-fetching img.url.
+func (s *UkrainskaScraper) ocrImage(ctx context.Context, img scheduleImage, sourceRef string) ([]vision.ScheduleEntry, error) {
+	cacheKey := "ukrainska-ocr/v1/" + img.checksum
 
 	// Check OCR cache.
 	var raw vision.RawScheduleResult
 	if s.store.GetJSON(cacheKey, &raw) {
-		log.Printf("Ukrainska: OCR cache hit for %s (checksum %s)", sourceRef, checksum[:12])
+		log.Printf("Ukrainska: OCR cache hit for %s (checksum %s)", sourceRef, img.checksum[:12])
 	} else {
-		log.Printf("Ukrainska: OCR cache miss for %s (checksum %s), calling API", sourceRef, checksum[:12])
+		log.Printf("Ukrainska: OCR cache miss for %s (checksum %s), calling API", sourceRef, img.checksum[:12])
+
+		imageData := img.data
+		if len(imageData) == 0 {
+			var err error
+			imageData, err = fetchURL(ctx, img.url)
+			if err != nil {
+				return nil, fmt.Errorf("re-fetching %s for OCR: %w", sourceRef, err)
+			}
+		}
 
 		rawPtr, resp, err := s.vision.ExtractScheduleRaw(ctx, imageData)
 		if err != nil {
