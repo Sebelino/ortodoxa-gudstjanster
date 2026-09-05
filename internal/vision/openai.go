@@ -15,6 +15,16 @@ import (
 
 const openaiAPIURL = "https://api.openai.com/v1/chat/completions"
 
+// parseLeadingJSON decodes the first JSON value in s into v, ignoring any
+// trailing content. Despite being told to return only JSON, the model
+// occasionally appends explanatory prose after it (e.g. "**Note:** some
+// entries have no listed time...") with no code fence to strip, which
+// json.Unmarshal would reject outright as trailing garbage after a
+// complete top-level value.
+func parseLeadingJSON(s string, v any) error {
+	return json.NewDecoder(strings.NewReader(s)).Decode(v)
+}
+
 // ScheduleEntry represents a single church service extracted from an image.
 type ScheduleEntry struct {
 	Date        string `json:"date"`
@@ -182,7 +192,7 @@ Return ONLY the JSON object, no other text.`, currentYear)
 	content = strings.TrimSpace(content)
 
 	var result RawScheduleResult
-	if err := json.Unmarshal([]byte(content), &result); err != nil {
+	if err := parseLeadingJSON(content, &result); err != nil {
 		return nil, content, fmt.Errorf("parsing raw schedule result: %w (content: %s)", err, content)
 	}
 
@@ -272,7 +282,7 @@ Text to parse:
 	content = strings.TrimSpace(content)
 
 	var entries []ScheduleEntry
-	if err := json.Unmarshal([]byte(content), &entries); err != nil {
+	if err := parseLeadingJSON(content, &entries); err != nil {
 		return nil, fmt.Errorf("parsing schedule entries: %w (content: %s)", err, content)
 	}
 
@@ -444,7 +454,7 @@ Return ONLY the JSON array, no other text.`, today, string(entriesJSON))
 	content = strings.TrimSpace(content)
 
 	var translated []ScheduleEntry
-	if err := json.Unmarshal([]byte(content), &translated); err != nil {
+	if err := parseLeadingJSON(content, &translated); err != nil {
 		return nil, content, fmt.Errorf("parsing translated entries: %w (content: %s)", err, content)
 	}
 
@@ -565,7 +575,7 @@ Return ONLY the JSON object, no other text.`, string(namesJSON))
 	content = strings.TrimSpace(content)
 
 	var titles map[string]string
-	if err := json.Unmarshal([]byte(content), &titles); err != nil {
+	if err := parseLeadingJSON(content, &titles); err != nil {
 		return nil, fmt.Errorf("parsing titles: %w (content: %s)", err, content)
 	}
 
@@ -693,7 +703,7 @@ Return ONLY a JSON array, no other text.`, recurringDesc, noticeText, today)
 	content = strings.TrimSpace(content)
 
 	var exceptions []ScheduleException
-	if err := json.Unmarshal([]byte(content), &exceptions); err != nil {
+	if err := parseLeadingJSON(content, &exceptions); err != nil {
 		return nil, fmt.Errorf("parsing schedule exceptions: %w (content: %s)", err, content)
 	}
 
@@ -829,7 +839,7 @@ Return ONLY the JSON array, no other text.`, len(events), string(eventsJSON))
 	content = strings.TrimSpace(content)
 
 	var raw []*string
-	if err := json.Unmarshal([]byte(content), &raw); err != nil {
+	if err := parseLeadingJSON(content, &raw); err != nil {
 		return nil, fmt.Errorf("parsing event languages: %w (content: %s)", err, content)
 	}
 
@@ -957,7 +967,7 @@ Return ONLY the JSON array, no other text.`, string(entriesJSON))
 		Start string  `json:"start"`
 		End   *string `json:"end"`
 	}
-	if err := json.Unmarshal([]byte(content), &results); err != nil {
+	if err := parseLeadingJSON(content, &results); err != nil {
 		return nil, fmt.Errorf("parsing time results: %w (content: %s)", err, content)
 	}
 
@@ -1085,7 +1095,7 @@ Webpage text:
 	content = strings.TrimSpace(content)
 
 	var events []CampEvent
-	if err := json.Unmarshal([]byte(content), &events); err != nil {
+	if err := parseLeadingJSON(content, &events); err != nil {
 		return nil, fmt.Errorf("parsing camp events: %w (content: %s)", err, content)
 	}
 
@@ -1228,7 +1238,7 @@ Return ONLY the JSON object, no other text.`, currentYear)
 	content = strings.TrimSpace(content)
 
 	var result ImageEventResult
-	if err := json.Unmarshal([]byte(content), &result); err != nil {
+	if err := parseLeadingJSON(content, &result); err != nil {
 		return nil, content, fmt.Errorf("parsing image event result: %w (content: %s)", err, content)
 	}
 
@@ -1417,7 +1427,7 @@ Text:
 	content = strings.TrimSpace(content)
 
 	var entries []ScheduleEntry
-	if err := json.Unmarshal([]byte(content), &entries); err != nil {
+	if err := parseLeadingJSON(content, &entries); err != nil {
 		return nil, fmt.Errorf("parsing schedule entries: %w (content: %s)", err, content)
 	}
 
