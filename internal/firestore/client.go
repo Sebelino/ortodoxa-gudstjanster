@@ -219,6 +219,36 @@ func (c *Client) CountFutureServicesForScraper(ctx context.Context, scraperName 
 	return count, nil
 }
 
+// LatestFutureServiceDate returns the latest date (YYYY-MM-DD) among a
+// scraper's stored future services, or "" if it has none. Used to gauge how
+// much runway a scraper's currently-published schedule has left when its
+// most recent fetch was rejected — see shouldSendCountDecreaseAlert in
+// cmd/ingest.
+func (c *Client) LatestFutureServiceDate(ctx context.Context, scraperName string) (string, error) {
+	today := time.Now().Format("2006-01-02")
+	iter := c.client.Collection(c.collection).
+		Where("scraper_name", "==", scraperName).
+		Where("date", ">=", today).
+		OrderBy("date", firestore.Desc).
+		Limit(1).
+		Documents(ctx)
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err == iterator.Done {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("finding latest future service date for scraper %s: %w", scraperName, err)
+	}
+
+	var svc model.ChurchService
+	if err := doc.DataTo(&svc); err != nil {
+		return "", fmt.Errorf("decoding latest future service for scraper %s: %w", scraperName, err)
+	}
+	return svc.Date, nil
+}
+
 // GetLatestBatchID returns the most recent batch_id from the collection.
 func (c *Client) GetLatestBatchID(ctx context.Context) (string, error) {
 	iter := c.client.Collection(c.collection).

@@ -48,3 +48,23 @@ resource "google_firestore_index" "services_scraper_date" {
 
   depends_on = [google_firestore_database.main]
 }
+
+# Composite index for finding a scraper's latest future service date
+# (Firestore doesn't reuse an ascending composite index for a descending
+# order-by, so this needs its own index rather than reusing the one above).
+resource "google_firestore_index" "services_scraper_date_desc" {
+  database   = google_firestore_database.main.name
+  collection = "services"
+
+  fields {
+    field_path = "scraper_name"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "date"
+    order      = "DESCENDING"
+  }
+
+  depends_on = [google_firestore_database.main]
+}
