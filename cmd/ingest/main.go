@@ -218,13 +218,14 @@ registry.Register(scraper.NewGCalendarScraper())
 				// Save rejected data to GCS for diagnostics
 				gcsPath := saveDiagnostics(gcsStore, scraperName, services)
 
-				// Send alert email if SMTP is configured and this isn't the
-				// same rejection already alerted on before (e.g. a source
-				// that simply hasn't posted anything new since last time) —
-				// only the first occurrence of a given rejection is worth
-				// a human's attention.
+				// Send alert email if SMTP is configured. A rejection with a
+				// detected technical failure behind it (see
+				// notesIndicateFailure) alerts right away; a clean rejection
+				// (most likely just a source that hasn't posted anything new)
+				// only alerts as a long-term fallback if it never resolves —
+				// see shouldSendCountDecreaseAlert.
 				if smtpConfig != nil {
-					if shouldSendCountDecreaseAlert(gcsStore, scraperName, services) {
+					if shouldSendCountDecreaseAlert(gcsStore, scraperName, services, notesIndicateFailure(fetchNotes)) {
 						subject, body := buildCountDecreaseAlert(scraperName, existingCount, newCount, gcsBucket, gcsPath, services, fetchNotes)
 						if err := smtpConfig.Send(subject, body); err != nil {
 							log.Printf("ERROR: Failed to send alert email for %s: %v", scraperName, err)
@@ -232,7 +233,7 @@ registry.Register(scraper.NewGCalendarScraper())
 							log.Printf("Alert email sent for %s", scraperName)
 						}
 					} else {
-						log.Printf("Alert email skipped for %s: rejection unchanged since last alert", scraperName)
+						log.Printf("Alert email skipped for %s: rejection unchanged/not yet due", scraperName)
 					}
 				}
 
@@ -310,8 +311,8 @@ registry.Register(scraper.NewGCalendarScraper())
 			// Only alert when at least one failure is new or has changed
 			// since it was last reported — an ongoing, unchanged outage
 			// (e.g. an upstream site still down) doesn't get re-alerted
-			// every 3 hours, but a still-unresolved failure does get a
-			// daily reminder so it isn't forgotten either.
+			// every 3 hours. Every currently-failing scraper is still
+			// listed in the body for context once an alert does fire.
 			anyNew := false
 			for _, f := range scraperErrors {
 				if shouldSendScraperFailureAlert(gcsStore, f.name, f.err.Error()) {
@@ -637,13 +638,17 @@ func safeScraperName(scraperName string) string {
 	return strings.ReplaceAll(strings.ToLower(scraperName), " ", "-")
 }
 
-// lastAlertRecord is what's persisted per dedup key to suppress repeat
-// alerts describing the same underlying problem (see shouldSendDedupedAlert).
-// SentAt is purely informational (visible to anyone inspecting the file
-// directly) — it plays no part in the dedup decision itself.
+// lastAlertRecord is what's persisted per dedup key to decide whether an
+// alert should fire for the same underlying problem — see
+// shouldSendDedupedAlert. FirstSeen is when the current Checksum was first
+// recorded, used to hold off a first alert until a problem has persisted a
+// while. LastAlert is when an alert was last actually sent for it, used for
+// periodic reminders; nil means the current problem hasn't been alerted on
+// yet.
 type lastAlertRecord struct {
-	Checksum string    `json:"checksum"`
-	SentAt   time.Time `json:"sent_at"`
+	Checksum  string     `json:"checksum"`
+	FirstSeen time.Time  `json:"first_seen"`
+	LastAlert *time.Time `json:"last_alert,omitempty"`
 }
 
 func countDecreaseAlertDedupKey(scraperName string) string {
@@ -657,53 +662,112 @@ func scraperFailureAlertDedupKey(scraperName string) string {
 
 // scraperFailureReminderInterval is how often a still-unresolved scraper
 // failure gets re-alerted even though the error hasn't changed. A hard
-// failure is worth not losing track of if it drags on — unlike a
-// count-decrease rejection (see shouldSendCountDecreaseAlert), which is
-// often just a source that hasn't posted anything new and never gets a
-// periodic reminder.
+// failure — or a count-decrease rejection with a detected technical failure
+// behind it (see notesIndicateFailure) — is worth not losing track of if it
+// drags on.
 const scraperFailureReminderInterval = 24 * time.Hour
 
-// shouldSendDedupedAlert reports whether an alert should actually be emailed,
-// given a checksum of the content it would describe, persisted under key.
-// The goal is to alert only when something changes — a scraper starting to
-// fail or reject data when it wasn't before, or a failure/rejection changing
-// shape — not to re-notify for an unchanged, already-known problem on every
-// ingestion cycle (e.g. a source that simply hasn't posted anything new, or
-// an outage that hasn't resolved yet). maxAge, if nonzero, additionally
-// forces a reminder once that long has passed since the last alert, even
-// with the content unchanged; maxAge == 0 means no periodic reminder at
-// all — silent until the content actually changes. When it returns true, it
-// also persists the new checksum so the next call can compare against it.
-func shouldSendDedupedAlert(gcsStore *store.GCSStore, key string, content []byte, maxAge time.Duration) bool {
+// countDecreaseSilentFailsafeDelay is the long-term fallback for a
+// count-decrease rejection with no detected technical failure (see
+// notesIndicateFailure) — most likely just a source that hasn't posted
+// anything new, which never gets alerted on its own. If the exact same
+// rejection is still unresolved after this long, it starts looking more
+// like a scraper silently broken in a way it doesn't notice itself, so it's
+// worth one alert — repeated at the same interval for as long as it persists.
+const countDecreaseSilentFailsafeDelay = 14 * 24 * time.Hour
+
+// notesIndicateFailure reports whether any diagnostic note logged during a
+// Fetch call describes an actual technical failure (an OCR/fetch/parse
+// error, etc.) as opposed to a routine "nothing new" note. Scrapers
+// consistently word failure notes with "fail" (e.g. "OCR failed for image
+// 2: ..."), so that's used as the signal.
+func notesIndicateFailure(notes []string) bool {
+	for _, n := range notes {
+		if strings.Contains(strings.ToLower(n), "fail") {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldSendDedupedAlert reports whether an alert should actually be
+// emailed, given a checksum of the content it would describe, persisted
+// under key. A changed checksum is always treated as a brand new problem,
+// resetting tracking.
+//   - firstAlertDelay: how long the same unresolved problem must persist
+//     before its very first alert; 0 means alert immediately.
+//   - reminderInterval: once alerted, how often to remind again while still
+//     unresolved; 0 means never remind — silent until it changes.
+func shouldSendDedupedAlert(gcsStore *store.GCSStore, key string, content []byte, firstAlertDelay, reminderInterval time.Duration) bool {
 	sum := sha256.Sum256(content)
 	checksum := hex.EncodeToString(sum[:])
+	now := time.Now().UTC()
 
 	var last lastAlertRecord
-	if gcsStore.GetJSON(key, &last) {
-		unchanged := last.Checksum == checksum
-		reminderDue := maxAge > 0 && time.Since(last.SentAt) >= maxAge
-		if unchanged && !reminderDue {
-			return false
+	found := gcsStore.GetJSON(key, &last)
+
+	save := func(r lastAlertRecord) {
+		if err := gcsStore.SetJSON(key, r); err != nil {
+			log.Printf("WARNING: failed to save alert dedup record for %s: %v", key, err)
 		}
 	}
 
-	record := lastAlertRecord{Checksum: checksum, SentAt: time.Now().UTC()}
-	if err := gcsStore.SetJSON(key, record); err != nil {
-		log.Printf("WARNING: failed to save alert dedup record for %s: %v", key, err)
+	if !found || last.Checksum != checksum {
+		record := lastAlertRecord{Checksum: checksum, FirstSeen: now}
+		alertNow := firstAlertDelay <= 0
+		if alertNow {
+			record.LastAlert = &now
+		}
+		save(record)
+		return alertNow
 	}
-	return true
+
+	if last.LastAlert == nil {
+		if last.FirstSeen.IsZero() {
+			// Record predates FirstSeen tracking being added — start the
+			// clock now instead of reading a zero time as "overdue for
+			// eons" and firing immediately.
+			last.FirstSeen = now
+			alertNow := firstAlertDelay <= 0
+			if alertNow {
+				last.LastAlert = &now
+			}
+			save(last)
+			return alertNow
+		}
+		if now.Sub(last.FirstSeen) < firstAlertDelay {
+			return false
+		}
+		last.LastAlert = &now
+		save(last)
+		return true
+	}
+
+	if reminderInterval > 0 && now.Sub(*last.LastAlert) >= reminderInterval {
+		last.LastAlert = &now
+		save(last)
+		return true
+	}
+
+	return false
 }
 
 // shouldSendCountDecreaseAlert is shouldSendDedupedAlert specialized for
 // count-decrease rejections, checksumming the rejected services themselves.
-// No periodic reminder — an unchanged rejection (e.g. a source that simply
-// hasn't posted anything new) isn't something going wrong.
-func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService) bool {
+// A rejection with a detected technical failure behind it is treated like a
+// hard scraper failure (alert immediately, remind daily); a clean rejection
+// (likely just nothing new to report) only alerts as a long-term fallback if
+// it never resolves (see countDecreaseSilentFailsafeDelay).
+func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService, hasFailureNote bool) bool {
 	data, err := json.Marshal(services)
 	if err != nil {
 		log.Printf("WARNING: failed to checksum rejected data for %s: %v", scraperName, err)
 	}
-	return shouldSendDedupedAlert(gcsStore, countDecreaseAlertDedupKey(scraperName), data, 0)
+	key := countDecreaseAlertDedupKey(scraperName)
+	if hasFailureNote {
+		return shouldSendDedupedAlert(gcsStore, key, data, 0, scraperFailureReminderInterval)
+	}
+	return shouldSendDedupedAlert(gcsStore, key, data, countDecreaseSilentFailsafeDelay, countDecreaseSilentFailsafeDelay)
 }
 
 // shouldSendScraperFailureAlert is shouldSendDedupedAlert specialized for
@@ -711,7 +775,7 @@ func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, 
 // always alerts; an unchanged, still-failing error gets a daily reminder
 // (scraperFailureReminderInterval) rather than going silent indefinitely.
 func shouldSendScraperFailureAlert(gcsStore *store.GCSStore, scraperName, errMsg string) bool {
-	return shouldSendDedupedAlert(gcsStore, scraperFailureAlertDedupKey(scraperName), []byte(errMsg), scraperFailureReminderInterval)
+	return shouldSendDedupedAlert(gcsStore, scraperFailureAlertDedupKey(scraperName), []byte(errMsg), 0, scraperFailureReminderInterval)
 }
 
 // saveDiagnostics serializes rejected services to GCS and returns the object path.
