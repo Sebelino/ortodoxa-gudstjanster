@@ -26,9 +26,18 @@ const (
 	ukrainskaChannelURL = "https://t.me/ukrcerkva_stockholm"
 	ukrainskaLocation   = "Nynäsvägen 3C, 136 47 Haninge"
 	// Trailing window used only to seed scanning the very first time this
-	// scraper runs (no persisted state yet). After that, scanning is
-	// incremental — see findScheduleImages.
-	ukrainskaScanCount = 100
+	// scraper runs (no persisted state yet), or if persisted state is ever
+	// lost and it cold-starts again. After that, scanning is incremental —
+	// see findScheduleImages. A schedule is sometimes posted as a multi-photo
+	// album whose messages then sit unchanged for weeks while individual
+	// reminder reposts accumulate after it — 100 was once narrowly too
+	// short to reach back to such an album (see the 12210-12212 backfill,
+	// September 2026), silently and permanently missing it since the
+	// watermark only ever moves forward from wherever cold start lands.
+	// Widened with a generous margin against that recurring on any future
+	// cold start; the extra cost is one-time; incremental runs are
+	// unaffected.
+	ukrainskaScanCount = 400
 	// Safety cap on how far back a single run will catch up if ingestion
 	// hasn't run in a long time, so a large gap in scan history can't turn
 	// into one run fetching thousands of posts.
