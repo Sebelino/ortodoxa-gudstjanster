@@ -307,18 +307,26 @@ registry.Register(scraper.NewGCalendarScraper())
 	// Send consolidated alerts
 	if smtpConfig != nil {
 		if len(scraperErrors) > 0 {
-			var lines []string
+			// Only alert when at least one failure is new or has changed
+			// since it was last reported — an ongoing, unchanged outage
+			// (e.g. an upstream site still down) doesn't get re-alerted
+			// every 3 hours, but a still-unresolved failure does get a
+			// daily reminder so it isn't forgotten either.
+			anyNew := false
 			for _, f := range scraperErrors {
-				lines = append(lines, fmt.Sprintf("- %s: %v", f.name, f.err))
-				for _, n := range f.notes {
-					lines = append(lines, fmt.Sprintf("    • %s", n))
+				if shouldSendScraperFailureAlert(gcsStore, f.name, f.err.Error()) {
+					anyNew = true
 				}
 			}
-			body := "The following scrapers failed during ingestion:\r\n\r\n" + strings.Join(lines, "\r\n")
-			if err := smtpConfig.Send("Ingestion alert: scrapers failed", body); err != nil {
-				log.Printf("ERROR: Failed to send scraper failure alert: %v", err)
+			if anyNew {
+				subject, body := buildScraperFailureAlert(scraperErrors)
+				if err := smtpConfig.Send(subject, body); err != nil {
+					log.Printf("ERROR: Failed to send scraper failure alert: %v", err)
+				} else {
+					log.Printf("Alert email sent: %d scraper failure(s)", len(scraperErrors))
+				}
 			} else {
-				log.Printf("Alert email sent: %d scraper failure(s)", len(scraperErrors))
+				log.Printf("Alert email skipped: %d scraper failure(s) unchanged since last alert", len(scraperErrors))
 			}
 		}
 		if len(unknownSlugs) > 0 {
@@ -629,11 +637,11 @@ func safeScraperName(scraperName string) string {
 	return strings.ReplaceAll(strings.ToLower(scraperName), " ", "-")
 }
 
-// lastCountDecreaseAlert is what's persisted per scraper to dedupe repeat
-// count-decrease alerts (see shouldSendCountDecreaseAlert). SentAt is purely
-// informational (visible to anyone inspecting the file directly) — it plays
-// no part in the dedup decision itself.
-type lastCountDecreaseAlert struct {
+// lastAlertRecord is what's persisted per dedup key to suppress repeat
+// alerts describing the same underlying problem (see shouldSendDedupedAlert).
+// SentAt is purely informational (visible to anyone inspecting the file
+// directly) — it plays no part in the dedup decision itself.
+type lastAlertRecord struct {
 	Checksum string    `json:"checksum"`
 	SentAt   time.Time `json:"sent_at"`
 }
@@ -643,36 +651,67 @@ func countDecreaseAlertDedupKey(scraperName string) string {
 	return fmt.Sprintf("diagnostics/%s/last-alert", safeScraperName(scraperName))
 }
 
-// shouldSendCountDecreaseAlert reports whether a count-decrease alert should
-// actually be emailed. The goal is to alert only when something changes —
-// a scraper starting to reject data it wasn't rejecting before, or a
-// rejection changing shape — not to re-notify for an unchanged, already-known
-// rejection on every ingestion cycle (e.g. a source that simply hasn't
-// posted anything new). There's deliberately no time-based fallback either:
-// an ongoing, unchanged rejection doesn't get a periodic reminder — it was
-// already reported once, and re-alerting on it wouldn't mean anything new
-// is wrong. When it returns true, it also persists the new checksum so the
-// next call can compare against it.
-func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService) bool {
-	checksum := ""
-	if data, err := json.Marshal(services); err == nil {
-		sum := sha256.Sum256(data)
-		checksum = hex.EncodeToString(sum[:])
-	} else {
-		log.Printf("WARNING: failed to checksum rejected data for %s: %v", scraperName, err)
+func scraperFailureAlertDedupKey(scraperName string) string {
+	return fmt.Sprintf("diagnostics/%s/last-failure-alert", safeScraperName(scraperName))
+}
+
+// scraperFailureReminderInterval is how often a still-unresolved scraper
+// failure gets re-alerted even though the error hasn't changed. A hard
+// failure is worth not losing track of if it drags on — unlike a
+// count-decrease rejection (see shouldSendCountDecreaseAlert), which is
+// often just a source that hasn't posted anything new and never gets a
+// periodic reminder.
+const scraperFailureReminderInterval = 24 * time.Hour
+
+// shouldSendDedupedAlert reports whether an alert should actually be emailed,
+// given a checksum of the content it would describe, persisted under key.
+// The goal is to alert only when something changes — a scraper starting to
+// fail or reject data when it wasn't before, or a failure/rejection changing
+// shape — not to re-notify for an unchanged, already-known problem on every
+// ingestion cycle (e.g. a source that simply hasn't posted anything new, or
+// an outage that hasn't resolved yet). maxAge, if nonzero, additionally
+// forces a reminder once that long has passed since the last alert, even
+// with the content unchanged; maxAge == 0 means no periodic reminder at
+// all — silent until the content actually changes. When it returns true, it
+// also persists the new checksum so the next call can compare against it.
+func shouldSendDedupedAlert(gcsStore *store.GCSStore, key string, content []byte, maxAge time.Duration) bool {
+	sum := sha256.Sum256(content)
+	checksum := hex.EncodeToString(sum[:])
+
+	var last lastAlertRecord
+	if gcsStore.GetJSON(key, &last) {
+		unchanged := last.Checksum == checksum
+		reminderDue := maxAge > 0 && time.Since(last.SentAt) >= maxAge
+		if unchanged && !reminderDue {
+			return false
+		}
 	}
 
-	key := countDecreaseAlertDedupKey(scraperName)
-	var last lastCountDecreaseAlert
-	if gcsStore.GetJSON(key, &last) && last.Checksum == checksum {
-		return false
-	}
-
-	record := lastCountDecreaseAlert{Checksum: checksum, SentAt: time.Now().UTC()}
+	record := lastAlertRecord{Checksum: checksum, SentAt: time.Now().UTC()}
 	if err := gcsStore.SetJSON(key, record); err != nil {
-		log.Printf("WARNING: failed to save alert dedup record for %s: %v", scraperName, err)
+		log.Printf("WARNING: failed to save alert dedup record for %s: %v", key, err)
 	}
 	return true
+}
+
+// shouldSendCountDecreaseAlert is shouldSendDedupedAlert specialized for
+// count-decrease rejections, checksumming the rejected services themselves.
+// No periodic reminder — an unchanged rejection (e.g. a source that simply
+// hasn't posted anything new) isn't something going wrong.
+func shouldSendCountDecreaseAlert(gcsStore *store.GCSStore, scraperName string, services []model.ChurchService) bool {
+	data, err := json.Marshal(services)
+	if err != nil {
+		log.Printf("WARNING: failed to checksum rejected data for %s: %v", scraperName, err)
+	}
+	return shouldSendDedupedAlert(gcsStore, countDecreaseAlertDedupKey(scraperName), data, 0)
+}
+
+// shouldSendScraperFailureAlert is shouldSendDedupedAlert specialized for
+// scraper failures, checksumming the error message. A new or different error
+// always alerts; an unchanged, still-failing error gets a daily reminder
+// (scraperFailureReminderInterval) rather than going silent indefinitely.
+func shouldSendScraperFailureAlert(gcsStore *store.GCSStore, scraperName, errMsg string) bool {
+	return shouldSendDedupedAlert(gcsStore, scraperFailureAlertDedupKey(scraperName), []byte(errMsg), scraperFailureReminderInterval)
 }
 
 // saveDiagnostics serializes rejected services to GCS and returns the object path.
@@ -693,6 +732,45 @@ func saveDiagnostics(gcsStore *store.GCSStore, scraperName string, services []mo
 	}
 
 	return path
+}
+
+// buildScraperFailureAlert formats the subject and body for one or more
+// scrapers that errored out entirely this run (as opposed to a count
+// decrease, where the scraper did return data but less of it than expected).
+// The subject names the affected scraper(s) directly, and the body leads
+// with a plain-language summary before the technical error, so the actual
+// problem is clear without needing to decode a raw Go error string.
+func buildScraperFailureAlert(failures []scraperFailure) (subject, body string) {
+	if len(failures) == 1 {
+		subject = fmt.Sprintf("Ingestion alert: %s failed to update", failures[0].name)
+	} else {
+		names := make([]string, len(failures))
+		for i, f := range failures {
+			names[i] = f.name
+		}
+		subject = fmt.Sprintf("Ingestion alert: %d scrapers failed to update (%s)", len(failures), strings.Join(names, ", "))
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d scraper(s) could not fetch their schedule this run and were skipped.\r\n", len(failures))
+	fmt.Fprintf(&sb, "The site's existing published data for them is unaffected — nothing was changed or removed.\r\n")
+	fmt.Fprintf(&sb, "\r\n")
+
+	for i, f := range failures {
+		fmt.Fprintf(&sb, "%s\r\n", f.name)
+		fmt.Fprintf(&sb, "  Error: %v\r\n", f.err)
+		for _, n := range f.notes {
+			fmt.Fprintf(&sb, "    • %s\r\n", n)
+		}
+		if i < len(failures)-1 {
+			fmt.Fprintf(&sb, "\r\n")
+		}
+	}
+
+	fmt.Fprintf(&sb, "\r\n---\r\n")
+	fmt.Fprintf(&sb, "This alert fires on a new or changed error, and once a day as a reminder for as long as it stays unresolved.\r\n")
+
+	return subject, sb.String()
 }
 
 // buildCountDecreaseAlert formats the subject and body for a service count regression alert.
