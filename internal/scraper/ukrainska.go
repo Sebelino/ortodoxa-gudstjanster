@@ -550,10 +550,39 @@ func (s *UkrainskaScraper) isScheduleImage(ctx context.Context, imageData []byte
 	return result, nil
 }
 
+// refetchImageFromPost re-fetches postKey's Telegram post and downloads
+// whichever of its images currently matches checksum. Used when a
+// previously-saved image URL has stopped working — Telegram's per-file URLs
+// are signed and eventually expire, even though the image itself is still
+// live on the post — so a fresh URL is needed rather than the one saved in
+// scan state.
+func (s *UkrainskaScraper) refetchImageFromPost(ctx context.Context, postKey, checksum string) ([]byte, error) {
+	postNum, err := strconv.Atoi(postKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid post key %q: %w", postKey, err)
+	}
+	post, err := s.fetchPost(ctx, postNum)
+	if err != nil {
+		return nil, fmt.Errorf("re-fetching post %d: %w", postNum, err)
+	}
+	for _, url := range post.imageURLs {
+		data, err := fetchURL(ctx, url)
+		if err != nil {
+			log.Printf("Ukrainska: failed to download refreshed image candidate from post %d: %v", postNum, err)
+			continue
+		}
+		if computeChecksum(data) == checksum {
+			return data, nil
+		}
+	}
+	return nil, fmt.Errorf("no image in post %d matches checksum %s", postNum, checksum[:12])
+}
+
 // ocrImage extracts schedule entries from an image using the Vision API,
 // with caching by image checksum. For images carried forward from earlier
 // runs (img.data is nil), this normally hits the OCR cache directly without
-// any download; on a cache miss it falls back to re-fetching img.url.
+// any download; on a cache miss it falls back to re-fetching img.url, and
+// if that URL has since expired, to refetchImageFromPost.
 func (s *UkrainskaScraper) ocrImage(ctx context.Context, img scheduleImage, sourceRef string) ([]vision.ScheduleEntry, error) {
 	cacheKey := "ukrainska-ocr/v1/" + img.checksum
 
@@ -569,7 +598,16 @@ func (s *UkrainskaScraper) ocrImage(ctx context.Context, img scheduleImage, sour
 			var err error
 			imageData, err = fetchURL(ctx, img.url)
 			if err != nil {
-				return nil, fmt.Errorf("re-fetching %s for OCR: %w", sourceRef, err)
+				// Telegram's per-file URLs are signed and eventually expire,
+				// so a URL saved in scan state days ago can start 404ing even
+				// though the image itself is still live on the post — refetch
+				// the post for a current URL instead of giving up.
+				refreshed, rerr := s.refetchImageFromPost(ctx, img.postKey, img.checksum)
+				if rerr != nil {
+					return nil, fmt.Errorf("re-fetching %s for OCR: %w (refresh also failed: %v)", sourceRef, err, rerr)
+				}
+				log.Printf("Ukrainska: stale URL for %s, refreshed from post %s", sourceRef, img.postKey)
+				imageData = refreshed
 			}
 		}
 
