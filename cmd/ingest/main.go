@@ -934,33 +934,61 @@ func resolveParishFields(svc *model.ChurchService, scraperName string, slugToPar
 }
 
 // applyCorrections matches corrections to scraped services and overrides fields.
-// Corrections match on parish_slug + date + time.
+// Corrections match on parish_slug + date + time, optionally narrowed by
+// service_name. A correction with Delete=true removes the event entirely.
 func applyCorrections(accepted []acceptedResult, corrections []model.Correction) int {
+	// Build lookup keyed by (slug, date, time). Multiple corrections can
+	// target the same slot if they differ by service_name.
 	type corrKey struct{ slug, date, time string }
-	lookup := make(map[corrKey]model.Correction)
+	lookup := make(map[corrKey][]model.Correction)
 	for _, c := range corrections {
-		lookup[corrKey{c.ParishSlug, c.Date, c.OriginalTime}] = c
+		k := corrKey{c.ParishSlug, c.Date, c.OriginalTime}
+		lookup[k] = append(lookup[k], c)
 	}
 
 	applied := 0
-	for _, result := range accepted {
-		for i := range result.services {
-			svc := &result.services[i]
+	for ri := range accepted {
+		kept := accepted[ri].services[:0]
+		for i := range accepted[ri].services {
+			svc := &accepted[ri].services[i]
 			timeStr := ""
 			if svc.Time != nil {
 				timeStr = *svc.Time
 			}
-			corr, ok := lookup[corrKey{svc.ParishSlug, svc.Date, timeStr}]
+			corrs, ok := lookup[corrKey{svc.ParishSlug, svc.Date, timeStr}]
 			if !ok {
+				kept = append(kept, *svc)
 				continue
 			}
-			if corr.Time != "" {
-				svc.Time = &corr.Time
+			// Find the matching correction. If a correction specifies
+			// ServiceName it only matches that exact name; otherwise it
+			// matches any event in the slot.
+			var matched *model.Correction
+			for j := range corrs {
+				if corrs[j].ServiceName != "" && corrs[j].ServiceName != svc.ServiceName {
+					continue
+				}
+				matched = &corrs[j]
+				break
 			}
-			svc.Correction = &corr.Reason
+			if matched == nil {
+				kept = append(kept, *svc)
+				continue
+			}
+			if matched.Delete {
+				applied++
+				log.Printf("Deleted %s %s %s %q: %s", svc.ParishSlug, svc.Date, timeStr, svc.ServiceName, matched.Reason)
+				continue // skip — don't append to kept
+			}
+			if matched.Time != "" {
+				svc.Time = &matched.Time
+			}
+			svc.Correction = &matched.Reason
 			applied++
-			log.Printf("Applied correction to %s %s %s: %s", svc.ParishSlug, svc.Date, timeStr, corr.Reason)
+			log.Printf("Applied correction to %s %s %s: %s", svc.ParishSlug, svc.Date, timeStr, matched.Reason)
+			kept = append(kept, *svc)
 		}
+		accepted[ri].services = kept
 	}
 	return applied
 }
