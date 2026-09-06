@@ -108,6 +108,7 @@ func (s *GCalendarManualScraper) Fetch(ctx context.Context) ([]model.ChurchServi
 			Date:          ev.Start.Format("2006-01-02"),
 			DayOfWeek:     srpska.WeekdayToSwedish(ev.Start.Weekday()),
 			ServiceName:   ev.Summary,
+			Title:         ev.Summary,
 			Location:      strPtr(ev.Location),
 			Time:          formatTimeRange(ev),
 			Notes:         strPtr(notesText),
