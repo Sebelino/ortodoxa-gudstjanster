@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -75,7 +76,24 @@ func (s *UkrainskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, er
 	// frontier when we have one, so this is normally a cheap check of a
 	// post we already know is close to current, rather than a blind
 	// exponential search starting at a fixed post number every run.
-	latestPost, err := s.findLatestPost(ctx, state.HighestScannedPost)
+	// Telegram's embed pages intermittently serve a transient "not found"
+	// response for a post that does in fact exist — retried a few seconds
+	// later, it normally succeeds, so a single blip shouldn't fail the
+	// whole run (or repeat as a daily alert for a problem that isn't
+	// actually ongoing).
+	var latestPost int
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		latestPost, err = s.findLatestPost(ctx, state.HighestScannedPost)
+		if err == nil {
+			break
+		}
+		s.note("attempt %d/3: finding latest post failed: %v", attempt, err)
+		if attempt < 3 {
+			log.Printf("Ukrainska: finding latest post failed on attempt %d/3, retrying in 10s: %v", attempt, err)
+			time.Sleep(10 * time.Second)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("finding latest post: %w", err)
 	}
