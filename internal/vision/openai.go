@@ -499,9 +499,11 @@ Examples:
 - "Oljesmörjelsens sakrament" → "Oljesmörjelsen"
 - "Vigning i början av katekesundervisningen" → "Vattenvigning"
 - "Agiasmos" → "Vattenvigning"
+- "Lilla vattenvigningen & ärkebiskoplig liturgi" → "Vattenvigning & Gudomlig Liturgi"
 
 IMPORTANT: Any service that is a form of Divine Liturgy (Gudomlig liturgi, Helig Liturgi, Liturgi, Ärkeprästerlig liturgi, Divine Liturgy, etc.) must get the title "Gudomlig Liturgi". Exception: joint services ("gemensam") get "Gemensam Liturgi".
 IMPORTANT: Any service related to catechism or catechumens (katekumener, katekes, katekisundervisning, etc.) must get the title "Katekesundervisning" — UNLESS it is actually a water-blessing rite (Agiasmos, "Vigning"/"Vattenvigning") held on the occasion of the catechism year starting, in which case it must get the title "Vattenvigning" instead. The water-blessing rule takes precedence, since the service itself is a blessing, not a class.
+IMPORTANT: If a water-blessing rite (Agiasmos, "Vigning"/"Vattenvigning") is explicitly combined with a named Divine Liturgy (e.g. "... & ärkebiskoplig/ärkeprästerlig liturgi"), the title must reflect both: "Vattenvigning & Gudomlig Liturgi". Do not drop the liturgy just because a water-blessing rite is also mentioned — unlike the catechism case above, this is two distinct services, not one rite standing in for a class.
 IMPORTANT: A "Reading of the Book of Acts" or similar scriptural reading is an Orthodox liturgical service, not a book club — title it appropriately (e.g. "Apostelläsning").
 IMPORTANT: Special Holy Week services (Epitaphios/Sorgeropen, De tolv evangelieläsningarna, etc.) must keep their specific title — do NOT collapse them into "Vesper" or "Gudomlig Liturgi".
 
