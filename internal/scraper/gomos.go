@@ -630,7 +630,7 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 			if !strings.Contains(strings.ToLower(entry.Location), gomosHomeCity) {
 				continue
 			}
-			location = entry.Location
+			location = normalizeKnownParishLocation(entry.Location)
 		}
 		time := entry.Time
 

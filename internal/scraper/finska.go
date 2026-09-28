@@ -69,7 +69,7 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 		// Extract location
 		locRegex := regexp.MustCompile(`<strong>\s*Plats:\s*</strong>\s*([^<]+)`)
 		if locMatch := locRegex.FindStringSubmatch(detailsHTML); len(locMatch) > 1 {
-			loc := normalizeFinskaLocation(strings.TrimSpace(locMatch[1]))
+			loc := normalizeKnownParishLocation(strings.TrimSpace(locMatch[1]))
 			location = &loc
 		}
 
@@ -124,9 +124,14 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 	return services, nil
 }
 
-// normalizeFinskaLocation maps known location variants to a canonical address format.
-func normalizeFinskaLocation(loc string) string {
-	if strings.Contains(loc, "Nikolai") || strings.Contains(loc, "Bellmansgatan") {
+// normalizeKnownParishLocation maps references to known Stockholm parishes (by
+// name or address, in whatever spelling a source uses) to a canonical address
+// format. Shared across scrapers: Finska's own website uses inconsistent
+// formatting for its own address, and other scrapers (e.g. Gomos, when the
+// Archbishop celebrates a joint liturgy at another parish) sometimes name a
+// different parish by description rather than address.
+func normalizeKnownParishLocation(loc string) string {
+	if strings.Contains(loc, "Nikolai") || strings.Contains(loc, "Nikolaus") || strings.Contains(loc, "Bellmansgatan") {
 		return "Bellmansgatan 13, 118 47 Stockholm"
 	}
 	return loc
