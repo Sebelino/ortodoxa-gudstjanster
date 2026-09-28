@@ -24,6 +24,7 @@ const (
 	gomosParishSlug  = "st-georgios"
 	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
 	gomosLocation    = "Birger Jarlsgatan 92, 114 20 Stockholm"
+	gomosHomeCity    = "stockholm"
 )
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
@@ -445,7 +446,6 @@ func rawEntriesToSwedish(entries []vision.RawScheduleEntry) []vision.ScheduleEnt
 			ServiceName: e.ServiceName,
 			Occasion:    e.Occasion,
 			Location:    e.Location,
-			Abroad:      e.Abroad,
 		}
 	}
 	return result
@@ -621,7 +621,13 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 
 		location := gomosLocation
 		if entry.Location != "" {
-			if entry.Abroad {
+			// St. Georgios has one home venue in Stockholm. A named location
+			// elsewhere (whether abroad, like a Reykjavik parish, or elsewhere
+			// in Sweden, like a hierarchical liturgy in Borås) is a one-off
+			// away from the parish's typical location(s), not a normal
+			// St. Georgios service — skip it so the calendar stays relevant
+			// to members looking for services at their own parish.
+			if !strings.Contains(strings.ToLower(entry.Location), gomosHomeCity) {
 				continue
 			}
 			location = entry.Location
