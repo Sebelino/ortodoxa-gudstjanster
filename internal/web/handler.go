@@ -470,6 +470,31 @@ func generateICS(services []model.ChurchService) string {
 	sb.WriteString("X-WR-CALNAME:Ortodoxa Gudstjänster\r\n")
 	sb.WriteString("X-WR-TIMEZONE:Europe/Stockholm\r\n")
 
+	// VTIMEZONE for Europe/Stockholm (CET/CEST with EU transition rules)
+	sb.WriteString("BEGIN:VTIMEZONE\r\n")
+	sb.WriteString("TZID:Europe/Stockholm\r\n")
+	sb.WriteString("BEGIN:STANDARD\r\n")
+	sb.WriteString("DTSTART:19701025T030000\r\n")
+	sb.WriteString("RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10\r\n")
+	sb.WriteString("TZOFFSETFROM:+0200\r\n")
+	sb.WriteString("TZOFFSETTO:+0100\r\n")
+	sb.WriteString("TZNAME:CET\r\n")
+	sb.WriteString("END:STANDARD\r\n")
+	sb.WriteString("BEGIN:DAYLIGHT\r\n")
+	sb.WriteString("DTSTART:19700329T020000\r\n")
+	sb.WriteString("RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3\r\n")
+	sb.WriteString("TZOFFSETFROM:+0100\r\n")
+	sb.WriteString("TZOFFSETTO:+0200\r\n")
+	sb.WriteString("TZNAME:CEST\r\n")
+	sb.WriteString("END:DAYLIGHT\r\n")
+	sb.WriteString("END:VTIMEZONE\r\n")
+
+	// Use a fixed DTSTAMP so the output is stable across requests.
+	// DTSTAMP is required per RFC 5545 but only indicates when the
+	// iCalendar object was created; using a fixed value prevents
+	// calendar clients from seeing spurious changes on every sync.
+	dtstamp := "20250101T000000Z"
+
 	for _, s := range services {
 		sb.WriteString("BEGIN:VEVENT\r\n")
 
@@ -481,28 +506,28 @@ func generateICS(services []model.ChurchService) string {
 		uidData := fmt.Sprintf("%s|%s|%s|%s", s.Source, s.Date, s.ServiceName, timeStr)
 		uidHash := sha256.Sum256([]byte(uidData))
 		uid := hex.EncodeToString(uidHash[:16]) + "@ortodoxa-gudstjanster"
-		sb.WriteString(fmt.Sprintf("UID:%s\r\n", uid))
+		writeICSLine(&sb, "UID:"+uid)
 
 		// Date and time
 		if s.StartTime != nil {
 			dtstart := s.StartTime.Format("20060102T150405")
-			sb.WriteString(fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s\r\n", dtstart))
+			writeICSLine(&sb, fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s", dtstart))
 			if s.EndTime != nil {
 				dtend := s.EndTime.Format("20060102T150405")
-				sb.WriteString(fmt.Sprintf("DTEND;TZID=Europe/Stockholm:%s\r\n", dtend))
+				writeICSLine(&sb, fmt.Sprintf("DTEND;TZID=Europe/Stockholm:%s", dtend))
 			} else {
-				sb.WriteString("DURATION:PT1H\r\n")
+				writeICSLine(&sb, "DURATION:PT1H")
 			}
 		} else if s.Time != nil && *s.Time != "" {
 			if startTime := parseStartTime(*s.Time); startTime != "" {
 				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + startTime
-				sb.WriteString(fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s\r\n", dtstart))
-				sb.WriteString("DURATION:PT1H\r\n")
+				writeICSLine(&sb, fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s", dtstart))
+				writeICSLine(&sb, "DURATION:PT1H")
 			}
 		} else {
 			// All-day event
 			dtstart := strings.ReplaceAll(s.Date, "-", "")
-			sb.WriteString(fmt.Sprintf("DTSTART;VALUE=DATE:%s\r\n", dtstart))
+			writeICSLine(&sb, fmt.Sprintf("DTSTART;VALUE=DATE:%s", dtstart))
 		}
 
 		// Summary (use short title if available, else full service name)
@@ -510,13 +535,11 @@ func generateICS(services []model.ChurchService) string {
 		if s.Title != "" {
 			summaryText = s.Title
 		}
-		summary := escapeICS(summaryText)
-		sb.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", summary))
+		writeICSLine(&sb, "SUMMARY:"+escapeICS(summaryText))
 
 		// Location
 		if s.Location != nil && *s.Location != "" {
-			location := escapeICS(*s.Location)
-			sb.WriteString(fmt.Sprintf("LOCATION:%s\r\n", location))
+			writeICSLine(&sb, "LOCATION:"+escapeICS(*s.Location))
 		}
 
 		// Description with additional details
@@ -539,21 +562,46 @@ func generateICS(services []model.ChurchService) string {
 		} else if s.Source != "" {
 			desc = append(desc, fmt.Sprintf("Källa: %s", s.Source))
 		}
-		description := escapeICS(strings.Join(desc, "\n"))
-		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", description))
+		writeICSLine(&sb, "DESCRIPTION:"+escapeICS(strings.Join(desc, "\n")))
 
 		// Categories
-		sb.WriteString(fmt.Sprintf("CATEGORIES:%s\r\n", escapeICS(parishGroup(s))))
+		writeICSLine(&sb, "CATEGORIES:"+escapeICS(parishGroup(s)))
 
 		// Timestamp
-		now := time.Now().UTC().Format("20060102T150405Z")
-		sb.WriteString(fmt.Sprintf("DTSTAMP:%s\r\n", now))
+		writeICSLine(&sb, "DTSTAMP:"+dtstamp)
 
 		sb.WriteString("END:VEVENT\r\n")
 	}
 
 	sb.WriteString("END:VCALENDAR\r\n")
 	return sb.String()
+}
+
+// writeICSLine writes a content line to the ICS output, folding it per RFC 5545
+// (max 75 octets per line, continuation lines start with a space).
+func writeICSLine(sb *strings.Builder, line string) {
+	const maxLen = 75
+	b := []byte(line)
+	if len(b) <= maxLen {
+		sb.Write(b)
+		sb.WriteString("\r\n")
+		return
+	}
+	// First line: up to maxLen bytes
+	sb.Write(b[:maxLen])
+	sb.WriteString("\r\n")
+	b = b[maxLen:]
+	// Continuation lines: space + up to (maxLen-1) bytes
+	for len(b) > 0 {
+		chunk := maxLen - 1 // space takes 1 byte
+		if chunk > len(b) {
+			chunk = len(b)
+		}
+		sb.WriteByte(' ')
+		sb.Write(b[:chunk])
+		sb.WriteString("\r\n")
+		b = b[chunk:]
+	}
 }
 
 func firstWebsite(p ParishInfo) string {

@@ -106,6 +106,50 @@ func TestEscapeICS(t *testing.T) {
 	}
 }
 
+// --- writeICSLine ---
+
+func TestWriteICSLineFolding(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"short line",
+			"SUMMARY:Short",
+			"SUMMARY:Short\r\n",
+		},
+		{
+			"exactly 75 bytes",
+			"DESCRIPTION:" + strings.Repeat("x", 63),
+			"DESCRIPTION:" + strings.Repeat("x", 63) + "\r\n",
+		},
+		{
+			"76 bytes folds",
+			"DESCRIPTION:" + strings.Repeat("x", 64),
+			"DESCRIPTION:" + strings.Repeat("x", 63) + "\r\n x\r\n",
+		},
+		{
+			"long line folds correctly",
+			"DESCRIPTION:" + strings.Repeat("a", 150),
+			"DESCRIPTION:" + strings.Repeat("a", 63) + "\r\n" +
+				" " + strings.Repeat("a", 74) + "\r\n" +
+				" " + strings.Repeat("a", 13) + "\r\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sb strings.Builder
+			writeICSLine(&sb, tt.input)
+			got := sb.String()
+			if got != tt.want {
+				t.Errorf("writeICSLine(%q):\ngot:  %q\nwant: %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 // --- langCategory ---
 
 func TestLangCategory(t *testing.T) {
@@ -354,14 +398,33 @@ func TestGenerateICS(t *testing.T) {
 		"LOCATION:Stockholm",
 		"DTSTART;TZID=Europe/Stockholm:20260308T100000",
 		"DURATION:PT1H",
-		"Församling: Test Parish",
 		"VERSION:2.0",
+		"BEGIN:VTIMEZONE",
+		"TZID:Europe/Stockholm",
+		"END:VTIMEZONE",
+		"DTSTAMP:20250101T000000Z",
 	}
 
 	for _, check := range checks {
 		if !strings.Contains(ics, check) {
 			t.Errorf("ICS output missing %q", check)
 		}
+	}
+
+	// Verify CRLF line endings
+	if strings.Contains(ics, "\n") {
+		for _, line := range strings.Split(ics, "\n") {
+			if line != "" && !strings.HasSuffix(line, "\r") {
+				t.Errorf("line missing CRLF: %q", line)
+				break
+			}
+		}
+	}
+
+	// Verify description is present (may be folded across lines)
+	unfolded := strings.ReplaceAll(ics, "\r\n ", "")
+	if !strings.Contains(unfolded, "Församling: Test Parish") {
+		t.Error("ICS output missing parish in description (after unfolding)")
 	}
 }
 
