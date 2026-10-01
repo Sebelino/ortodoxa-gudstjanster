@@ -523,6 +523,10 @@ func generateICS(services []model.ChurchService) string {
 				dtstart := strings.ReplaceAll(s.Date, "-", "") + "T" + startTime
 				writeICSLine(&sb, fmt.Sprintf("DTSTART;TZID=Europe/Stockholm:%s", dtstart))
 				writeICSLine(&sb, "DURATION:PT1H")
+			} else {
+				// Unparseable time (e.g. "Efter Liturgi") — emit as all-day event
+				dtstart := strings.ReplaceAll(s.Date, "-", "")
+				writeICSLine(&sb, fmt.Sprintf("DTSTART;VALUE=DATE:%s", dtstart))
 			}
 		} else {
 			// All-day event
