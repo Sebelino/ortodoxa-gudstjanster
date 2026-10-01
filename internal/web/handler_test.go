@@ -136,6 +136,15 @@ func TestWriteICSLineFolding(t *testing.T) {
 				" " + strings.Repeat("a", 74) + "\r\n" +
 				" " + strings.Repeat("a", 13) + "\r\n",
 		},
+		{
+			"does not split multi-byte UTF-8",
+			// 'å' is 2 bytes (0xC3 0xA5). Place it at the fold boundary.
+			"DESCRIPTION:" + strings.Repeat("x", 62) + "å" + "after",
+			// 12 + 62 = 74 bytes, then 'å' would start at byte 74 but is 2 bytes
+			// so it fits (74+2=76 > 75), fold must happen before 'å'
+			"DESCRIPTION:" + strings.Repeat("x", 62) + "\r\n" +
+				" å" + "after\r\n",
+		},
 	}
 
 	for _, tt := range tests {

@@ -583,6 +583,7 @@ func generateICS(services []model.ChurchService) string {
 
 // writeICSLine writes a content line to the ICS output, folding it per RFC 5545
 // (max 75 octets per line, continuation lines start with a space).
+// Fold points are adjusted to avoid splitting multi-byte UTF-8 characters.
 func writeICSLine(sb *strings.Builder, line string) {
 	const maxLen = 75
 	b := []byte(line)
@@ -591,21 +592,37 @@ func writeICSLine(sb *strings.Builder, line string) {
 		sb.WriteString("\r\n")
 		return
 	}
-	// First line: up to maxLen bytes
-	sb.Write(b[:maxLen])
+	// First line: up to maxLen bytes, adjusted for UTF-8 boundaries
+	cut := utf8SafeCut(b, maxLen)
+	sb.Write(b[:cut])
 	sb.WriteString("\r\n")
-	b = b[maxLen:]
+	b = b[cut:]
 	// Continuation lines: space + up to (maxLen-1) bytes
 	for len(b) > 0 {
-		chunk := maxLen - 1 // space takes 1 byte
-		if chunk > len(b) {
-			chunk = len(b)
-		}
+		cut = utf8SafeCut(b, maxLen-1) // space takes 1 byte
 		sb.WriteByte(' ')
-		sb.Write(b[:chunk])
+		sb.Write(b[:cut])
 		sb.WriteString("\r\n")
-		b = b[chunk:]
+		b = b[cut:]
 	}
+}
+
+// utf8SafeCut returns the largest n <= max such that b[:n] doesn't split
+// a multi-byte UTF-8 character. A UTF-8 continuation byte has the form 10xxxxxx.
+func utf8SafeCut(b []byte, max int) int {
+	if max >= len(b) {
+		return len(b)
+	}
+	n := max
+	// Back up while we're pointing at a continuation byte (0x80..0xBF)
+	for n > 0 && b[n]&0xC0 == 0x80 {
+		n--
+	}
+	if n == 0 {
+		// Shouldn't happen with valid UTF-8, but avoid infinite loop
+		return max
+	}
+	return n
 }
 
 func firstWebsite(p ParishInfo) string {
