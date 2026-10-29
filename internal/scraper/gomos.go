@@ -598,6 +598,22 @@ func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData
 	)
 	log.Printf("Gomos: Facebook after cookies: %d img tags", imgCount)
 
+	// Log a snippet of visible text to diagnose login walls or regional blocks
+	var pageHint string
+	chromedp.Run(taskCtx,
+		chromedp.EvaluateAsDevTools(`
+			(() => {
+				const texts = Array.from(document.querySelectorAll('div[dir="auto"], h1, h2, title'))
+					.map(el => el.textContent.trim())
+					.filter(t => t.length > 5 && t.length < 500);
+				const imgs = Array.from(document.querySelectorAll('img'))
+					.map(el => el.src.substring(0, 80));
+				return JSON.stringify({texts: texts.slice(0, 10), imgs: imgs});
+			})()
+		`, &pageHint),
+	)
+	log.Printf("Gomos: Facebook page hint: %s", pageHint)
+
 	// Extract content images: deduplicate by Facebook image ID, keep largest variant
 	var imgURLs []string
 	err = chromedp.Run(taskCtx,
