@@ -27,7 +27,7 @@ const (
 	gomosScheduleURL  = "https://gomos.se/en/category/schedule/"
 	gomosLocation     = "Birger Jarlsgatan 92, 114 20 Stockholm"
 	gomosHomeCity     = "stockholm"
-	gomosFacebookURL  = "https://m.facebook.com/metropolisofsweden1"
+	gomosFacebookURL  = "https://www.facebook.com/metropolisofsweden1"
 	gomosFacebookSource = "https://www.facebook.com/metropolisofsweden1"
 )
 
@@ -536,7 +536,6 @@ func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData
 		chromedp.Headless,
 		chromedp.DisableGPU,
 		chromedp.NoSandbox,
-		chromedp.UserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"),
 	)
 
 	browserCtx, browserCancel := context.WithTimeout(ctx, 45*time.Second)
@@ -576,7 +575,9 @@ func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData
 					b.textContent.includes('Allow essential and optional') ||
 					b.textContent.includes('Only allow essential') ||
 					b.textContent.includes('Tillåt') ||
-					b.textContent.includes('cookies')
+					b.textContent.includes('cookies') ||
+					b.textContent.includes('Decline optional') ||
+					b.textContent.includes('Close')
 				);
 				if (acceptBtn) {
 					acceptBtn.click();
@@ -592,7 +593,20 @@ func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData
 	}
 	log.Printf("Gomos: Facebook cookie consent: %s", cookieResult)
 
-	// Log page state after cookie acceptance
+	// Dismiss login dialog/overlay if present (desktop site shows this)
+	chromedp.Run(taskCtx,
+		chromedp.EvaluateAsDevTools(`
+			(() => {
+				// Close button on login modal
+				document.querySelectorAll('[aria-label="Close"], [data-testid="royal_close_button"]').forEach(el => el.click());
+				// Remove dialog overlays
+				document.querySelectorAll('[role="dialog"]').forEach(el => el.remove());
+			})()
+		`, nil),
+		chromedp.Sleep(3*time.Second),
+	)
+
+	// Log page state after cookie/dialog handling
 	chromedp.Run(taskCtx,
 		chromedp.EvaluateAsDevTools(`document.querySelectorAll('img').length`, &imgCount),
 	)
