@@ -7,14 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/chromedp/chromedp"
 
 	"ortodoxa-gudstjanster/internal/model"
 	"ortodoxa-gudstjanster/internal/store"
@@ -22,13 +20,11 @@ import (
 )
 
 const (
-	gomosSourceName   = "St. Georgios Cathedral"
-	gomosParishSlug   = "st-georgios"
-	gomosScheduleURL  = "https://gomos.se/en/category/schedule/"
-	gomosLocation     = "Birger Jarlsgatan 92, 114 20 Stockholm"
-	gomosHomeCity     = "stockholm"
-	gomosFacebookURL  = "https://www.facebook.com/metropolisofsweden1"
-	gomosFacebookSource = "https://www.facebook.com/metropolisofsweden1"
+	gomosSourceName  = "St. Georgios Cathedral"
+	gomosParishSlug  = "st-georgios"
+	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
+	gomosLocation    = "Birger Jarlsgatan 92, 114 20 Stockholm"
+	gomosHomeCity    = "stockholm"
 )
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
@@ -83,15 +79,6 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 		}
 		allImages = append(allImages, bucketImages...)
 	}
-
-	fbImages, fbErr := s.fetchFacebookImages(ctx)
-	if fbErr != nil {
-		log.Printf("Gomos: Facebook failed: %v", fbErr)
-		s.note("Facebook fetch failed: %v", fbErr)
-	} else {
-		s.note("Facebook: fetched %d image(s)", len(fbImages))
-	}
-	allImages = append(allImages, fbImages...)
 
 	if len(allImages) == 0 {
 		if websiteErr != nil {
@@ -517,164 +504,6 @@ func (s *GomosScraper) fetchBucketImages(ctx context.Context) ([]imageWithData, 
 			data:      imageData,
 			sourceRef: name,
 			sourceURL: gomosScheduleURL,
-		})
-	}
-
-	return images, nil
-}
-
-// fetchFacebookImages loads the Facebook page with a headless browser and
-// extracts content images from recent posts. Facebook requires JavaScript
-// rendering, so we use chromedp with the mobile site (m.facebook.com) which
-// shows posts without requiring login after accepting cookies.
-func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData, error) {
-	opts := chromedp.DefaultExecAllocatorOptions[:]
-	if chromePath := os.Getenv("CHROME_PATH"); chromePath != "" {
-		opts = append(opts, chromedp.ExecPath(chromePath))
-	}
-	opts = append(opts,
-		chromedp.Headless,
-		chromedp.DisableGPU,
-		chromedp.NoSandbox,
-	)
-
-	browserCtx, browserCancel := context.WithTimeout(ctx, 45*time.Second)
-	defer browserCancel()
-
-	allocCtx, allocCancel := chromedp.NewExecAllocator(browserCtx, opts...)
-	defer allocCancel()
-
-	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
-	defer taskCancel()
-
-	// Navigate and wait for initial load
-	err := chromedp.Run(taskCtx,
-		chromedp.Navigate(gomosFacebookURL),
-		chromedp.Sleep(6*time.Second),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("navigating to Facebook: %w", err)
-	}
-
-	// Log page state for diagnostics
-	var bodyLen int
-	var imgCount int
-	chromedp.Run(taskCtx,
-		chromedp.EvaluateAsDevTools(`document.body.innerHTML.length`, &bodyLen),
-		chromedp.EvaluateAsDevTools(`document.querySelectorAll('img').length`, &imgCount),
-	)
-	log.Printf("Gomos: Facebook page loaded: body=%d chars, %d img tags", bodyLen, imgCount)
-
-	// Accept cookie consent (separate Run call for reliability)
-	var cookieResult string
-	err = chromedp.Run(taskCtx,
-		chromedp.EvaluateAsDevTools(`
-			(() => {
-				const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
-				const acceptBtn = buttons.find(b =>
-					b.textContent.includes('Allow essential and optional') ||
-					b.textContent.includes('Only allow essential') ||
-					b.textContent.includes('Tillåt') ||
-					b.textContent.includes('cookies') ||
-					b.textContent.includes('Decline optional') ||
-					b.textContent.includes('Close')
-				);
-				if (acceptBtn) {
-					acceptBtn.click();
-					return 'clicked: ' + acceptBtn.textContent.trim().substring(0, 60);
-				}
-				return 'no cookie button found among ' + buttons.length + ' buttons';
-			})()
-		`, &cookieResult),
-		chromedp.Sleep(6*time.Second),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("accepting Facebook cookies: %w", err)
-	}
-	log.Printf("Gomos: Facebook cookie consent: %s", cookieResult)
-
-	// Dismiss login dialog/overlay if present (desktop site shows this)
-	chromedp.Run(taskCtx,
-		chromedp.EvaluateAsDevTools(`
-			(() => {
-				// Close button on login modal
-				document.querySelectorAll('[aria-label="Close"], [data-testid="royal_close_button"]').forEach(el => el.click());
-				// Remove dialog overlays
-				document.querySelectorAll('[role="dialog"]').forEach(el => el.remove());
-			})()
-		`, nil),
-		chromedp.Sleep(3*time.Second),
-	)
-
-	// Log page state after cookie/dialog handling
-	chromedp.Run(taskCtx,
-		chromedp.EvaluateAsDevTools(`document.querySelectorAll('img').length`, &imgCount),
-	)
-	log.Printf("Gomos: Facebook after cookies: %d img tags", imgCount)
-
-	// Log a snippet of visible text to diagnose login walls or regional blocks
-	var pageHint string
-	chromedp.Run(taskCtx,
-		chromedp.EvaluateAsDevTools(`
-			(() => {
-				const texts = Array.from(document.querySelectorAll('div[dir="auto"], h1, h2, title'))
-					.map(el => el.textContent.trim())
-					.filter(t => t.length > 5 && t.length < 500);
-				const imgs = Array.from(document.querySelectorAll('img'))
-					.map(el => el.src.substring(0, 80));
-				return JSON.stringify({texts: texts.slice(0, 10), imgs: imgs});
-			})()
-		`, &pageHint),
-	)
-	log.Printf("Gomos: Facebook page hint: %s", pageHint)
-
-	// Extract content images: deduplicate by Facebook image ID, keep largest variant
-	var imgURLs []string
-	err = chromedp.Run(taskCtx,
-		chromedp.EvaluateAsDevTools(`
-			(() => {
-				const byId = {};
-				document.querySelectorAll('img').forEach(img => {
-					const src = img.src;
-					if (!src.includes('scontent')) return;
-					const match = src.match(/\/(\d+_\d+)/);
-					if (!match) return;
-					const key = match[1];
-					const sizeMatch = src.match(/p(\d+)x(\d+)/);
-					const w = sizeMatch ? parseInt(sizeMatch[1]) : 0;
-					if (!byId[key] || w > byId[key].w) {
-						byId[key] = {src: src, w: w};
-					}
-				});
-				return Object.values(byId).map(v => v.src);
-			})()
-		`, &imgURLs),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("extracting Facebook images: %w", err)
-	}
-
-	if len(imgURLs) == 0 {
-		return nil, fmt.Errorf("no images found on Facebook page (body=%d, img tags=%d)", bodyLen, imgCount)
-	}
-
-	log.Printf("Gomos: Facebook page returned %d unique images", len(imgURLs))
-
-	var images []imageWithData
-	for _, url := range imgURLs {
-		data, err := fetchURL(ctx, url)
-		if err != nil {
-			log.Printf("Gomos: failed to download Facebook image: %v", err)
-			continue
-		}
-		// Skip tiny images (profile pics, icons) — schedule images are typically >20KB
-		if len(data) < 20000 {
-			continue
-		}
-		images = append(images, imageWithData{
-			data:      data,
-			sourceRef: url,
-			sourceURL: gomosFacebookSource,
 		})
 	}
 
