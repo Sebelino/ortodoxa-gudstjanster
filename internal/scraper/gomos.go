@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/chromedp/chromedp"
 
 	"ortodoxa-gudstjanster/internal/model"
 	"ortodoxa-gudstjanster/internal/store"
@@ -20,11 +22,13 @@ import (
 )
 
 const (
-	gomosSourceName  = "St. Georgios Cathedral"
-	gomosParishSlug  = "st-georgios"
-	gomosScheduleURL = "https://gomos.se/en/category/schedule/"
-	gomosLocation    = "Birger Jarlsgatan 92, 114 20 Stockholm"
-	gomosHomeCity    = "stockholm"
+	gomosSourceName   = "St. Georgios Cathedral"
+	gomosParishSlug   = "st-georgios"
+	gomosScheduleURL  = "https://gomos.se/en/category/schedule/"
+	gomosLocation     = "Birger Jarlsgatan 92, 114 20 Stockholm"
+	gomosHomeCity     = "stockholm"
+	gomosFacebookURL  = "https://m.facebook.com/metropolisofsweden1"
+	gomosFacebookSource = "https://www.facebook.com/metropolisofsweden1"
 )
 
 // GomosScraper scrapes the St. Georgios Cathedral schedule using OpenAI Vision API.
@@ -79,6 +83,15 @@ func (s *GomosScraper) Fetch(ctx context.Context) ([]model.ChurchService, error)
 		}
 		allImages = append(allImages, bucketImages...)
 	}
+
+	fbImages, fbErr := s.fetchFacebookImages(ctx)
+	if fbErr != nil {
+		log.Printf("Gomos: Facebook failed: %v", fbErr)
+		s.note("Facebook fetch failed: %v", fbErr)
+	} else {
+		s.note("Facebook: fetched %d image(s)", len(fbImages))
+	}
+	allImages = append(allImages, fbImages...)
 
 	if len(allImages) == 0 {
 		if websiteErr != nil {
@@ -504,6 +517,111 @@ func (s *GomosScraper) fetchBucketImages(ctx context.Context) ([]imageWithData, 
 			data:      imageData,
 			sourceRef: name,
 			sourceURL: gomosScheduleURL,
+		})
+	}
+
+	return images, nil
+}
+
+// fetchFacebookImages loads the Facebook page with a headless browser and
+// extracts content images from recent posts. Facebook requires JavaScript
+// rendering, so we use chromedp with the mobile site (m.facebook.com) which
+// shows posts without requiring login after accepting cookies.
+func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData, error) {
+	opts := chromedp.DefaultExecAllocatorOptions[:]
+	if chromePath := os.Getenv("CHROME_PATH"); chromePath != "" {
+		opts = append(opts, chromedp.ExecPath(chromePath))
+	}
+	opts = append(opts,
+		chromedp.Headless,
+		chromedp.DisableGPU,
+		chromedp.NoSandbox,
+		chromedp.UserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"),
+	)
+
+	browserCtx, browserCancel := context.WithTimeout(ctx, 45*time.Second)
+	defer browserCancel()
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(browserCtx, opts...)
+	defer allocCancel()
+
+	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
+	defer taskCancel()
+
+	// Navigate and wait for initial load
+	err := chromedp.Run(taskCtx,
+		chromedp.Navigate(gomosFacebookURL),
+		chromedp.Sleep(6*time.Second),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("navigating to Facebook: %w", err)
+	}
+
+	// Accept cookie consent (separate Run call for reliability)
+	err = chromedp.Run(taskCtx,
+		chromedp.EvaluateAsDevTools(`
+			(() => {
+				const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+				const acceptBtn = buttons.find(b =>
+					b.textContent.includes('Allow essential and optional') ||
+					b.textContent.includes('Only allow essential')
+				);
+				if (acceptBtn) acceptBtn.click();
+			})()
+		`, nil),
+		chromedp.Sleep(6*time.Second),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("accepting Facebook cookies: %w", err)
+	}
+
+	// Extract content images: deduplicate by Facebook image ID, keep largest variant
+	var imgURLs []string
+	err = chromedp.Run(taskCtx,
+		chromedp.EvaluateAsDevTools(`
+			(() => {
+				const byId = {};
+				document.querySelectorAll('img').forEach(img => {
+					const src = img.src;
+					if (!src.includes('scontent')) return;
+					const match = src.match(/\/(\d+_\d+)/);
+					if (!match) return;
+					const key = match[1];
+					const sizeMatch = src.match(/p(\d+)x(\d+)/);
+					const w = sizeMatch ? parseInt(sizeMatch[1]) : 0;
+					if (!byId[key] || w > byId[key].w) {
+						byId[key] = {src: src, w: w};
+					}
+				});
+				return Object.values(byId).map(v => v.src);
+			})()
+		`, &imgURLs),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("extracting Facebook images: %w", err)
+	}
+
+	if len(imgURLs) == 0 {
+		return nil, fmt.Errorf("no images found on Facebook page")
+	}
+
+	log.Printf("Gomos: Facebook page returned %d unique images", len(imgURLs))
+
+	var images []imageWithData
+	for _, url := range imgURLs {
+		data, err := fetchURL(ctx, url)
+		if err != nil {
+			log.Printf("Gomos: failed to download Facebook image: %v", err)
+			continue
+		}
+		// Skip tiny images (profile pics, icons) — schedule images are typically >20KB
+		if len(data) < 20000 {
+			continue
+		}
+		images = append(images, imageWithData{
+			data:      data,
+			sourceRef: url,
+			sourceURL: gomosFacebookSource,
 		})
 	}
 
