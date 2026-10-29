@@ -557,23 +557,46 @@ func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData
 		return nil, fmt.Errorf("navigating to Facebook: %w", err)
 	}
 
+	// Log page state for diagnostics
+	var bodyLen int
+	var imgCount int
+	chromedp.Run(taskCtx,
+		chromedp.EvaluateAsDevTools(`document.body.innerHTML.length`, &bodyLen),
+		chromedp.EvaluateAsDevTools(`document.querySelectorAll('img').length`, &imgCount),
+	)
+	log.Printf("Gomos: Facebook page loaded: body=%d chars, %d img tags", bodyLen, imgCount)
+
 	// Accept cookie consent (separate Run call for reliability)
+	var cookieResult string
 	err = chromedp.Run(taskCtx,
 		chromedp.EvaluateAsDevTools(`
 			(() => {
 				const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
 				const acceptBtn = buttons.find(b =>
 					b.textContent.includes('Allow essential and optional') ||
-					b.textContent.includes('Only allow essential')
+					b.textContent.includes('Only allow essential') ||
+					b.textContent.includes('Tillåt') ||
+					b.textContent.includes('cookies')
 				);
-				if (acceptBtn) acceptBtn.click();
+				if (acceptBtn) {
+					acceptBtn.click();
+					return 'clicked: ' + acceptBtn.textContent.trim().substring(0, 60);
+				}
+				return 'no cookie button found among ' + buttons.length + ' buttons';
 			})()
-		`, nil),
+		`, &cookieResult),
 		chromedp.Sleep(6*time.Second),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("accepting Facebook cookies: %w", err)
 	}
+	log.Printf("Gomos: Facebook cookie consent: %s", cookieResult)
+
+	// Log page state after cookie acceptance
+	chromedp.Run(taskCtx,
+		chromedp.EvaluateAsDevTools(`document.querySelectorAll('img').length`, &imgCount),
+	)
+	log.Printf("Gomos: Facebook after cookies: %d img tags", imgCount)
 
 	// Extract content images: deduplicate by Facebook image ID, keep largest variant
 	var imgURLs []string
@@ -602,7 +625,7 @@ func (s *GomosScraper) fetchFacebookImages(ctx context.Context) ([]imageWithData
 	}
 
 	if len(imgURLs) == 0 {
-		return nil, fmt.Errorf("no images found on Facebook page")
+		return nil, fmt.Errorf("no images found on Facebook page (body=%d, img tags=%d)", bodyLen, imgCount)
 	}
 
 	log.Printf("Gomos: Facebook page returned %d unique images", len(imgURLs))
