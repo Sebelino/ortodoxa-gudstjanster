@@ -9,6 +9,15 @@
 //	  -time="09:30 - 12:30" \
 //	  -reason="Start time corrected from 08:30 to 09:30"
 //
+// Usage (override date):
+//
+//	go run scripts/add-correction.go \
+//	  -parish-slug=demetrios-nestor \
+//	  -date=2026-11-02 \
+//	  -original-time="10:00" \
+//	  -new-date=2026-11-01 \
+//	  -reason="Församlingen angav fel datum"
+//
 // Usage (delete event):
 //
 //	go run scripts/add-correction.go \
@@ -39,6 +48,7 @@ func main() {
 	originalTime := flag.String("original-time", "", "Original time to match (required)")
 	serviceName := flag.String("service-name", "", "Service name to match (optional, narrows match)")
 	newTime := flag.String("time", "", "New time value (optional)")
+	newDate := flag.String("new-date", "", "New date YYYY-MM-DD (optional)")
 	deleteFlag := flag.Bool("delete", false, "Delete the matched event instead of correcting it")
 	reason := flag.String("reason", "", "Correction reason (required)")
 	flag.Parse()
@@ -67,6 +77,9 @@ func main() {
 	if *newTime != "" {
 		data["time"] = *newTime
 	}
+	if *newDate != "" {
+		data["new_date"] = *newDate
+	}
 	if *deleteFlag {
 		data["delete"] = true
 	}
@@ -94,6 +107,9 @@ func main() {
 		fmt.Printf("  Action:  DELETE\n")
 	} else {
 		fmt.Printf("  Time:    %s → %s\n", *originalTime, *newTime)
+		if *newDate != "" {
+			fmt.Printf("  Date:    %s → %s\n", *date, *newDate)
+		}
 	}
 	fmt.Printf("  Reason:  %s\n", *reason)
 }

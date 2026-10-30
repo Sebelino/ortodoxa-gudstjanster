@@ -17,6 +17,7 @@ import (
 	"ortodoxa-gudstjanster/internal/firestore"
 	"ortodoxa-gudstjanster/internal/model"
 	"ortodoxa-gudstjanster/internal/scraper"
+	"ortodoxa-gudstjanster/internal/srpska"
 	"ortodoxa-gudstjanster/internal/store"
 	"ortodoxa-gudstjanster/internal/umap"
 	"ortodoxa-gudstjanster/internal/vision"
@@ -983,6 +984,13 @@ func applyCorrections(accepted []acceptedResult, corrections []model.Correction)
 			if matched.Time != "" {
 				svc.Time = &matched.Time
 			}
+			if matched.NewDate != "" {
+				if err := moveToDate(svc, matched.NewDate); err != nil {
+					log.Printf("Skipping correction of %s %s %s: %v", svc.ParishSlug, svc.Date, timeStr, err)
+					kept = append(kept, *svc)
+					continue
+				}
+			}
 			svc.Correction = &matched.Reason
 			applied++
 			log.Printf("Applied correction to %s %s %s: %s", svc.ParishSlug, svc.Date, timeStr, matched.Reason)
@@ -991,6 +999,31 @@ func applyCorrections(accepted []acceptedResult, corrections []model.Correction)
 		accepted[ri].services = kept
 	}
 	return applied
+}
+
+// moveToDate reschedules a service to the given YYYY-MM-DD date, keeping its
+// time of day.
+func moveToDate(svc *model.ChurchService, date string) error {
+	newDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return fmt.Errorf("invalid new_date: %w", err)
+	}
+	oldDate, err := time.Parse("2006-01-02", svc.Date)
+	if err != nil {
+		return fmt.Errorf("invalid service date: %w", err)
+	}
+	days := int(newDate.Sub(oldDate).Hours() / 24)
+	if svc.StartTime != nil {
+		start := svc.StartTime.AddDate(0, 0, days)
+		svc.StartTime = &start
+	}
+	if svc.EndTime != nil {
+		end := svc.EndTime.AddDate(0, 0, days)
+		svc.EndTime = &end
+	}
+	svc.Date = date
+	svc.DayOfWeek = srpska.WeekdayToSwedish(newDate.Weekday())
+	return nil
 }
 
 // buildParishLanguage joins primary and secondary languages into a single display string.
