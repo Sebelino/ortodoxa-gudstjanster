@@ -2,103 +2,113 @@ package scraper
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"ortodoxa-gudstjanster/internal/store"
+	"ortodoxa-gudstjanster/internal/vision"
 )
 
-// demetriosTestNow is a fixed "now" that puts a September schedule in the current year.
-var demetriosTestNow = time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
-
-func TestParseDemetriosLine(t *testing.T) {
-	tests := []struct {
-		name                         string
-		in                           string
-		wantOK                       bool
-		wantDate, wantWD, wantClause string
-	}{
-		{
-			"confession line",
-			"Lördag 5:e September: Bikt vid kl:11 meddela/boka på gerav23@gmail.com innan",
-			true, "2026-09-05", "Lördag", "Bikt vid kl:11 meddela/boka på gerav23@gmail.com innan",
-		},
-		{
-			"two-service sunday line, trailing period",
-			"Söndag 6:e September: Liturgi 10:00 och Orhros kl 09:00 i Brickebacken.",
-			true, "2026-09-06", "Söndag", "Liturgi 10:00 och Orhros kl 09:00 i Brickebacken.",
-		},
-		{
-			"weekday recomputed from date (source label ignored)",
-			"Måndag 6:e September: Vesper 18:00",
-			true, "2026-09-06", "Söndag", "Vesper 18:00",
-		},
-		{"saint heading, no date shape", "5 sep: Helige Profeten Zacharias", false, "", "", ""},
-		{"quote line", "Johannes Chrysostomos (ca 347–407)", false, "", "", ""},
-		{"prefix only, empty clause", "Lördag 5:e September:", false, "", "", ""},
+func TestDemetriosResolveDate(t *testing.T) {
+	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	date, wd := demetriosResolveDate(18, 10, now)
+	if date != "2026-10-18" || wd != "Söndag" {
+		t.Errorf("got (%q, %q), want (2026-10-18, Söndag)", date, wd)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			date, wd, clause, ok := parseDemetriosLine(tt.in, demetriosTestNow)
-			if ok != tt.wantOK {
-				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
-			}
-			if !ok {
-				return
-			}
-			if date != tt.wantDate || wd != tt.wantWD || clause != tt.wantClause {
-				t.Errorf("got (%q, %q, %q), want (%q, %q, %q)", date, wd, clause, tt.wantDate, tt.wantWD, tt.wantClause)
-			}
-		})
-	}
-}
-
-func TestParseDemetriosLineYearWindow(t *testing.T) {
 	// Late December, looking at a January line → next year.
-	now := time.Date(2026, 12, 20, 12, 0, 0, 0, time.UTC)
-	date, _, _, ok := parseDemetriosLine("Torsdag 7:e Januari: Liturgi 10:00", now)
-	if !ok || date != "2027-01-07" {
-		t.Errorf("got (%q, %v), want 2027-01-07", date, ok)
+	now = time.Date(2026, 12, 20, 12, 0, 0, 0, time.UTC)
+	if date, _ := demetriosResolveDate(7, 1, now); date != "2027-01-07" {
+		t.Errorf("got %q, want 2027-01-07", date)
 	}
 	// Mid January, looking at a December line → previous year.
 	now = time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
-	date, _, _, ok = parseDemetriosLine("Lördag 26:e December: Vesper 17:00", now)
-	if !ok || date != "2025-12-26" {
-		t.Errorf("got (%q, %v), want 2025-12-26", date, ok)
+	if date, _ := demetriosResolveDate(26, 12, now); date != "2025-12-26" {
+		t.Errorf("got %q, want 2025-12-26", date)
 	}
 }
 
-func TestSplitDemetriosClause(t *testing.T) {
-	tests := []struct {
-		in   string
-		want []string
-	}{
-		{
-			"Liturgi 10:00 och Orhros kl 09:00 i Brickebacken",
-			[]string{"Liturgi 10:00", "Orhros kl 09:00 i Brickebacken"},
-		},
-		{ // second half has no time → not split
-			"17:00 Esperinos och Ikon&Koboskini tillverkning samt bikt",
-			[]string{"17:00 Esperinos och Ikon&Koboskini tillverkning samt bikt"},
-		},
-		{ // single service, no connector
-			"Bikt vid kl:11 meddela/boka på gerav23@gmail.com innan",
-			[]string{"Bikt vid kl:11 meddela/boka på gerav23@gmail.com innan"},
-		},
-		{ // comma-separated, both timed
-			"Julotta kl 07:00, Liturgi kl 10:00",
-			[]string{"Julotta kl 07:00", "Liturgi kl 10:00"},
-		},
+const (
+	demetriosLineSunday = "Söndag 18 okt kl 10:00 Gudomlig Liturgi i Gode Herdens kapell i Brickebackens centrum med start 09:00(bikt fram till 09:30) Orthros. Fika efteråt, välkomna"
+	demetriosLineCancel = "Söndag 25 ok: Ingen Liturgi på Söndag, då jag är i Stockholm"
+)
+
+func TestValidateDemetriosLine(t *testing.T) {
+	good := &vision.LineSchedule{Days: []vision.LineDay{{Day: 18, Month: 10, Services: []vision.LineService{
+		{Time: "10:00", Name: demetriosLineSunday[len("Söndag 18 okt "):]},
+		{Time: "09:00", Name: "start 09:00(bikt fram till 09:30) Orthros", IsOrthros: true},
+	}}}}
+	if err := validateDemetriosLine(demetriosLineSunday, good); err != nil {
+		t.Errorf("valid parse rejected: %v", err)
 	}
-	for _, tt := range tests {
-		got := splitDemetriosClause(tt.in)
-		if len(got) != len(tt.want) {
-			t.Errorf("split(%q) = %q, want %q", tt.in, got, tt.want)
-			continue
+	cancel := &vision.LineSchedule{Days: []vision.LineDay{{Day: 25, Month: 10}}}
+	if err := validateDemetriosLine(demetriosLineCancel, cancel); err != nil {
+		t.Errorf("cancellation rejected: %v", err)
+	}
+
+	bad := map[string]*vision.LineSchedule{
+		"wrong month":      {Days: []vision.LineDay{{Day: 18, Month: 11, Services: good.Days[0].Services[:1]}}},
+		"day not in line":  {Days: []vision.LineDay{{Day: 19, Month: 10, Services: good.Days[0].Services[:1]}}},
+		"hour not in line": {Days: []vision.LineDay{{Day: 18, Month: 10, Services: []vision.LineService{{Time: "17:00", Name: "Gudomlig Liturgi"}}}}},
+		"malformed time":   {Days: []vision.LineDay{{Day: 18, Month: 10, Services: []vision.LineService{{Time: "10", Name: "Gudomlig Liturgi"}}}}},
+		"translated name":  {Days: []vision.LineDay{{Day: 18, Month: 10, Services: []vision.LineService{{Time: "10:00", Name: "Divine Liturgy at 10:00"}}}}},
+	}
+	for name, ls := range bad {
+		if err := validateDemetriosLine(demetriosLineSunday, ls); err == nil {
+			t.Errorf("%s: expected rejection", name)
 		}
-		for i := range got {
-			if got[i] != tt.want[i] {
-				t.Errorf("split(%q)[%d] = %q, want %q", tt.in, i, got[i], tt.want[i])
-			}
+	}
+}
+
+type fakeLineParser struct {
+	calls  int
+	result *vision.LineSchedule
+	err    error
+}
+
+func (f *fakeLineParser) ParseScheduleLine(context.Context, string) (*vision.LineSchedule, error) {
+	f.calls++
+	return f.result, f.err
+}
+
+func TestDemetriosReadLineCaches(t *testing.T) {
+	st, err := store.NewLocal(filepath.Join(t.TempDir(), "store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeLineParser{result: &vision.LineSchedule{Days: []vision.LineDay{{Day: 25, Month: 10}}}}
+	s := &DemetriosScraper{store: st, parser: fake}
+
+	for i, wantHit := range []bool{false, true} {
+		got, hit, err := s.readLine(context.Background(), demetriosLineCancel)
+		if err != nil || hit != wantHit || len(got.Days) != 1 {
+			t.Fatalf("call %d: got (%v, hit=%v, %v), want hit=%v", i, got, hit, err, wantHit)
 		}
+	}
+	if fake.calls != 1 {
+		t.Errorf("parser called %d times, want 1 (second read should hit the cache)", fake.calls)
+	}
+}
+
+func TestDemetriosReadLineRejectsInvalidAndDoesNotCache(t *testing.T) {
+	st, _ := store.NewLocal(filepath.Join(t.TempDir(), "store"))
+	fake := &fakeLineParser{result: &vision.LineSchedule{Days: []vision.LineDay{{Day: 3, Month: 2}}}}
+	s := &DemetriosScraper{store: st, parser: fake}
+
+	if _, _, err := s.readLine(context.Background(), demetriosLineCancel); err == nil {
+		t.Fatal("expected validation error")
+	}
+	fake.result = &vision.LineSchedule{Days: []vision.LineDay{{Day: 25, Month: 10}}}
+	if _, hit, err := s.readLine(context.Background(), demetriosLineCancel); err != nil || hit {
+		t.Errorf("after a rejected parse, got (hit=%v, %v), want fresh successful read", hit, err)
+	}
+
+	fake.err = errors.New("boom")
+	s2 := &DemetriosScraper{parser: fake}
+	if _, _, err := s2.readLine(context.Background(), demetriosLineSunday); err == nil {
+		t.Error("expected parser error to propagate")
 	}
 }
 
@@ -120,42 +130,21 @@ func TestDemetriosTime(t *testing.T) {
 	}
 }
 
-func TestDemetriosSegmentToService(t *testing.T) {
-	// Booking/contact text stays in the Beskrivning verbatim — the whole clause,
-	// only the leading date prefix (handled upstream) and trailing "." removed.
-	svc, ok := demetriosSegmentToService("2026-09-05", "Lördag",
-		"Bikt vid kl:11 meddela/boka på gerav23@gmail.com innan")
-	if !ok {
-		t.Fatal("expected a service")
-	}
+func TestDemetriosService(t *testing.T) {
+	// Booking/contact text stays in the Beskrivning verbatim; only the trailing "." goes.
+	svc := demetriosService("2026-09-05", "Lördag", vision.LineService{
+		Time: "11:00", Name: "Bikt vid kl:11 meddela/boka på gerav23@gmail.com innan."})
 	if svc.ServiceName != "Bikt vid kl:11 meddela/boka på gerav23@gmail.com innan" {
 		t.Errorf("ServiceName = %q", svc.ServiceName)
 	}
-	if svc.Time == nil || *svc.Time != "11:00" {
-		t.Errorf("Time = %v, want 11:00", svc.Time)
-	}
-	if svc.Notes != nil {
-		t.Errorf("Notes = %v, want nil (kept in Beskrivning instead)", *svc.Notes)
-	}
-	if svc.Title != "" {
-		t.Errorf("Title = %q, want empty", svc.Title)
+	if svc.Time == nil || *svc.Time != "11:00" || svc.Title != "" || svc.Notes != nil {
+		t.Errorf("unexpected service: %+v", svc)
 	}
 
-	// Orthros segment: verbatim name, explicit title override.
-	svc, ok = demetriosSegmentToService("2026-09-06", "Söndag", "Orhros kl 09:00 i Brickebacken.")
-	if !ok {
-		t.Fatal("expected a service")
-	}
-	if svc.ServiceName != "Orhros kl 09:00 i Brickebacken" { // trailing "." trimmed
-		t.Errorf("ServiceName = %q", svc.ServiceName)
-	}
+	svc = demetriosService("2026-10-18", "Söndag", vision.LineService{
+		Time: "09:00", Name: "Orhros kl 09:00 i Brickebacken", IsOrthros: true})
 	if svc.Title != "Orthros" {
 		t.Errorf("Title = %q, want Orthros", svc.Title)
-	}
-
-	// A segment with no time is not a service.
-	if _, ok := demetriosSegmentToService("2026-09-06", "Söndag", "bara text"); ok {
-		t.Error("expected no service for a segment without a time")
 	}
 }
 
@@ -191,7 +180,8 @@ func TestDemetriosScraperHasCurrentMonthEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	scraper := NewDemetriosScraper()
+	deps := newTestDeps(t, filepath.Join(os.TempDir(), "ortodoxa-gudstjanster-store-test"))
+	scraper := NewDemetriosScraper(deps.store, deps.vision)
 	services, err := scraper.Fetch(ctx)
 	if err != nil {
 		t.Fatalf("Fetch failed: %v", err)

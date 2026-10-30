@@ -140,7 +140,7 @@ func main() {
 	registry.Register(scraper.NewHeligaAnnaScraper())
 	registry.Register(scraper.NewRyskaScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewHeligeSergijScraper(gcsStore, visionClient))
-	registry.Register(scraper.NewDemetriosScraper())
+	registry.Register(scraper.NewDemetriosScraper(gcsStore, visionClient))
 	registry.Register(scraper.NewGCalendarScraper())
 	registry.Register(scraper.NewGCalendarManualScraper())
 	registry.Register(scraper.NewUppstandelseScraper())
