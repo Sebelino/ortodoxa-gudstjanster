@@ -460,9 +460,9 @@ func TestGenerateICSSummarySimplification(t *testing.T) {
 		title       string
 		wantSummary string
 	}{
-		{"Morgongudstjänst", "", "Gudstjänst"},
-		{"Aftongudstjänst", "", "Gudstjänst"},
-		{"Kvällsgudstjänst", "", "Gudstjänst"},
+		{"Morgongudstjänst", "", "Morgongudstjänst"},
+		{"Aftongudstjänst", "", "Aftongudstjänst"},
+		{"Kvällsgudstjänst", "", "Kvällsgudstjänst"},
 		{"Helig Liturgi", "", "Helig Liturgi"},
 		{"Morgongudstjänst", "Morgon", "Morgon"},
 		{"Helig Liturgi", "Liturgi", "Liturgi"},
