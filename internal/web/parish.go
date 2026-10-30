@@ -24,10 +24,13 @@ type ParishInfo struct {
 	MapQuery           string
 	Lat                float64
 	Lng                float64
+
+	street string // normalized street and number, see streetKey
 }
 
 var parishes []ParishInfo
 var parishBySlug map[string]ParishInfo
+var parishByName map[string]ParishInfo
 var parishesWithCalendar map[string]bool
 
 // SetParishesWithCalendar records which parishes have services in Firestore.
@@ -55,12 +58,15 @@ func SetParishes(umapParishes []umap.Parish) {
 			MapQuery:           mapQuery(p),
 			Lat:                p.Lat,
 			Lng:                p.Lng,
+			street:             streetKey(p.Address),
 		}
 	}
 
 	parishBySlug = make(map[string]ParishInfo, len(parishes))
+	parishByName = make(map[string]ParishInfo, len(parishes))
 	for _, p := range parishes {
 		parishBySlug[p.Slug] = p
+		parishByName[p.Name] = p
 	}
 }
 

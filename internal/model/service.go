@@ -23,4 +23,8 @@ type ChurchService struct {
 	ParishLanguage *string    `json:"parish_language,omitempty"`
 	EventLanguage  *string    `json:"event_language,omitempty"`
 	Correction     *string    `json:"correction,omitempty"`
+
+	// OffsiteVenue names the place when a service isn't held at its parish's
+	// usual address. Derived when serving; not stored in Firestore.
+	OffsiteVenue string `json:"offsite_venue,omitempty"`
 }

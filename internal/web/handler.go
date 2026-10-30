@@ -539,6 +539,9 @@ func generateICS(services []model.ChurchService) string {
 		if s.Title != "" {
 			summaryText = s.Title
 		}
+		if s.OffsiteVenue != "" {
+			summaryText += " (obs: " + s.OffsiteVenue + ")"
+		}
 		writeICSLine(&sb, "SUMMARY:"+escapeICS(summaryText))
 
 		// Location
@@ -754,6 +757,10 @@ func filterAndSort(services []model.ChurchService) []model.ChurchService {
 		}
 		return timeI < timeJ
 	})
+
+	for i := range future {
+		future[i].OffsiteVenue = offsiteVenue(future[i])
+	}
 
 	return future
 }

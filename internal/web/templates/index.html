@@ -195,6 +195,32 @@
             font-weight: 500;
         }
 
+        .service-line {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 0.2rem 0.75rem;
+        }
+
+        .offsite-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-left: auto;
+            padding: 0 0.4rem;
+            border-radius: 4px;
+            background: var(--offline-bg);
+            color: var(--offline-text);
+            font-size: 0.8rem;
+        }
+
+        .offsite-note svg {
+            flex-shrink: 0;
+            width: 0.8rem;
+            height: 0.8rem;
+            fill: currentColor;
+        }
+
         .col-source {
             width: 140px;
             color: var(--text-muted);
@@ -921,7 +947,7 @@
                                         return `
                                             <tr class="service-row" onclick="toggleDetails(${id})">
                                                 <td class="col-time">${formatTime(service)}</td>
-                                                <td class="col-name">${escapeHtml(service.title || service.service_name)}</td>
+                                                <td class="col-name">${serviceNameCell(service)}</td>
                                             </tr>
                                             <tr class="service-details" id="details-${id}">
                                                 <td colspan="2">${details}</td>
@@ -983,6 +1009,13 @@
                 return `<a href="/parish/${p.slug}" onclick="event.stopPropagation()" class="parish-link">${name}</a>`;
             }
             return name;
+        }
+
+        function serviceNameCell(service) {
+            const name = escapeHtml(service.title || service.service_name);
+            if (!service.offsite_venue) return name;
+            const address = escapeHtml(service.location).replace(/"/g, '&quot;');
+            return `<div class="service-line"><span>${name}</span><span class="offsite-note" title="${address}"><svg viewBox="0 0 24 24" role="img" aria-label="Plats"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>${escapeHtml(service.offsite_venue)}</span></div>`;
         }
 
         function escapeHtml(text) {
