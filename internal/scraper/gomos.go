@@ -655,10 +655,12 @@ func (s *GomosScraper) convertToServices(entries []vision.ScheduleEntry, sourceU
 			// away from the parish's typical location(s), not a normal
 			// St. Georgios service — skip it so the calendar stays relevant
 			// to members looking for services at their own parish.
-			if !strings.Contains(strings.ToLower(entry.Location), gomosHomeCity) {
+			// Known parishes are resolved first: a schedule can name one without
+			// spelling out the city.
+			location = normalizeKnownParishLocation(entry.Location)
+			if !strings.Contains(strings.ToLower(location), gomosHomeCity) {
 				continue
 			}
-			location = normalizeKnownParishLocation(entry.Location)
 		}
 		time := entry.Time
 

@@ -272,3 +272,23 @@ func TestNormalizeKnownParishLocationNikolaj(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestConvertToServicesOffsiteLocations(t *testing.T) {
+	entries := []vision.ScheduleEntry{
+		{Date: "2026-10-31", ServiceName: "Stockholm parish without city", Location: "den finska församlingen Helige Nikolai"},
+		{Date: "2026-11-14", ServiceName: "Outside Stockholm", Location: "Aposteln Bartholomaios församling i Reykjavik"},
+		{Date: "2026-11-28", ServiceName: "Same saint, other place", Location: "Helige Nikolais kloster i Rättvik, Dalarna"},
+		{Date: "2026-11-15", ServiceName: "At home"},
+	}
+	services := (&GomosScraper{}).convertToServices(entries, "")
+
+	if len(services) != 2 {
+		t.Fatalf("got %d services, want 2: %+v", len(services), services)
+	}
+	if got, want := *services[0].Location, "Bellmansgatan 13, 118 47 Stockholm"; got != want {
+		t.Errorf("location = %q, want %q", got, want)
+	}
+	if got := services[1].ServiceName; got != "At home" {
+		t.Errorf("second service = %q, want the home service", got)
+	}
+}

@@ -129,8 +129,12 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 // format. Shared across scrapers: Finska's own website uses inconsistent
 // formatting for its own address, and other scrapers (e.g. Gomos, when the
 // Archbishop celebrates a joint liturgy at another parish) sometimes name a
-// different parish by description rather than address.
+// different parish by description rather than address. Monasteries are left
+// alone: Helige Nikolais kloster in Rättvik shares the name but not the place.
 func normalizeKnownParishLocation(loc string) string {
+	if strings.Contains(strings.ToLower(loc), "kloster") {
+		return loc
+	}
 	if strings.Contains(loc, "Nikolai") || strings.Contains(loc, "Nikolaj") || strings.Contains(loc, "Nikolaus") || strings.Contains(loc, "Bellmansgatan") {
 		return "Bellmansgatan 13, 118 47 Stockholm"
 	}
