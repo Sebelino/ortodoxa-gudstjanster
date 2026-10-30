@@ -199,7 +199,7 @@ func (s *GomosScraper) processImages(ctx context.Context, images []imageWithData
 // ocrImage extracts schedule entries from an image, returning Swedish entries.
 // The raw OCR result is cached by image checksum under gomos-ocr/v3/ as a
 // vision.RawScheduleResult. Translation is always done via translateEntries,
-// which has its own cache (translate/v3/). This separation means translations
+// which has its own cache (translate/v5/). This separation means translations
 // can be re-run by clearing only the translate cache, without re-running OCR.
 func (s *GomosScraper) ocrImage(ctx context.Context, imageData []byte, sourceRef string) (*ocrCacheEntry, error) {
 	checksum := s.computeChecksum(imageData)
@@ -289,14 +289,15 @@ func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.Ra
 	}
 	hash := sha256.Sum256(entriesJSON)
 	hashStr := hex.EncodeToString(hash[:])
-	cacheKey := "translate/v3/" + hashStr
+	cacheKey := "translate/v5/" + hashStr
 
 	var cached []vision.ScheduleEntry
 	if s.store.GetJSON(cacheKey, &cached) {
 		log.Printf("Gomos: translate cache hit")
 		fixSundayOrdinals(cached)
-		fixArchbishopTitle(cached)
+		restoreDroppedLocations(entries, cached)
 		fixOfficialTerms(cached)
+		fixArchbishopTitle(cached)
 		return cached, nil
 	}
 
@@ -306,8 +307,9 @@ func (s *GomosScraper) translateEntries(ctx context.Context, entries []vision.Ra
 	}
 
 	fixSundayOrdinals(translated)
-	fixArchbishopTitle(translated)
+	restoreDroppedLocations(entries, translated)
 	fixOfficialTerms(translated)
+	fixArchbishopTitle(translated)
 
 	// Persist structured result
 	if data, merr := json.Marshal(translated); merr == nil {
@@ -408,10 +410,16 @@ var cleopasHonorificRe = regexp.MustCompile(`Hans (?:Eminens|Nåd|Högvördighet
 
 // fixArchbishopTitle corrects known mistransliterations and honorific-class errors for
 // Archbishop Cleopas and Bishop Bartolomaios — both known, fixed facts that the translation
-// model occasionally garbles.
+// model occasionally garbles. The official Swedish schedules omit "Ärkebiskop" for Cleopas
+// in a hierarchical liturgy (Greek "Αρχιερατική", Swedish "Ärkeprästerlig") and keep it
+// elsewhere, so run this after fixOfficialTerms has normalized the service name.
 func fixArchbishopTitle(entries []vision.ScheduleEntry) {
 	for i := range entries {
-		entries[i].ServiceName = cleopasHonorificRe.ReplaceAllString(entries[i].ServiceName, "Hans Eminens Ärkebiskop Cleopas av Sverige")
+		cleopas := "Hans Eminens Ärkebiskop Cleopas av Sverige"
+		if strings.HasPrefix(entries[i].ServiceName, "Ärkeprästerlig") {
+			cleopas = "Hans Eminens Cleopas av Sverige"
+		}
+		entries[i].ServiceName = cleopasHonorificRe.ReplaceAllString(entries[i].ServiceName, cleopas)
 		entries[i].ServiceName = bartholomaiosHonorificRe.ReplaceAllString(entries[i].ServiceName, "Hans Nåd Bartolomaios av Elaia")
 		entries[i].ServiceName = bartholomaiosArchimandriteRe.ReplaceAllString(entries[i].ServiceName, "Hans Nåd Bartolomaios av Elaia")
 	}
@@ -423,6 +431,21 @@ func fixArchbishopTitle(entries []vision.ScheduleEntry) {
 // against) get corrected, not any arbitrary name styled "av Elaia".
 var bartholomaiosHonorificRe = regexp.MustCompile(`Hans (?:Eminens|Nåd|Högvördighet)(?: Biskop| Ärkebiskop)? (?:Bartolomaios|Bartholomaios|Bartholomeus|Bartholomew) av Elaia`)
 
+// restoreDroppedLocations puts back locations the translation left out. The model
+// has dropped them from entries it otherwise translated correctly, which would
+// present an off-site service as one held at the parish, so the OCR'd value is kept.
+func restoreDroppedLocations(raw []vision.RawScheduleEntry, translated []vision.ScheduleEntry) {
+	if len(raw) != len(translated) {
+		return
+	}
+	for i := range raw {
+		if translated[i].Location == "" && raw[i].Location != "" && raw[i].Date == translated[i].Date {
+			translated[i].Location = raw[i].Location
+			translated[i].Abroad = raw[i].Abroad
+		}
+	}
+}
+
 // bartholomaiosArchimandriteRe matches the model reading the "Αρχ." of "Αρχ. Θεία
 // Λειτουργία" as Archimandrite. "Hans Nåd" is a bishop's honorific, so the combination
 // can only be this slip, and the parish's only bishop of that name is the one of Elaia.
@@ -431,14 +454,15 @@ var bartholomaiosArchimandriteRe = regexp.MustCompile(`Hans Nåd Arkimandrit Bar
 // officialTermFixes restores the wording of the parish's own Swedish schedules.
 // "Ärkeprästerlig" and "katekumener" are its terms, but OCR of the Swedish schedules
 // has garbled them ("Ärkepåstterlig", "katekumerer") and translations of the Greek
-// ones have rendered the former as "Hierarkisk" regardless of the prompt.
+// ones have rendered the former as "Hierarkisk" regardless of the prompt. The
+// "NOTERING:" label in front of off-site services is layout, not part of the name.
 var officialTermFixes = []struct {
 	re          *regexp.Regexp
 	replacement string
 }{
 	{regexp.MustCompile(`Ärkep\p{L}*terlig|Hierarkisk`), "Ärkeprästerlig"},
 	{regexp.MustCompile(`katekumerer`), "katekumener"},
-	{regexp.MustCompile(`för firandet av den helige Nikolaj i Stockholm till ära för martyrerna i Karelen`), "i Helige Nikolai församling i Stockholm, för högtiden för Karelens helgon"},
+	{regexp.MustCompile(`^NOTERING:\s*`), ""},
 }
 
 // fixOfficialTerms applies officialTermFixes to every service name.

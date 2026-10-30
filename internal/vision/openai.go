@@ -109,7 +109,7 @@ Return a JSON object with these fields:
   - time: in HH:MM format (24-hour). Convert "π.μ." to AM and "μ.μ." to PM times in 24h format (e.g., 6:00 μ.μ. = 18:00)
   - service_name: the name of the service in the ORIGINAL language
   - occasion: optional, any special occasion or holiday mentioned, in the ORIGINAL language
-  - location: optional. Set ONLY when the text explicitly states the event takes place at a different named venue (e.g. "NOTERA: ... i Aposteln Bartholomaios församling i Reykjavik"). Do NOT set this for phrases like "från [place]" which describe where a visiting person is from, not where the event is held.
+  - location: optional. Set ONLY when the text explicitly states the event takes place at a different named venue (e.g. "NOTERA: ... i Aposteln Bartholomaios församling i Reykjavik"). When the text gives a street address, usually in parentheses, include it exactly as written. Do NOT set this for phrases like "från [place]" which describe where a visiting person is from, not where the event is held.
   - abroad: optional boolean. Set to true when location is set and that location is clearly outside Sweden.
 
 Only include entries that have both a date/day and a time specified. Note that NOTERING/NOTE entries also have times — the time typically appears right-aligned at the end of the last line of wrapped text (e.g., after a closing parenthesis).
@@ -314,8 +314,10 @@ FIXED STRING OVERRIDE (highest priority — apply before any other rule below):
 
 Clergy titles — use these official Swedish forms:
 - Archbishop / Αρχιεπίσκοπος / Ärkebishop → "Hans Eminens Ärkebiskop [Name]"
-- Metropolitan / Μητροπολίτης (Σεβ. Μητροπολίτης) → "Hans Eminens Ärkebiskop [Name]" (the Swedish metropolis uses "Ärkebiskop" as the Swedish title for the Metropolitan)
+- Metropolitan of Sweden / Μητροπολίτης Σουηδίας (Σεβ. Μητροπολίτης) → "Hans Eminens Ärkebiskop [Name] av Sverige" (the Swedish metropolis uses "Ärkebiskop" as the Swedish title for its own Metropolitan). Exception: in a hierarchical liturgy ("Αρχιερατική Θεία Λειτουργία", "Αρχιερατικόν Συλλείτουργον") the official form is "Hans Eminens [Name] av Sverige", without "Ärkebiskop"
+- Visiting metropolitans of other sees keep their title: "Metropoliten [Name] av [See]", e.g. "Metropoliten Bartholomaios av Polyani och Kilkis"
 - Bishop / Επίσκοπος (Θεοφιλ. Επίσκοπος) → "Hans Nåd [Name]"
+- "Θεοφιλ. Επισκόπου Ελαίας κ. Βαρθολομαίου" → "Hans Nåd Bartolomaios av Elaia", including when the see is misread by OCR (e.g. "Ελαιώκ"). He is a bishop, never an archimandrite
 - Archimandrite / Αρχιμανδρίτης → "Arkimandrit [Name]" (no honorific prefix needed)
 - NEVER use "ledd av" or "metropolitiska" — these are wrong
 - Always use "med" (not "ledd av") when a clergyman presides: "med Hans Eminens Ärkebiskop X"
@@ -338,8 +340,12 @@ Capitalization:
 
 Service name examples:
 - "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" / abbreviated "Αρχ. Θεία Λειτουργία" → "Ärkeprästerlig Gudomlig Liturgi" (the parish's official Swedish term, NEVER "Hierarkisk"; presider goes in the name field after a comma: "Ärkeprästerlig Gudomlig Liturgi, med Hans Nåd Bartolomaios av Elaia"). The abbreviation "Αρχ." here is short for "Αρχιερατική" (Hierarchical) — do NOT confuse it with "Αρχιμανδρίτου" (Archimandrite); never prefix the service name itself with "Arkimandrit"
-- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Αρχιερατικό Συλλείτουργο" / "Hierarchical Synlitourgon" → "Ärkeprästerlig Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
+- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Αρχιερατικό Συλλείτουργο" / "Αρχιερατικόν Συλλείτουργιον" / "Hierarchical Synlitourgon" → "Ärkeprästerlig Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Cleopas av Sverige")
 - "Divine Liturgy" / "Θεία Λειτουργία" → "Gudomlig Liturgi"
+- A participle naming the presider becomes plain "med", whichever one is used: "χοροστατούντος", "ιερουργούντος", "προεξάρχοντος", "υπό του". Example: "Θεία Λειτουργία, χοροστατούντος του Σεβ. Μητροπολίτου Σουηδίας κ. Κλεόπα" → "Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige"
+- Language of a service: "στα Σουηδικά" → "på svenska", "στην Αγγλική" → "på engelska"
+- Services at another venue name the place after the presider, with "i": "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Cleopas av Sverige i Göteborg". "η Φιλλανδική Ενορία Αγίου Νικολάου Στοκχόλμης" → "den finska församlingen Helige Nikolai". Monasteries: "i Helige Nikolais kloster i Rättvik, Dalarna". Leave out addresses here; they belong in the location field
+- "Doxology" / "Δοξολογία" → "Doxologi": "Doxologi för Greklands nationalfirande"
 - "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
 - "Sermon" / "Homily" / "Κήρυγμα" / "Ομιλία" / "Divine Proclamation" / "Gudomligt förkunnande" → "Predikan" (always use "Predikan", never "Gudomligt förkunnande"; include the preacher: "Predikan av Arkimandrit Bartholomaios")
 - "Memorial service for founders" / "Κτητορικόν Μνημόσυνον" → "Stiftarnas minnesgudstjänst"
@@ -361,17 +367,16 @@ Service name examples:
 - "Vespers" / "Εσπερινός" → "Vesper"
 - "Hours" / "Ώρες" → "Tidebönerna"
 - Do NOT transliterate unknown Greek liturgical terms — map them to the nearest known Swedish equivalent above
+- NEVER leave Greek words transliterated into Latin letters, in any field. "Ενορία" → "församling", "Ναός" → "kyrka", "Ι. Μητροπολιτικός Ναός" → "katedralen". Example: "Ενορία Αγίου Νικολάου Στοκχόλμης" → "Helige Nikolai församling i Stockholm", never "Enoariá"
+- "στην πανηγυρίζουσα Ενορία [Name]" (the parish celebrating its feast) → "i [Name] församling". Leave out the phrase about the feast the parish is celebrating, as the official schedules do: "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Cleopas av Sverige i Helige Dimitrios och Nestors församling i Örebro"
 
 Greek saint titles and occasions:
 - Female great martyrs: "ΑΓΙΑΣ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" → "Heliga stormartyren [Name]" (NEVER "storsjälen" — that is not a recognized Orthodox Swedish term)
 - Male great martyrs: "ΑΓΙΟΥ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" / "Holy Great Martyr [Name]" → "Helige stormartyren [Name]"
   Abbreviated "ΑΓ." is gender-ambiguous by itself; resolve it from the name. Exact example: "ΑΓ. ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ ΦΑΝΟΥΡΙΟΥ" → "Helige stormartyren Fanourios" (Fanourios is male — output exactly this string, no brackets, no "heliga")
-- Sunday ordinals in the post-Pentecost Matthew/Luke lectionary cycle: Greek ordinal + evangelist name → "[Swedish ordinal] söndagen i [evangelist]"
-  Greek alphabetic ordinals: Α΄=1(Första), Β΄=2(Andra), Γ΄=3(Tredje), Δ΄=4(Fjärde), Ε΄=5(Femte), ΣΤ΄=6(Sjätte), Ζ΄=7(Sjunde), Η΄=8(Åttonde), Θ΄=9(Nionde), Ι΄=10(Tionde), ΙΑ΄=11(Elfte), ΙΒ΄=12(Tolfte), ΙΓ΄=13(Trettonde), ΙΔ΄=14(Fjortonde), ΙΕ΄=15(Femtonde), ΙΣΤ΄=16(Sextonde), ΙΖ΄=17(Sjuttonde)
-  Examples: "Β΄ ΜΑΤΘΑΙΟΥ" → "Andra söndagen i Matteus", "Θ΄ ΜΑΤΘΑΙΟΥ" → "Nionde söndagen i Matteus", "ΙΑ΄ ΜΑΤΘΑΙΟΥ" → "Elfte söndagen i Matteus", "ΙΓ΄ ΜΑΤΘΑΙΟΥ" → "Trettonde söndagen i Matteus"
-  Similarly: ΛΟΥΚΑ → "Lukas", ΜΑΡΚΟΥ → "Markus", ΙΩΑΝΝΟΥ → "Johannes"
+- Sunday ordinals in the post-Pentecost Matthew/Luke lectionary cycle (e.g. "Β΄ ΛΟΥΚΑ", "ΙΑ΄ ΜΑΤΘΑΙΟΥ", also numbered Sundays of Mark or John): leave the occasion empty. The parish's official Swedish schedules do not print these. All other feasts and saints are still translated.
 - "Σύναξις" (Synaxis) → "synaxis" (NOT "samling" or "gathering"): "Σύναξις των Αγίων Δώδεκα Αποστόλων" → "De tolv apostlarnas synaxis"
-- Feasts of the Theotokos use "Gudaföderskan", not "Guds moder". Official Swedish feast names used by the parish: "Γενέσιον της Θεοτόκου" → "Gudaföderskans födelse"; "Ύψωσις του Τιμίου Σταυρού" → "Upphöjandet av Korset"; "Εισόδια της Θεοτόκου" → "Gudaföderskans införande i templet"; "Μετάστασις Ιωάννου του Θεολόγου" → "Johannes Teologens insomnande"
+- Feasts of the Theotokos use "Gudaföderskan", not "Guds moder". Official Swedish feast names used by the parish: "Γενέσιον της Θεοτόκου" → "Gudaföderskans födelse"; "Ύψωσις του Τιμίου Σταυρού" → "Upphöjandet av Korset"; "Εισόδια της Θεοτόκου" → "Gudaföderskans införande i templet"; "Μετάστασις Ιωάννου του Θεολόγου" → "Johannes Teologens insomnande"; "Αγία Σκέπη της Θεοτόκου" → "Guds moders beskydd"; "Σύναξις του Αρχαγγέλου Μιχαήλ" / "Αρχαγγέλων" → "Ärkeängel Mikael och de övriga okroppsliga makterna"; "Αποστόλου Ανδρέου" → "Aposteln Andreas"; "Νεκταρίου Αιγίνης" → "Helige Nektarios av Aegina"; "Αγίου Δημητρίου" → "Helige Dimitrios" (the great martyr is called just this; do NOT add "av Myra" or translate "Μυροβλύτου")
 - "Γενέθλιον του Προδρόμου" / "Nativity of the Forerunner" → "Johannes Döparens födelse" (always include "Johannes")
 - "Μεταμόρφωσις (του Σωτήρος)" / "Transfiguration (of the Savior)" → "Kristi Förklaring" (NEVER "Förvandling" — that is not the established Swedish Orthodox term; the Russian parish in Stockholm is itself named after this feast, "Kristi Förklarings Ortodoxa Församling")
   Example: "Η ΜΕΤΑΜΟΡΦΩΣΙΣ ΤΟΥ ΣΩΤΗΡΟΣ ΧΡΙΣΤΟΥ" → "Kristi Förklaring"; "Εσπερινός της Μεταμορφώσεως" → "Vesper för Kristi Förklaring"
@@ -390,7 +395,7 @@ Return a JSON array of services with these fields:
 - time: in HH:MM format (24-hour, keep the same times)
 - service_name: the name of the service translated to Swedish following all rules above
 - occasion: optional, any special occasion or holiday, translated to Swedish
-- location: optional. If present in the input, carry it through verbatim — do not translate or modify place names or church names.
+- location: optional. If it contains a street address, return just that address exactly as written, e.g. "Thor Olsens gate 9, 0177 Oslo". Otherwise translate any Greek words to Swedish and keep names already written in Latin letters unchanged.
 - abroad: optional boolean. If present in the input, carry it through unchanged.
 
 Return ONLY the JSON array, no other text.`, today, string(entriesJSON))

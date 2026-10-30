@@ -210,6 +210,16 @@ func TestFixArchbishopTitle(t *testing.T) {
 			"Gudomlig Liturgi, med Hans Nåd Bartolomaios av Elaia",
 		},
 		{
+			"hierarchical liturgy omits Ärkebiskop",
+			"Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige",
+			"Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Cleopas av Sverige",
+		},
+		{
+			"catechumen lecture keeps Ärkebiskop",
+			"Föreläsning för katekumener, med Hans Eminens Cleopas av Sverige på engelska",
+			"Föreläsning för katekumener, med Hans Eminens Ärkebiskop Cleopas av Sverige på engelska",
+		},
+		{
 			"real bug: Αρχ. read as Archimandrite",
 			"Ärkeprästerlig Gudomlig Liturgi, med Hans Nåd Arkimandrit Bartholomaios",
 			"Ärkeprästerlig Gudomlig Liturgi, med Hans Nåd Bartolomaios av Elaia",
@@ -250,10 +260,7 @@ func TestFixOfficialTerms(t *testing.T) {
 		},
 		{"Hierarkisk Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas", "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas"},
 		{"Föreläsning för katekumerer, med Hans Eminens Cleopas av Sverige på engelska", "Föreläsning för katekumener, med Hans Eminens Cleopas av Sverige på engelska"},
-		{
-			"Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige, för firandet av den helige Nikolaj i Stockholm till ära för martyrerna i Karelen",
-			"Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige, i Helige Nikolai församling i Stockholm, för högtiden för Karelens helgon",
-		},
+		{"NOTERING: Ärkeprästerlig Gudomlig Liturgi", "Ärkeprästerlig Gudomlig Liturgi"},
 		{"Ärkeprästerlig Gudomlig Liturgi", "Ärkeprästerlig Gudomlig Liturgi"},
 		{"Gudomlig Liturgi", "Gudomlig Liturgi"},
 	}
@@ -290,5 +297,35 @@ func TestConvertToServicesOffsiteLocations(t *testing.T) {
 	}
 	if got := services[1].ServiceName; got != "At home" {
 		t.Errorf("second service = %q, want the home service", got)
+	}
+}
+
+func TestRestoreDroppedLocations(t *testing.T) {
+	raw := []vision.RawScheduleEntry{
+		{Date: "2026-10-24", Location: "Gode Herdens Kapell, Björkrisvägen 17, 70234 Örebro"},
+		{Date: "2026-10-31", Location: "Ενορία Αγίου Νικολάου Στοκχόλμης"},
+		{Date: "2026-11-01"},
+	}
+	translated := []vision.ScheduleEntry{
+		{Date: "2026-10-24"},
+		{Date: "2026-10-31", Location: "Helige Nikolai församling i Stockholm"},
+		{Date: "2026-11-01"},
+	}
+	restoreDroppedLocations(raw, translated)
+
+	want := []string{raw[0].Location, "Helige Nikolai församling i Stockholm", ""}
+	for i, w := range want {
+		if translated[i].Location != w {
+			t.Errorf("entry %d location = %q, want %q", i, translated[i].Location, w)
+		}
+	}
+}
+
+func TestRestoreDroppedLocationsIgnoresMisalignedEntries(t *testing.T) {
+	raw := []vision.RawScheduleEntry{{Date: "2026-10-24", Location: "Örebro"}}
+	translated := []vision.ScheduleEntry{{Date: "2026-10-25"}}
+	restoreDroppedLocations(raw, translated)
+	if translated[0].Location != "" {
+		t.Errorf("location copied onto another date: %q", translated[0].Location)
 	}
 }
