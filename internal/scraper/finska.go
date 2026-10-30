@@ -131,7 +131,7 @@ func (s *FinskaScraper) Fetch(ctx context.Context) ([]model.ChurchService, error
 // Archbishop celebrates a joint liturgy at another parish) sometimes name a
 // different parish by description rather than address.
 func normalizeKnownParishLocation(loc string) string {
-	if strings.Contains(loc, "Nikolai") || strings.Contains(loc, "Nikolaus") || strings.Contains(loc, "Bellmansgatan") {
+	if strings.Contains(loc, "Nikolai") || strings.Contains(loc, "Nikolaj") || strings.Contains(loc, "Nikolaus") || strings.Contains(loc, "Bellmansgatan") {
 		return "Bellmansgatan 13, 118 47 Stockholm"
 	}
 	return loc

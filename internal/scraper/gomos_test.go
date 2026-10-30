@@ -169,9 +169,19 @@ func TestFixArchbishopTitle(t *testing.T) {
 			"Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige",
 		},
 		{
-			"Bartholomaios Latinized form",
+			"Bartolomaios Latinized form",
 			"Gudomlig Liturgi, med Hans Nåd Bartholomew av Elaia",
+			"Gudomlig Liturgi, med Hans Nåd Bartolomaios av Elaia",
+		},
+		{
+			"older official spelling with h",
 			"Gudomlig Liturgi, med Hans Nåd Bartholomaios av Elaia",
+			"Gudomlig Liturgi, med Hans Nåd Bartolomaios av Elaia",
+		},
+		{
+			"real bug: Αρχ. read as Archimandrite",
+			"Ärkeprästerlig Gudomlig Liturgi, med Hans Nåd Arkimandrit Bartholomaios",
+			"Ärkeprästerlig Gudomlig Liturgi, med Hans Nåd Bartolomaios av Elaia",
 		},
 		{
 			"unrelated hierarch styled av Sverige is not overwritten",
@@ -198,5 +208,36 @@ func TestFixArchbishopTitle(t *testing.T) {
 				t.Errorf("ServiceName = %q, want %q", entries[0].ServiceName, tt.want)
 			}
 		})
+	}
+}
+
+func TestFixOfficialTerms(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{
+			"Ärkepåstterlig Gudomlig Liturgi, Metropoliten Bartholomaios av Polyani och Kilkis",
+			"Ärkeprästerlig Gudomlig Liturgi, Metropoliten Bartholomaios av Polyani och Kilkis",
+		},
+		{"Hierarkisk Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas", "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas"},
+		{"Föreläsning för katekumerer, med Hans Eminens Cleopas av Sverige på engelska", "Föreläsning för katekumener, med Hans Eminens Cleopas av Sverige på engelska"},
+		{
+			"Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige, för firandet av den helige Nikolaj i Stockholm till ära för martyrerna i Karelen",
+			"Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige, i Helige Nikolai församling i Stockholm, för högtiden för Karelens helgon",
+		},
+		{"Ärkeprästerlig Gudomlig Liturgi", "Ärkeprästerlig Gudomlig Liturgi"},
+		{"Gudomlig Liturgi", "Gudomlig Liturgi"},
+	}
+	for _, tt := range tests {
+		entries := []vision.ScheduleEntry{{ServiceName: tt.in}}
+		fixOfficialTerms(entries)
+		if entries[0].ServiceName != tt.want {
+			t.Errorf("fixOfficialTerms(%q) = %q, want %q", tt.in, entries[0].ServiceName, tt.want)
+		}
+	}
+}
+
+func TestNormalizeKnownParishLocationNikolaj(t *testing.T) {
+	got := normalizeKnownParishLocation("Församlingen av den helige Nikolaj i Stockholm")
+	if want := "Bellmansgatan 13, 118 47 Stockholm"; got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

@@ -308,7 +308,7 @@ Today is %s.
 TRANSLATION RULES:
 
 FIXED STRING OVERRIDE (highest priority — apply before any other rule below):
-- Whenever an input occasion contains "ΦΑΝΟΥΡΙΟΥ" (in any form, e.g. "ΑΓ. ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ ΦΑΝΟΥΡΙΟΥ"), output the occasion as EXACTLY the literal string: Den helige storemartyr Fanourios
+- Whenever an input occasion contains "ΦΑΝΟΥΡΙΟΥ" (in any form, e.g. "ΑΓ. ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ ΦΑΝΟΥΡΙΟΥ"), output the occasion as EXACTLY the literal string: Helige stormartyren Fanourios
   Copy that string character for character. Saint Fanourios is historically and unambiguously male. Do not reason about gender from the abbreviation "ΑΓ." or from anything else — this override wins regardless. Do not output "heliga", "storemartyrinna", "storemartyrinnan", "Phanourios", "Frånuris", or brackets around the name.
 - Whenever you write the Archbishop's name, spell it EXACTLY "Cleopas" — with a C, never "Kleopas" with a K. This is the established spelling used throughout this site, overriding the K-transliteration you would otherwise default to for a Greek name like this (compare Konstantin, Kyrillos).
 
@@ -322,6 +322,7 @@ Clergy titles — use these official Swedish forms:
 
 Name transliteration:
 - Preserve Greek name forms: Bartholomaios (not Bartholomeus/Bartholomew), Cleopas, Makarios, etc.
+- The Bishop of Elaia is spelled "Bartolomaios", without an h: "Hans Nåd Bartolomaios av Elaia" (the parish's current official spelling)
 - Do not Latinize or Anglicize Greek names
 
 Swedish compound words:
@@ -336,8 +337,8 @@ Capitalization:
 - "Guds moder" — both words capitalized (it is a proper title)
 
 Service name examples:
-- "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" / abbreviated "Αρχ. Θεία Λειτουργία" → "Gudomlig Liturgi" (presider goes in the name field after a comma: "Gudomlig Liturgi, med Hans Nåd Bartholomaios av Elaia"). The abbreviation "Αρχ." here is short for "Αρχιερατική" (Hierarchical) — do NOT confuse it with "Αρχιμανδρίτου" (Archimandrite); never prefix the service name itself with "Arkimandrit"
-- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Hierarchical Synlitourgon" → "Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
+- "Hierarchical Divine Liturgy" / "Αρχιερατική Θεία Λειτουργία" / abbreviated "Αρχ. Θεία Λειτουργία" → "Ärkeprästerlig Gudomlig Liturgi" (the parish's official Swedish term, NEVER "Hierarkisk"; presider goes in the name field after a comma: "Ärkeprästerlig Gudomlig Liturgi, med Hans Nåd Bartolomaios av Elaia"). The abbreviation "Αρχ." here is short for "Αρχιερατική" (Hierarchical) — do NOT confuse it with "Αρχιμανδρίτου" (Archimandrite); never prefix the service name itself with "Arkimandrit"
+- "Hierarchical Concelebration" / "Αρχιερατικόν Συλλείτουργον" / "Αρχιερατικό Συλλείτουργο" / "Hierarchical Synlitourgon" → "Ärkeprästerlig Gudomlig Liturgi" (a hierarchical concelebration IS the Divine Liturgy; include the presider: "Ärkeprästerlig Gudomlig Liturgi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
 - "Divine Liturgy" / "Θεία Λειτουργία" → "Gudomlig Liturgi"
 - "Chorostasia" / "Χοροστασία" / "Αρχιερατική Χοροστασία" → "Korostasi" (the bishop presides from the choir throne; include the presider: "Korostasi, med Hans Eminens Ärkebiskop Cleopas av Sverige")
 - "Sermon" / "Homily" / "Κήρυγμα" / "Ομιλία" / "Divine Proclamation" / "Gudomligt förkunnande" → "Predikan" (always use "Predikan", never "Gudomligt förkunnande"; include the preacher: "Predikan av Arkimandrit Bartholomaios")
@@ -354,26 +355,29 @@ Service name examples:
 - "Service of the Holy Passion" → "De tolv evangelieläsningarna"
 - "Royal Hours" → "Kungliga tidebönerna"
 - "Royal Hours and Vespers of the Apokathelosis (Descent from the Cross)" → "Kungliga tidebönerna och vesper för avtagandet från korset"
+- "Catechumen seminar" / "Σεμινάριο Κατηχουμένων" → "Föreläsning för katekumener"; "στην Αγγλική" (in English) → "på engelska": "Föreläsning för katekumener, med Hans Eminens Ärkebiskop Cleopas av Sverige på engelska"
+- "Blessing of the waters" / "Αγιασμός" → "Vattenvälsignelse"
 - "Orthros" / "Όρθρος" → "Morgongudstjänst"
 - "Vespers" / "Εσπερινός" → "Vesper"
 - "Hours" / "Ώρες" → "Tidebönerna"
 - Do NOT transliterate unknown Greek liturgical terms — map them to the nearest known Swedish equivalent above
 
 Greek saint titles and occasions:
-- Female great martyrs: "ΑΓΙΑΣ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" → "Den heliga storemartyrinna [Name]" (NEVER "storsjälen" — that is not a recognized Orthodox Swedish term)
-- Male great martyrs: "ΑΓΙΟΥ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" / "Holy Great Martyr [Name]" → "Den helige storemartyr [Name]"
-  Abbreviated "ΑΓ." is gender-ambiguous by itself; resolve it from the name. Exact example: "ΑΓ. ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ ΦΑΝΟΥΡΙΟΥ" → "Den helige storemartyr Fanourios" (Fanourios is male — output exactly this string, no brackets, no "heliga")
+- Female great martyrs: "ΑΓΙΑΣ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" → "Heliga stormartyren [Name]" (NEVER "storsjälen" — that is not a recognized Orthodox Swedish term)
+- Male great martyrs: "ΑΓΙΟΥ ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ [Name]" / "Holy Great Martyr [Name]" → "Helige stormartyren [Name]"
+  Abbreviated "ΑΓ." is gender-ambiguous by itself; resolve it from the name. Exact example: "ΑΓ. ΜΕΓΑΛΟΜΑΡΤΥΡΟΣ ΦΑΝΟΥΡΙΟΥ" → "Helige stormartyren Fanourios" (Fanourios is male — output exactly this string, no brackets, no "heliga")
 - Sunday ordinals in the post-Pentecost Matthew/Luke lectionary cycle: Greek ordinal + evangelist name → "[Swedish ordinal] söndagen i [evangelist]"
   Greek alphabetic ordinals: Α΄=1(Första), Β΄=2(Andra), Γ΄=3(Tredje), Δ΄=4(Fjärde), Ε΄=5(Femte), ΣΤ΄=6(Sjätte), Ζ΄=7(Sjunde), Η΄=8(Åttonde), Θ΄=9(Nionde), Ι΄=10(Tionde), ΙΑ΄=11(Elfte), ΙΒ΄=12(Tolfte), ΙΓ΄=13(Trettonde), ΙΔ΄=14(Fjortonde), ΙΕ΄=15(Femtonde), ΙΣΤ΄=16(Sextonde), ΙΖ΄=17(Sjuttonde)
   Examples: "Β΄ ΜΑΤΘΑΙΟΥ" → "Andra söndagen i Matteus", "Θ΄ ΜΑΤΘΑΙΟΥ" → "Nionde söndagen i Matteus", "ΙΑ΄ ΜΑΤΘΑΙΟΥ" → "Elfte söndagen i Matteus", "ΙΓ΄ ΜΑΤΘΑΙΟΥ" → "Trettonde söndagen i Matteus"
   Similarly: ΛΟΥΚΑ → "Lukas", ΜΑΡΚΟΥ → "Markus", ΙΩΑΝΝΟΥ → "Johannes"
 - "Σύναξις" (Synaxis) → "synaxis" (NOT "samling" or "gathering"): "Σύναξις των Αγίων Δώδεκα Αποστόλων" → "De tolv apostlarnas synaxis"
+- Feasts of the Theotokos use "Gudaföderskan", not "Guds moder". Official Swedish feast names used by the parish: "Γενέσιον της Θεοτόκου" → "Gudaföderskans födelse"; "Ύψωσις του Τιμίου Σταυρού" → "Upphöjandet av Korset"; "Εισόδια της Θεοτόκου" → "Gudaföderskans införande i templet"; "Μετάστασις Ιωάννου του Θεολόγου" → "Johannes Teologens insomnande"
 - "Γενέθλιον του Προδρόμου" / "Nativity of the Forerunner" → "Johannes Döparens födelse" (always include "Johannes")
 - "Μεταμόρφωσις (του Σωτήρος)" / "Transfiguration (of the Savior)" → "Kristi Förklaring" (NEVER "Förvandling" — that is not the established Swedish Orthodox term; the Russian parish in Stockholm is itself named after this feast, "Kristi Förklarings Ortodoxa Församling")
   Example: "Η ΜΕΤΑΜΟΡΦΩΣΙΣ ΤΟΥ ΣΩΤΗΡΟΣ ΧΡΙΣΤΟΥ" → "Kristi Förklaring"; "Εσπερινός της Μεταμορφώσεως" → "Vesper för Kristi Förklaring"
 - "Αποτομή (της Τιμίας Κεφαλής) του Προδρόμου/Ιωάννου Προδρόμου" / "Beheading of the Forerunner" → "Johannes Döparens halshuggning" (do NOT translate word-for-word as "avskärande av huvudet")
 - "Απόδοσις (της εορτής) [feast]" / "Leave-taking/Apodosis (of the feast) of [feast]" → "Avslutningen av högtiden [feast]" (do NOT translate literally as "återgivande"/"återinförsel" — those mean "restoration"/"reintroduction" and are wrong here)
-  Example: "ΑΠΟΔΟΣΙΣ ΤΗΣ ΕΟΡΤΗΣ ΤΗΣ ΚΟΙΜΗΣΕΩΣ ΤΗΣ Υ. ΘΕΟΤΟΚΟΥ" → "Avslutningen av högtiden för Guds moders insomnande"
+  Example: "ΑΠΟΔΟΣΙΣ ΤΗΣ ΕΟΡΤΗΣ ΤΗΣ ΚΟΙΜΗΣΕΩΣ ΤΗΣ Υ. ΘΕΟΤΟΚΟΥ" → "Avslutningen av högtiden för Gudaföderskans insomnande"
 - Greek saint names appear in genitive case — always convert to nominative form: ΜΑΡΙΝΗΣ → "Marina" (NOT "Marinis"), ΠΑΡΑΣΚΕΥΗΣ → "Paraskevi", ΓΕΩΡΓΙΟΥ → "Georgios", ΔΗΜΗΤΡΙΟΥ → "Dimitrios", etc.
 - Ecumenical councils: "ΑΓΙΩΝ ΠΑΤΕΡΩΝ [ordinal] ΟΙΚΟΥΜΕΝΙΚΗΣ ΣΥΝΟΔΟΥ" → "De heliga fäderna vid det [ordinal] ekumeniska rådet" (use "rådet" or "konciliet", NEVER "fädernas")
 
