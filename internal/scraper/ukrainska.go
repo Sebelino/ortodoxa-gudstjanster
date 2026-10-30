@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -241,6 +242,15 @@ func rawToScheduleEntries(entries []vision.RawScheduleEntry) []vision.ScheduleEn
 	return result
 }
 
+// ukrainskaTownPrefixRe matches the Ukrainian "у м." ("in the town of") in front
+// of a place name, as written or transliterated.
+var ukrainskaTownPrefixRe = regexp.MustCompile(`^(?:[uvув]\s+)?[mм]\.\s*`)
+
+// cleanUkrainskaLocation reduces "u m.Södertälje." to "Södertälje".
+func cleanUkrainskaLocation(location string) string {
+	return strings.TrimRight(ukrainskaTownPrefixRe.ReplaceAllString(strings.TrimSpace(location), ""), ". ")
+}
+
 func (s *UkrainskaScraper) convertToServices(entries []vision.ScheduleEntry, sourceURL string) []model.ChurchService {
 	var services []model.ChurchService
 	for _, entry := range entries {
@@ -249,7 +259,7 @@ func (s *UkrainskaScraper) convertToServices(entries []vision.ScheduleEntry, sou
 			if entry.Abroad {
 				continue
 			}
-			location = entry.Location
+			location = cleanUkrainskaLocation(entry.Location)
 		}
 		t := entry.Time
 
