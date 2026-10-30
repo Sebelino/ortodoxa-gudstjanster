@@ -131,6 +131,37 @@ func TestFixSundayOrdinalsIndependentEvangelistGroups(t *testing.T) {
 	}
 }
 
+// The real October 2026 schedule prints Β', Δ' and ΣΤ' Λουκά, with the feast of St. Luke
+// in between. The printed numbers skip ahead of the calendar and must be kept.
+func TestFixSundayOrdinalsKeepsLectionaryJump(t *testing.T) {
+	entries := []vision.ScheduleEntry{
+		{Date: "2026-10-04", Occasion: "Andra söndagen i Lukas"},
+		{Date: "2026-10-11", Occasion: "Fjärde söndagen i Lukas"},
+		{Date: "2026-10-18", Occasion: "Lukas, evangelisten"},
+		{Date: "2026-10-25", Occasion: "Sjätte söndagen i Lukas"},
+	}
+	want := []string{"Andra söndagen i Lukas", "Fjärde söndagen i Lukas", "Lukas, evangelisten", "Sjätte söndagen i Lukas"}
+	fixSundayOrdinals(entries)
+	for i, w := range want {
+		if entries[i].Occasion != w {
+			t.Errorf("entry %d (%s) occasion = %q, want %q", i, entries[i].Date, entries[i].Occasion, w)
+		}
+	}
+}
+
+// A misread after the jump is still corrected, counting from the jumped number.
+func TestFixSundayOrdinalsCorrectsMisreadAfterJump(t *testing.T) {
+	entries := []vision.ScheduleEntry{
+		{Date: "2026-10-04", Occasion: "Andra söndagen i Lukas"},
+		{Date: "2026-10-11", Occasion: "Fjärde söndagen i Lukas"},
+		{Date: "2026-10-25", Occasion: "Femte söndagen i Lukas"},
+	}
+	fixSundayOrdinals(entries)
+	if got, want := entries[2].Occasion, "Sjätte söndagen i Lukas"; got != want {
+		t.Errorf("occasion = %q, want %q", got, want)
+	}
+}
+
 func TestFixSundayOrdinalsLeavesNonOrdinalOccasionsUntouched(t *testing.T) {
 	entries := []vision.ScheduleEntry{
 		{Date: "2026-08-27", Occasion: "Den helige storemartyr Fanourios"},

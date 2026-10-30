@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -346,19 +347,21 @@ func sundayOrdinalWord(n int) string {
 	return swedishSundayOrdinals[n-1]
 }
 
-// fixSundayOrdinals recomputes "[ordinal] söndagen i [evangelist]" occasions using
-// the earliest dated entry in each evangelist group as a trusted anchor, and calendar
-// week arithmetic (always exact, since consecutive Sundays are exactly 7 days apart)
-// for the rest. OCR/translation occasionally misreads Greek compound numerals (e.g.
-// ΙΓ' as ΙΒ'), which trusting the AI's own numeral transcription can't reliably catch —
-// dates are read far more reliably than these fine numeral suffixes, so we prefer them.
+// fixSundayOrdinals corrects "[ordinal] söndagen i [evangelist]" occasions that fall
+// behind the calendar. Walking each evangelist group in date order, a Sunday can never
+// have a lower number than the previous one plus the weeks between them, so a lower
+// number must be a misread: OCR/translation occasionally garbles Greek compound
+// numerals (e.g. ΙΓ' as ΙΒ'), and dates are read far more reliably than these fine
+// numeral suffixes. A higher number is kept, because the lectionary does skip ahead:
+// October 2026 goes from Β' Λουκά directly to Δ' Λουκά in a single week.
 func fixSundayOrdinals(entries []vision.ScheduleEntry) {
-	type anchor struct {
-		date time.Time
-		num  int
+	type sunday struct {
+		index int
+		date  time.Time
+		num   int
 	}
-	anchors := make(map[string]anchor)
-	for _, e := range entries {
+	groups := make(map[string][]sunday)
+	for i, e := range entries {
 		m := sundayOrdinalRe.FindStringSubmatch(e.Occasion)
 		if m == nil {
 			continue
@@ -371,32 +374,25 @@ func fixSundayOrdinals(entries []vision.ScheduleEntry) {
 		if err != nil {
 			continue
 		}
-		evangelist := m[2]
-		if a, ok := anchors[evangelist]; !ok || d.Before(a.date) {
-			anchors[evangelist] = anchor{date: d, num: num}
-		}
+		groups[m[2]] = append(groups[m[2]], sunday{index: i, date: d, num: num})
 	}
 
-	for i := range entries {
-		m := sundayOrdinalRe.FindStringSubmatch(entries[i].Occasion)
-		if m == nil {
-			continue
-		}
-		evangelist := m[2]
-		a := anchors[evangelist]
-		d, err := time.Parse("2006-01-02", entries[i].Date)
-		if err != nil {
-			continue
-		}
-		weeksApart := int(d.Sub(a.date).Hours()) / (24 * 7)
-		word := sundayOrdinalWord(a.num + weeksApart)
-		if word == "" {
-			continue
-		}
-		corrected := word + " söndagen i " + evangelist
-		if corrected != entries[i].Occasion {
-			log.Printf("Gomos: correcting Sunday ordinal %q -> %q for %s", entries[i].Occasion, corrected, entries[i].Date)
-			entries[i].Occasion = corrected
+	for evangelist, sundays := range groups {
+		sort.SliceStable(sundays, func(i, j int) bool { return sundays[i].date.Before(sundays[j].date) })
+		for i := 1; i < len(sundays); i++ {
+			prev, cur := sundays[i-1], &sundays[i]
+			earliest := prev.num + int(cur.date.Sub(prev.date).Hours())/(24*7)
+			if cur.num >= earliest {
+				continue
+			}
+			word := sundayOrdinalWord(earliest)
+			if word == "" {
+				continue
+			}
+			cur.num = earliest
+			corrected := word + " söndagen i " + evangelist
+			log.Printf("Gomos: correcting Sunday ordinal %q -> %q for %s", entries[cur.index].Occasion, corrected, entries[cur.index].Date)
+			entries[cur.index].Occasion = corrected
 		}
 	}
 }
